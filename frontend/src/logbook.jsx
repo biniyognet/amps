@@ -780,7 +780,8 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [type, setType] = useState('general')
   const [subtype, setSubtype] = useState('Monthly')
   const [system, setSystem] = useState('')         // coarse rollup (short list)
-  const [category, setCategory] = useState('')     // asset class under the system
+  const [category, setCategory] = useState('')     // asset class (kept, inferred from asset; no longer a form field)
+  const [station, setStation] = useState('')       // station (asset.location) — narrows the asset picker
   const [tim, setTim] = useState('')               // optional HH:MM
   const [faultType, setFaultType] = useState('')   // failures: fault class
   const [team, setTeam] = useState('')             // crew that did the work
@@ -813,6 +814,13 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     fetch(`${API}/api/assets`).then((r) => (r.ok ? r.json() : []))
       .then(setAssets).catch(() => {})
   }, [])
+  // opened from an asset page (?asset=…): once the register loads, pre-fill the
+  // System + Station (and class) from that asset so the add form is ready.
+  useEffect(() => {
+    if (!initialAsset || !assets.length) return
+    const hit = assets.find((a) => a.code === initialAsset)
+    if (hit) { setSystem(hit.system || ''); setStation(hit.location || ''); setCategory(hit.asset_class || '') }
+  }, [initialAsset, assets])
   // distinct asset classes, sorted — the entry-form's class options (unfiltered)
   const classes = [...new Set(assets.map((a) => a.asset_class).filter(Boolean))].sort()
   const depots = [...new Set(assets.map((a) => a.depot).filter(Boolean))].sort()
@@ -828,6 +836,16 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   // picker only ever shows what belongs to the chosen system
   const systems = [...new Set(assets.map((a) => a.system).filter(Boolean))].sort()
   const locations = [...new Set(assets.map((a) => a.location).filter(Boolean))].sort()
+  // add-form pickers: stations under the chosen system, and the asset list shrunk
+  // to the chosen system + station so "Equipment" only offers what fits.
+  const stationsForSystem = (system
+    ? [...new Set(assets.filter((a) => a.system === system).map((a) => a.location).filter(Boolean))]
+    : locations).sort()
+  const pickerAssets = assets.filter((a) => (!system || a.system === system) && (!station || a.location === station))
+  // toolbar: stations under the chosen filter-system (cascading)
+  const filterStations = [...new Set([...assets
+    .filter((a) => !fSystem || a.system === fSystem).map((a) => a.location).filter(Boolean),
+    ...(fLocation ? [fLocation] : [])])].sort()
   const classesForSystem = system
     ? [...new Set(assets.filter((a) => a.system === system).map((a) => a.asset_class).filter(Boolean))].sort()
     : classes
@@ -1051,7 +1069,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           }
         }
       }
-      setText(''); setConsumables(''); setAttachFiles([]); setAssetCode(''); setTim(''); setFaultType(''); setSystem('')
+      setText(''); setConsumables(''); setAttachFiles([]); setAssetCode(''); setTim(''); setFaultType(''); setSystem(''); setStation(''); setCategory('')
       setRectifiesId(''); setOpenFails([])
       setAProgress('open'); setAcked(false); setAckText('')
       setRDate(''); setRTim(''); setRText(''); setRTeam(''); setRConsumables(''); setRFaultType('')
@@ -1133,21 +1151,17 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             <option value="">All types</option>
             {ENTRY_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
           </select>
-          <select value={fSystem} onChange={(e) => setFSystem(e.target.value)} aria-label="Filter by system">
+          <select value={fSystem} onChange={(e) => { setFSystem(e.target.value); setFLocation('') }} aria-label="Filter by system">
             <option value="">All systems</option>
             {systems.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select value={fCat} onChange={(e) => setFCat(e.target.value)} aria-label="Filter by class">
-            <option value="">All classes</option>
-            {filterClasses.map((c) => <option key={c} value={c}>{c}</option>)}
+          <select value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by station">
+            <option value="">All stations</option>
+            {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
-          <select value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by location">
-            <option value="">All locations</option>
-            {locations.map((l) => <option key={l} value={l}>{l}</option>)}
-          </select>
-          {(search || fCat || fType || fSystem || fLocation || !allDates) && (
+          {(search || fType || fSystem || fLocation || !allDates) && (
             <button type="button" className="btn ghost sm" onClick={() => {
-              setSearch(''); setFCat(''); setFType(''); setFSystem(''); setFLocation(''); setAllDates(true)
+              setSearch(''); setFType(''); setFSystem(''); setFLocation(''); setAllDates(true)
             }}>Clear</button>
           )}
           <span className="asset-count">
@@ -1229,18 +1243,18 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                     </select>
                   </label>
                 )}
-                {/* System (short list), then the class under it, then the asset code */}
+                {/* System, then Station under it — both narrow the Equipment picker.
+                    Picking an asset fills System + Station automatically. */}
                 <label>System
-                  <select value={system} onChange={(e) => { setSystem(e.target.value); setCategory('') }}>
+                  <select value={system} onChange={(e) => { setSystem(e.target.value); setStation('') }}>
                     <option value="">System…</option>
                     {systems.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
-                <label>Class {type !== 'failure' && <span className="ef-opt">(optional)</span>}
-                  <select value={category} disabled={!system && classesForSystem.length === 0}
-                          onChange={(e) => { const c = e.target.value; setCategory(c); if (c && classSystem[c]) setSystem(classSystem[c]) }}>
-                    <option value="">Class…</option>
-                    {classesForSystem.map((c) => <option key={c} value={c}>{c}</option>)}
+                <label>Station
+                  <select value={station} onChange={(e) => setStation(e.target.value)}>
+                    <option value="">Station…</option>
+                    {stationsForSystem.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
                 <label>Equipment (Asset ID)
@@ -1248,12 +1262,11 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                          onChange={(e) => {
                            const v = e.target.value; setAssetCode(v)
                            const hit = assets.find((a) => a.code === v)
-                           if (hit?.system) setSystem(hit.system)
-                           if (hit?.asset_class) setCategory(hit.asset_class)
+                           if (hit) { if (hit.system) setSystem(hit.system); if (hit.location) setStation(hit.location); setCategory(hit.asset_class || '') }
                          }} />
                 </label>
                 <datalist id="register-codes">
-                  {assets.map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}
+                  {pickerAssets.map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}
                 </datalist>
               </div>
             </section>
