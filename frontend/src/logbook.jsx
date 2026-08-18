@@ -733,7 +733,7 @@ function VersionHistory({ id }) {
   )
 }
 
-export default function LogBook({ editId = null, focusDate = null, initialResp = null } = {}) {
+export default function LogBook({ editId = null, focusDate = null, initialResp = null, initialAsset = null } = {}) {
   const { me, canWrite } = useMe()
   const authOn = me?.auth_enabled
   const [entries, setEntries] = useState([])
@@ -756,11 +756,13 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [fCat, setFCat] = useState('')             // '' = all categories (classes)
   const [fType, setFType] = useState('')           // '' = all types
   const [fDepot, setFDepot] = useState('')         // '' = all depots (line-wide)
+  const [fSystem, setFSystem] = useState('')       // '' = all systems
+  const [fLocation, setFLocation] = useState('')   // '' = all locations (stations)
   const [search, setSearch] = useState('')         // free-text box value
   const [qParam, setQParam] = useState('')         // debounced -> ?q= server search
   const [impBusy, setImpBusy] = useState(false)
   const [impResult, setImpResult] = useState(null)
-  const [newOpen, setNewOpen] = useState(false)   // the add-entry form, toggled by ＋
+  const [newOpen, setNewOpen] = useState(!!initialAsset)   // the add-entry form, toggled by ＋ (or opened from an asset page)
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
   const [apiOk, setApiOk] = useState(null)
@@ -801,7 +803,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [rectifying, setRectifying] = useState(null)
   const [editingId, setEditingId] = useState(editId ? Number(editId) : null)   // entry being edited
   const [historyFor, setHistoryFor] = useState(null) // entry whose trail is open
-  const [assetCode, setAssetCode] = useState('')   // cross-reference to the register
+  const [assetCode, setAssetCode] = useState(initialAsset || '')   // cross-reference to the register (pre-filled from an asset page)
   const [author, setAuthor] = useState('demo.visitor')
   const [assets, setAssets] = useState([])         // register rows for the datalist
 
@@ -823,6 +825,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   // the systems (short) and, per system, the classes under it — so the class
   // picker only ever shows what belongs to the chosen system
   const systems = [...new Set(assets.map((a) => a.system).filter(Boolean))].sort()
+  const locations = [...new Set(assets.map((a) => a.location).filter(Boolean))].sort()
   const classesForSystem = system
     ? [...new Set(assets.filter((a) => a.system === system).map((a) => a.asset_class).filter(Boolean))].sort()
     : classes
@@ -858,6 +861,8 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
       if (fCat) q.set('category', fCat)
       if (fType) q.set('entry_type', fType)
       if (fDepot) q.set('depot', fDepot)
+      if (fSystem) q.set('system', fSystem)
+      if (fLocation) q.set('location', fLocation)
       if (searching) q.set('q', qParam.trim())
       if (allDates || searching) {
         if (from) q.set('date_from', from)
@@ -876,9 +881,9 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     }
   }
 
-  useEffect(() => { load() }, [logDate, allDates, fCat, fType, fDepot, qParam, from, to, page])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to, page])  // eslint-disable-line react-hooks/exhaustive-deps
   // any change of what we are looking at starts again at the first page
-  useEffect(() => { setPage(0) }, [logDate, allDates, fCat, fType, fDepot, qParam, from, to])
+  useEffect(() => { setPage(0) }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to])
   // debounce the search box so we don't hit the API on every keystroke
   useEffect(() => { const t = setTimeout(() => setQParam(search), 300); return () => clearTimeout(t) }, [search])
   // logging a rectification against an asset → show that asset's OPEN failures so
@@ -1126,13 +1131,21 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             <option value="">All types</option>
             {ENTRY_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
           </select>
+          <select value={fSystem} onChange={(e) => setFSystem(e.target.value)} aria-label="Filter by system">
+            <option value="">All systems</option>
+            {systems.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
           <select value={fCat} onChange={(e) => setFCat(e.target.value)} aria-label="Filter by class">
             <option value="">All classes</option>
             {filterClasses.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          {(search || fCat || fType || !allDates) && (
+          <select value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by location">
+            <option value="">All locations</option>
+            {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+          {(search || fCat || fType || fSystem || fLocation || !allDates) && (
             <button type="button" className="btn ghost sm" onClick={() => {
-              setSearch(''); setFCat(''); setFType(''); setAllDates(true)
+              setSearch(''); setFCat(''); setFType(''); setFSystem(''); setFLocation(''); setAllDates(true)
             }}>Clear</button>
           )}
           <span className="asset-count">

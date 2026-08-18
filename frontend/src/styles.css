@@ -1881,3 +1881,8 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0078B4;
   border-radius: 6px;
 }
+
+/* asset-detail section header with an inline action (Add log) */
+.sect-h-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.btn.preset.sm.add-log-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12.5px;
+  text-decoration: none; border-radius: 99px; }

@@ -848,7 +848,7 @@ function LogList({ rows, staff }) {
   )
 }
 
-function AssetLogSections({ log, staff }) {
+function AssetLogSections({ log, staff, code, canWrite }) {
   const maint = log.filter((e) => e.type === 'maintenance')
   const allFails = log.filter((e) => e.type === 'failure')
   // a failure's rectification/acknowledgement is shown INLINE with the failure
@@ -878,8 +878,15 @@ function AssetLogSections({ log, staff }) {
   return (
     <>
       <div className="sect">
-        <h3>
-          Maintenance history — {maint.length ? `${maint.length} entr${maint.length === 1 ? 'y' : 'ies'}, newest first` : 'none recorded'}
+        <h3 className="sect-h-row">
+          <span>Maintenance history — {maint.length ? `${maint.length} entr${maint.length === 1 ? 'y' : 'ies'}, newest first` : 'none recorded'}</span>
+          {canWrite && code && (
+            <a className="btn preset sm add-log-btn" href={`#/log?asset=${encodeURIComponent(code)}`}
+               title="Log maintenance / failure for this asset">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M8 3.4v9.2M3.4 8h9.2" /></svg>
+              Add log
+            </a>
+          )}
         </h3>
         {maint.length === 0
           ? <p className="dim">No maintenance logged against this asset yet.</p>
@@ -1378,7 +1385,7 @@ function LiveAssetDetail({ code }) {
         )}
 
         <div className="card">
-          <AssetLogSections log={log} staff={canWrite} />
+          <AssetLogSections log={log} staff={canWrite} code={a.code} canWrite={canWrite} />
 
           {history.length > 0 && (
             <div className="sect">
@@ -3712,7 +3719,7 @@ export default function App() {
         : jcMatch ? (LIVE ? <NotYet /> : <JobCard jcId={jcMatch[1]} />)
         : routePath === '/planner' ? (LIVE ? <NotYet /> : <Planner />)
         : routePath === '/roster' ? (LIVE ? <NotYet /> : <DutyRoster />)
-        : routePath === '/log' ? <LogBook editId={routeQuery.get('edit')} focusDate={routeQuery.get('d')} initialResp={routeQuery.get('resp')} />
+        : routePath === '/log' ? <LogBook editId={routeQuery.get('edit')} focusDate={routeQuery.get('d')} initialResp={routeQuery.get('resp')} initialAsset={routeQuery.get('asset')} />
         /* legacy top-level /failures now redirects to the signed-in line's board */
         : routePath === '/failures' ? (LIVE ? <FailuresRedirect me={me} go={go} /> : <Failures />)
         : routePath === '/job-cards' ? (LIVE ? <JobCardsView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)

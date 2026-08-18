@@ -513,6 +513,7 @@ def list_entries(log_date: date | None = None, shift: str | None = None,
                  category: str | None = None, q: str | None = None,
                  date_from: date | None = None, date_to: date | None = None,
                  line: str | None = None, depot: str | None = None,
+                 system: str | None = None, location: str | None = None,
                  limit: int = 200, offset: int = 0, response: Response = None,
                  db: Session = Depends(get_db), user=Depends(optional_user)):
     """The day's log, a shift's log, or one asset's complete logged history.
@@ -562,6 +563,17 @@ def list_entries(log_date: date | None = None, shift: str | None = None,
         filters.append(LogEntry.type == LogEntryType(entry_type))
     if category:
         filters.append(LogEntry.category == category)
+    # system / location narrow by the linked asset's system and station — mirrors
+    # the register's System and Location filters
+    if system and system.strip():
+        filters.append(LogEntry.asset_id.in_(
+            select(Asset.id).where(Asset.system == system.strip())))
+    if location and location.strip():
+        loc = db.scalar(select(Location).where(
+            func.lower(Location.name) == location.strip().lower()))
+        if loc:
+            filters.append(LogEntry.asset_id.in_(
+                select(Asset.id).where(Asset.location_id == loc.id)))
     if q and q.strip():
         # free-text search across the record, crew, fault and system/class —
         # case-insensitive; matches the register's search box behaviour
