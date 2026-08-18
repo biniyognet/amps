@@ -11,6 +11,9 @@ import {
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
 import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout } from './api.js'
+// backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
+const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
+  .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 import QR, { assetUrl } from './qr.jsx'
 import DutyRoster from './roster.jsx'
 import LogBook, { AttachmentUpload } from './logbook.jsx'
@@ -1268,7 +1271,7 @@ function AssetAudit({ code }) {
               <span className="dot" />{r.action}
             </span>
             <span className="dim">by <b>{r.actor}</b></span>
-            <span className="sub dt">{new Date(r.at).toLocaleString()}</span>
+            <span className="sub dt">{fmtDT(r.at)}</span>
           </div>
           {r.detail && <div className="findings">{r.detail}</div>}
         </div>
@@ -2766,7 +2769,7 @@ function ChecksheetHistory({ fmt, onClose }) {
           <ul className="cs-audit">
             {rows.map((r, i) => (
               <li key={i}><span className="cs-audit-act">{r.action}</span> <span className="dim">{r.detail || ''}</span><br />
-                <span className="dim cs-audit-meta">{r.actor} · {new Date(r.at).toLocaleString()}</span></li>
+                <span className="dim cs-audit-meta">{r.actor} · {fmtDT(r.at)}</span></li>
             ))}
           </ul>
         )}

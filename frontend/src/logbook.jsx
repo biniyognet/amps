@@ -253,6 +253,8 @@ const periodRange = (period, anchorIso) => {
 
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+// entry `at`/`time` are stored as the IST clock time the user typed (naive), so
+// show them literally — no tz conversion (that would double-shift by +5:30).
 const fmtTime = (ts) =>
   new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 /* "HH:MM" from an ISO timestamp, or "" when it's midnight (= no time given) */
