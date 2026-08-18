@@ -785,6 +785,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [tim, setTim] = useState('')               // optional HH:MM
   const [faultType, setFaultType] = useState('')   // failures: fault class
   const [team, setTeam] = useState('')             // crew that did the work
+  const [newDate, setNewDate] = useState(focusDate || today())   // the add form's own date (editable in the modal)
   // ONE failure form spans the whole lifecycle so the separate acknowledgement /
   // job-card / rectification logs need not be filed by hand. Two independent axes,
   // exactly like the edit screen: an acknowledged flag+note, and a fix `aProgress`
@@ -904,6 +905,9 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   useEffect(() => { load() }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to, page])  // eslint-disable-line react-hooks/exhaustive-deps
   // any change of what we are looking at starts again at the first page
   useEffect(() => { setPage(0) }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to])
+  // opening the add form defaults its date to the ruler day; the user can then
+  // change it in the modal without moving the ruler.
+  useEffect(() => { if (newOpen) setNewDate(logDate) }, [newOpen])  // eslint-disable-line react-hooks/exhaustive-deps
   // debounce the search box so we don't hit the API on every keystroke
   useEffect(() => { const t = setTimeout(() => setQParam(search), 300); return () => clearTimeout(t) }, [search])
   // logging a rectification against an asset → show that asset's OPEN failures so
@@ -1000,7 +1004,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          log_date: logDate, shift, type,
+          log_date: newDate, shift, type,
           subtype: type === 'maintenance' ? subtype : null,
           system: system || null,
           category: category || null,
@@ -1035,11 +1039,11 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             acknowledged: acked,
-            ack: acked ? { date: logDate, time: tim || null, text: ackText.trim(),
+            ack: acked ? { date: newDate, time: tim || null, text: ackText.trim(),
                            attended_by: team.trim() || null } : null,
             progress: aProgress,
             detail: aProgress !== 'open' ? {
-              date: rDate || logDate, time: rTim || null,
+              date: rDate || newDate, time: rTim || null,
               text: rText.trim() || (aProgress === 'rectified' ? 'Rectified' : 'Job card issued'),
               fault_type: rFaultType.trim() || faultType.trim() || null,
               attended_by: rTeam.trim() || team.trim() || null,
@@ -1274,6 +1278,10 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             {/* row 2 — time › attended by › (entered by) › (fault type) › record */}
             <section className="fg">
               <div className="fg-fields">
+                <label>Date
+                  <input type="date" value={newDate} max={today()}
+                         onChange={(e) => setNewDate(e.target.value || today())} />
+                </label>
                 <label>Time <span className="ef-opt">(optional)</span>
                   <TimeInput value={tim} onChange={setTim} />
                 </label>
