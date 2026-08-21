@@ -16,7 +16,7 @@ const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `$
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 import QR, { assetUrl } from './qr.jsx'
 import DutyRoster from './roster.jsx'
-import LogBook, { AttachmentUpload } from './logbook.jsx'
+import LogBook, { AttachmentUpload, JobCardEntry } from './logbook.jsx'
 import { CHECKSHEET_FORMATS } from './checksheets.js'
 
 const STATUS_LABEL = {
@@ -3197,11 +3197,16 @@ function JobCardsView({ line = '' }) {
   const [q, setQ] = useState('')
   const [fAgency, setFAgency] = useState([])   // multi-select "Issued to" filter
   const [openCol, setOpenCol] = useState(null)
-  useEffect(() => {
+  const [jcAdd, setJcAdd] = useState(null)     // null | 'single' | 'bulk'
+  const [assets, setAssets] = useState([])
+  const load = () => {
     const lq = line ? `&line=${encodeURIComponent(line)}` : ''
     getJSON(`/api/logbook?entry_type=failure&limit=5000${lq}`)
       .then((r) => setRows(r || [])).catch((e) => setError(String(e)))
-  }, [line])
+  }
+  useEffect(() => { load() }, [line])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { getJSON('/api/assets').then(setAssets).catch(() => {}) }, [])
+  const systems = [...new Set(assets.map((a) => a.system).filter(Boolean))].sort()
   if (error) return <div className="card offline-note">Backend unreachable — {error}.</div>
   if (rows === null) return <p className="dim">Loading job cards…</p>
   const days = (a, b) => Math.max(0, Math.round(((b ? new Date(`${b}T00:00:00`) : Date.now()) - new Date(`${a}T00:00:00`)) / 86400000))
@@ -3254,6 +3259,18 @@ function JobCardsView({ line = '' }) {
         {(q || fAgency.length) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]) }}>Clear</button>}
         <span className="asset-count">{shown.length} shown</span>
         <div className="asset-actions">
+          {canWrite && (
+            <button type="button" className={`icon-btn${jcAdd === 'single' ? ' on' : ''}`} title="Raise a job card"
+                    aria-label="Raise job card" onClick={() => setJcAdd((v) => (v === 'single' ? null : 'single'))}>
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
+            </button>
+          )}
+          {canWrite && (
+            <button type="button" className={`icon-btn${jcAdd === 'bulk' ? ' on' : ''}`} title="Bulk raise job cards (grid)"
+                    aria-label="Bulk job cards" onClick={() => setJcAdd((v) => (v === 'bulk' ? null : 'bulk'))}>
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2.2" y="3" width="11.6" height="10" rx="1.2" /><path d="M2.2 6.4h11.6M2.2 9.7h11.6M6 3v10M10 3v10" strokeWidth="1.1" /></svg>
+            </button>
+          )}
           <button type="button" className="icon-btn" title="Download these job cards (CSV)" aria-label="Download job cards"
                   onClick={() => exportJobCards(shown)}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
@@ -3263,6 +3280,11 @@ function JobCardsView({ line = '' }) {
           </button>
         </div>
       </div>
+
+      {canWrite && jcAdd && (
+        <JobCardEntry assets={assets} systems={systems} defaultDate={new Date().toISOString().slice(0, 10)}
+                      bulk={jcAdd === 'bulk'} onClose={() => setJcAdd(null)} onDone={() => { setJcAdd(null); load() }} />
+      )}
 
       {shown.length === 0 ? (
         <div className="card"><p className="dim" style={{ margin: 0 }}>{tab === 'open' ? 'No open job cards — nothing to chase. 👍' : 'None in this view.'}</p></div>

@@ -925,6 +925,134 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
   )
 }
 
+/* Raise job card(s): single quick-add or a spreadsheet grid (paste + fill), same
+   as the log-book bulk entry but with job-card columns. A job card auto-raises a
+   failure and tags itself to it (backend), so filing one here starts the
+   failure → job-card lifecycle the board tracks. */
+const JC_COLS = ['date', 'system', 'station', 'asset', 'fault', 'agency', 'detail']
+export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, onDone, onClose }) {
+  const blank = () => ({ date: defaultDate, system: '', station: '', asset: '', fault: '', agency: '', detail: '' })
+  const [rows, setRows] = useState(() => Array.from({ length: bulk ? 6 : 1 }, blank))
+  const [paste, setPaste] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const byCode = useMemo(() => Object.fromEntries(assets.map((a) => [a.code, a])), [assets])
+  const sysList = systems.length ? systems : [...new Set(assets.map((a) => a.system).filter(Boolean))].sort()
+  const stationsFor = (sys) => (sys ? [...new Set(assets.filter((a) => a.system === sys).map((a) => a.location).filter(Boolean))]
+    : [...new Set(assets.map((a) => a.location).filter(Boolean))]).sort()
+  const assetsFor = (sys, stn) => assets.filter((a) => (!sys || a.system === sys) && (!stn || a.location === stn))
+  const set = (i, k, v) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
+  const addRows = (n) => setRows((rs) => [...rs, ...Array.from({ length: n }, blank)])
+  const delRow = (i) => setRows((rs) => (rs.length > 1 ? rs.filter((_, j) => j !== i) : rs))
+  const applyCell = (row, col, raw) => {
+    const val = (raw ?? '').toString().trim()
+    if (col === 'date') { const iso = toISO(val); if (iso) row.date = iso; return }
+    if (col === 'system') { row.system = sysList.find((s) => s.toLowerCase() === val.toLowerCase()) || val; row.station = ''; return }
+    if (col === 'station') { row.station = val; return }
+    if (col === 'asset') { row.asset = val; const h = byCode[val]; if (h) { row.system = h.system || row.system; row.station = h.location || row.station } return }
+    row[col] = val
+  }
+  const pasteInto = (i, col, e) => {
+    const text = (e.clipboardData || window.clipboardData)?.getData('text') || ''
+    if (!/[\t\n]/.test(text)) return
+    e.preventDefault()
+    const block = text.replace(/\r/g, '').replace(/\n+$/, '').split('\n').map((l) => l.split('\t'))
+    const c0 = JC_COLS.indexOf(col)
+    setRows((rs) => {
+      const next = rs.map((r) => ({ ...r }))
+      block.forEach((line, r) => { const ri = i + r; while (next.length <= ri) next.push(blank()); line.forEach((v, c) => { const cc = JC_COLS[c0 + c]; if (cc) applyCell(next[ri], cc, v) }) })
+      return next
+    })
+  }
+  const applyPaste = () => {
+    const lines = paste.split(/\r?\n/).map((l) => l.split('\t')).filter((c) => c.some((x) => x.trim()))
+    if (!lines.length) return
+    const parsed = lines.map((c) => { const asset = (c[1] || '').trim(); const h = byCode[asset]
+      return { date: toISO(c[0]) || defaultDate, system: h?.system || '', station: h?.location || '', asset, fault: (c[2] || '').trim(), agency: (c[3] || '').trim(), detail: (c[4] || '').trim() } })
+    setRows((rs) => [...rs.filter((r) => r.asset || r.fault || r.detail), ...parsed]); setPaste('')
+  }
+  const [fill, setFill] = useState(null); const [fillEnd, setFillEnd] = useState(null)
+  useEffect(() => {
+    if (!fill) return undefined
+    const up = () => {
+      setRows((rs) => { if (fillEnd == null) return rs
+        const lo = Math.min(fill.src, fillEnd), hi = Math.max(fill.src, fillEnd), val = rs[fill.src][fill.col]
+        return rs.map((r, j) => { if (j < lo || j > hi || j === fill.src) return r; const n = { ...r }; applyCell(n, fill.col, val); return n }) })
+      setFill(null); setFillEnd(null)
+    }
+    window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up)
+  }, [fill, fillEnd])   // eslint-disable-line react-hooks/exhaustive-deps
+  const inFill = (i, col) => fill && fill.col === col && fillEnd != null && i >= Math.min(fill.src, fillEnd) && i <= Math.max(fill.src, fillEnd)
+  const handle = (i, col) => bulk && <span className="bg-handle" title="Drag down to fill" onMouseDown={(e) => { e.preventDefault(); setFill({ col, src: i }); setFillEnd(i) }} />
+  const toEntry = (r) => {
+    const detail = (r.detail || '').trim(); const fault = (r.fault || '').trim()
+    return { log_date: r.date || defaultDate, type: 'job_card', asset_code: (r.asset || '').trim() || null,
+      text: detail.length >= 3 ? detail : (fault || 'Job card issued'), fault_type: fault.slice(0, 120) || null,
+      attended_by: (r.agency || '').trim() || null, system: (r.system || '').trim() || null, shift: 'G' }
+  }
+  const submit = async () => {
+    const live = rows.filter((r) => (r.asset || '').trim() && ((r.fault || '').trim() || (r.detail || '').trim()))
+    if (!live.length) { setResult({ err: 'Each job card needs an Equipment and a Fault or detail.' }); return }
+    setBusy(true); setResult(null)
+    try {
+      const res = await fetch(`${API}/api/logbook/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entries: live.map(toEntry) }) })
+      if (!res.ok) throw new Error(res.status)
+      const d = await res.json(); setResult(d)
+      if (d.failed === 0) { onDone(); return }
+    } catch (e) { setResult({ err: `Submit failed (${e.message})` }) }
+    setBusy(false)
+  }
+  return (
+    <div className="entry-form card bulk-card">
+      <div className="ef-head">
+        <span className="ep-title">{bulk ? '▦ Raise job cards' : '＋ Raise job card'} <span className="dim">— {rows.length} row{rows.length > 1 ? 's' : ''}</span></span>
+        <button type="button" className="mini-btn" onClick={onClose}>Close</button>
+      </div>
+      {bulk && (
+        <details className="bulk-paste">
+          <summary>Paste from a spreadsheet (Date · Asset · Fault · Issued to · Detail)</summary>
+          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={4} placeholder="Copy rows from Excel and paste here — tab-separated, one job card per line." />
+          <button type="button" className="btn preset sm" onClick={applyPaste} disabled={!paste.trim()}>Add pasted rows</button>
+        </details>
+      )}
+      {bulk && <p className="bulk-hint">Tip: paste a block of cells from Excel into any cell, or drag a cell's corner square to fill down.</p>}
+      <div className="tbl-wrap">
+        <table className="bulk-grid jc-grid">
+          <thead><tr><th>#</th><th>Date</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
+                <td className="dim bg-n">{i + 1}</td>
+                <td className={inFill(i, 'date') ? 'bg-fillrng' : ''}><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} onPaste={(e) => pasteInto(i, 'date', e)} />{handle(i, 'date')}</td>
+                <td className={inFill(i, 'system') ? 'bg-fillrng' : ''}><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}><option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'system')}</td>
+                <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}><option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
+                <td className={inFill(i, 'asset') ? 'bg-fillrng' : ''}>
+                  <input value={r.asset} list={`jc-${i}`} placeholder="scan/type code" onPaste={(e) => pasteInto(i, 'asset', e)}
+                         onChange={(e) => { const v = e.target.value; const hit = byCode[v]; setRows((rs) => rs.map((x, j) => (j === i ? { ...x, asset: v, system: hit?.system ?? x.system, station: hit?.location ?? x.station } : x))) }} />
+                  <datalist id={`jc-${i}`}>{assetsFor(r.system, r.station).slice(0, 300).map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}</datalist>
+                  {handle(i, 'asset')}
+                </td>
+                <td className={inFill(i, 'fault') ? 'bg-fillrng' : ''}><input value={r.fault} placeholder="the problem" onChange={(e) => set(i, 'fault', e.target.value)} onPaste={(e) => pasteInto(i, 'fault', e)} />{handle(i, 'fault')}</td>
+                <td className={inFill(i, 'agency') ? 'bg-fillrng' : ''}><input value={r.agency} placeholder="agency / dept" onChange={(e) => set(i, 'agency', e.target.value)} onPaste={(e) => pasteInto(i, 'agency', e)} />{handle(i, 'agency')}</td>
+                <td className={inFill(i, 'detail') ? 'bg-fillrng' : ''}><input value={r.detail} placeholder="JC no / details" onChange={(e) => set(i, 'detail', e.target.value)} onPaste={(e) => pasteInto(i, 'detail', e)} />{handle(i, 'detail')}</td>
+                <td><button type="button" className="bg-x" title="Remove row" onClick={() => delRow(i)}>×</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="bulk-foot">
+        {bulk && <button type="button" className="btn ghost sm" onClick={() => addRows(5)}>+ 5 rows</button>}
+        <div className="bulk-spring" />
+        {result && (result.err ? <span className="bulk-msg err">{result.err}</span>
+          : <span className={`bulk-msg${result.failed ? ' warn' : ' ok'}`}>Raised {result.created}{result.failed ? ` · ${result.failed} failed` : ''}</span>)}
+        <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? 'Saving…' : (bulk ? 'Raise all' : 'Raise')}</button>
+      </div>
+      {result && result.errors && result.errors.length > 0 && <ul className="bulk-errs">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+    </div>
+  )
+}
+
 export default function LogBook({ editId = null, focusDate = null, initialResp = null, initialAsset = null } = {}) {
   const { me, canWrite } = useMe()
   const authOn = me?.auth_enabled
