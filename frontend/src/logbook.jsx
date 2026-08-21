@@ -9,7 +9,7 @@
    the old one — the bound-paper-logbook discipline, enforced by software).
 
    API base: same-origin by default; demo hosting builds with VITE_AMPS_API. */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { LIVE, ORG, useMe } from './api.js'
 
 /* Optional time — the plain native picker. Blank = no time. */
@@ -751,9 +751,15 @@ const toISO = (s) => {
 /* Spreadsheet-style bulk entry — a grid the staff fill (or paste from the old
    sheet) and submit in one go, mirroring how they worked before. Columns match
    the old logbook: Date · Type · Cycle · Equipment · Details · Action · Team. */
-function BulkEntry({ assets, defaultDate, onDone, onClose }) {
-  const blank = () => ({ date: defaultDate, type: 'maintenance', cycle: 'Yearly', asset: '', details: '', action: '', team: '' })
+function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
+  const blank = () => ({ date: defaultDate, type: 'maintenance', cycle: 'Yearly', system: '', station: '', asset: '', details: '', action: '', team: '' })
   const [rows, setRows] = useState(() => Array.from({ length: 6 }, blank))
+  const byCode = useMemo(() => Object.fromEntries(assets.map((a) => [a.code, a])), [assets])
+  const sysList = systems.length ? systems : [...new Set(assets.map((a) => a.system).filter(Boolean))].sort()
+  // stations under a system, and the asset picker shrunk to system+station
+  const stationsFor = (sys) => (sys ? [...new Set(assets.filter((a) => a.system === sys).map((a) => a.location).filter(Boolean))]
+    : [...new Set(assets.map((a) => a.location).filter(Boolean))]).sort()
+  const assetsFor = (sys, stn) => assets.filter((a) => (!sys || a.system === sys) && (!stn || a.location === stn))
   const [paste, setPaste] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
@@ -764,12 +770,16 @@ function BulkEntry({ assets, defaultDate, onDone, onClose }) {
   const applyPaste = () => {
     const lines = paste.split(/\r?\n/).map((l) => l.split('\t')).filter((c) => c.some((x) => x.trim()))
     if (!lines.length) return
-    const parsed = lines.map((c) => ({
-      date: toISO(c[0]) || defaultDate,
-      type: 'maintenance',
-      cycle: BULK_CYCLES.find((f) => f.toLowerCase() === (c[2] || '').trim().toLowerCase()) || (c[2] || '').trim() || 'Yearly',
-      asset: (c[1] || '').trim(), details: (c[3] || '').trim(), action: (c[4] || '').trim(), team: (c[5] || '').trim(),
-    }))
+    const parsed = lines.map((c) => {
+      const asset = (c[1] || '').trim()
+      const hit = byCode[asset]
+      return {
+        date: toISO(c[0]) || defaultDate, type: 'maintenance',
+        cycle: BULK_CYCLES.find((f) => f.toLowerCase() === (c[2] || '').trim().toLowerCase()) || (c[2] || '').trim() || 'Yearly',
+        system: hit?.system || '', station: hit?.location || '',
+        asset, details: (c[3] || '').trim(), action: (c[4] || '').trim(), team: (c[5] || '').trim(),
+      }
+    })
     setRows((rs) => [...rs.filter((r) => r.asset || r.details), ...parsed])
     setPaste('')
   }
@@ -780,6 +790,7 @@ function BulkEntry({ assets, defaultDate, onDone, onClose }) {
     return {
       log_date: r.date || defaultDate, type: r.type || 'maintenance',
       subtype: isM ? (r.cycle || null) : null, text,
+      system: (r.system || '').trim() || null,
       action_taken: (r.action || '').trim() || null, attended_by: (r.team || '').trim() || null,
       asset_code: (r.asset || '').trim() || null, shift: isM ? 'N' : 'G',
     }
@@ -802,7 +813,6 @@ function BulkEntry({ assets, defaultDate, onDone, onClose }) {
   }
   return (
     <div className="entry-form card bulk-card">
-      <datalist id="bulk-codes">{assets.map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}</datalist>
       <div className="ef-head">
         <span className="ep-title">▦ Bulk entry <span className="dim">— {rows.length} rows</span></span>
         <button type="button" className="mini-btn" onClick={onClose}>Close</button>
@@ -815,7 +825,7 @@ function BulkEntry({ assets, defaultDate, onDone, onClose }) {
       </details>
       <div className="tbl-wrap">
         <table className="bulk-grid">
-          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
@@ -823,7 +833,16 @@ function BulkEntry({ assets, defaultDate, onDone, onClose }) {
                 <td><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} /></td>
                 <td><select value={r.type} onChange={(e) => set(i, 'type', e.target.value)}>{BULK_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}</select></td>
                 <td><select value={r.cycle} disabled={r.type !== 'maintenance'} onChange={(e) => set(i, 'cycle', e.target.value)}>{BULK_CYCLES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
-                <td><input value={r.asset} list="bulk-codes" placeholder="scan/type code" onChange={(e) => set(i, 'asset', e.target.value)} /></td>
+                <td><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}>
+                  <option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select></td>
+                <td><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}>
+                  <option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select></td>
+                <td>
+                  <input value={r.asset} list={`bc-${i}`} placeholder="scan/type code"
+                         onChange={(e) => { const v = e.target.value; const hit = byCode[v]
+                           setRows((rs) => rs.map((x, j) => (j === i ? { ...x, asset: v, system: hit?.system ?? x.system, station: hit?.location ?? x.station } : x))) }} />
+                  <datalist id={`bc-${i}`}>{assetsFor(r.system, r.station).slice(0, 300).map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}</datalist>
+                </td>
                 <td><input value={r.details} placeholder="report / cause / remark" onChange={(e) => set(i, 'details', e.target.value)} /></td>
                 <td><input value={r.action} placeholder="work done" onChange={(e) => set(i, 'action', e.target.value)} /></td>
                 <td><input value={r.team} placeholder="crew" onChange={(e) => set(i, 'team', e.target.value)} /></td>
