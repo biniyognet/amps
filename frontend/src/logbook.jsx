@@ -735,6 +735,119 @@ function VersionHistory({ id }) {
   )
 }
 
+const BULK_CYCLES = ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly']
+const BULK_TYPES = ['maintenance', 'failure', 'general']
+// parse a pasted date (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD) to ISO; '' if unclear
+const toISO = (s) => {
+  s = (s || '').trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (!m) return ''
+  const [, d, mo, y] = m
+  const yr = y.length === 2 ? '20' + y : y
+  return `${yr}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+}
+
+/* Spreadsheet-style bulk entry — a grid the staff fill (or paste from the old
+   sheet) and submit in one go, mirroring how they worked before. Columns match
+   the old logbook: Date · Type · Cycle · Equipment · Details · Action · Team. */
+function BulkEntry({ assets, defaultDate, onDone, onClose }) {
+  const blank = () => ({ date: defaultDate, type: 'maintenance', cycle: 'Yearly', asset: '', details: '', action: '', team: '' })
+  const [rows, setRows] = useState(() => Array.from({ length: 6 }, blank))
+  const [paste, setPaste] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const set = (i, k, v) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
+  const addRows = (n) => setRows((rs) => [...rs, ...Array.from({ length: n }, blank)])
+  const delRow = (i) => setRows((rs) => rs.filter((_, j) => j !== i))
+  // paste TSV: Date, Asset, Cycle, Details, Action, Team (Type defaults to maintenance)
+  const applyPaste = () => {
+    const lines = paste.split(/\r?\n/).map((l) => l.split('\t')).filter((c) => c.some((x) => x.trim()))
+    if (!lines.length) return
+    const parsed = lines.map((c) => ({
+      date: toISO(c[0]) || defaultDate,
+      type: 'maintenance',
+      cycle: BULK_CYCLES.find((f) => f.toLowerCase() === (c[2] || '').trim().toLowerCase()) || (c[2] || '').trim() || 'Yearly',
+      asset: (c[1] || '').trim(), details: (c[3] || '').trim(), action: (c[4] || '').trim(), team: (c[5] || '').trim(),
+    }))
+    setRows((rs) => [...rs.filter((r) => r.asset || r.details), ...parsed])
+    setPaste('')
+  }
+  const toEntry = (r) => {
+    const isM = r.type === 'maintenance'
+    let text = (r.details || '').trim()
+    if (text.length < 3) text = isM ? `${r.cycle || 'Maintenance'} maintenance` : (text || 'Log entry')
+    return {
+      log_date: r.date || defaultDate, type: r.type || 'maintenance',
+      subtype: isM ? (r.cycle || null) : null, text,
+      action_taken: (r.action || '').trim() || null, attended_by: (r.team || '').trim() || null,
+      asset_code: (r.asset || '').trim() || null, shift: isM ? 'N' : 'G',
+    }
+  }
+  const submit = async () => {
+    const live = rows.filter((r) => (r.asset || '').trim() || (r.details || '').trim() || (r.action || '').trim())
+    if (!live.length) { setResult({ err: 'Nothing to submit — fill at least one row.' }); return }
+    setBusy(true); setResult(null)
+    try {
+      const res = await fetch(`${API}/api/logbook/bulk`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: live.map(toEntry) }),
+      })
+      if (!res.ok) throw new Error(res.status)
+      const d = await res.json()
+      setResult(d)
+      if (d.failed === 0) { onDone(); return }
+    } catch (e) { setResult({ err: `Submit failed (${e.message})` }) }
+    setBusy(false)
+  }
+  return (
+    <div className="entry-form card bulk-card">
+      <datalist id="bulk-codes">{assets.map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}</datalist>
+      <div className="ef-head">
+        <span className="ep-title">▦ Bulk entry <span className="dim">— {rows.length} rows</span></span>
+        <button type="button" className="mini-btn" onClick={onClose}>Close</button>
+      </div>
+      <details className="bulk-paste">
+        <summary>Paste from a spreadsheet (Date · Asset · Cycle · Details · Action · Team)</summary>
+        <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={4}
+                  placeholder="Copy rows from Excel/the old sheet and paste here — columns tab-separated, one entry per line." />
+        <button type="button" className="btn preset sm" onClick={applyPaste} disabled={!paste.trim()}>Add pasted rows</button>
+      </details>
+      <div className="tbl-wrap">
+        <table className="bulk-grid">
+          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="dim bg-n">{i + 1}</td>
+                <td><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} /></td>
+                <td><select value={r.type} onChange={(e) => set(i, 'type', e.target.value)}>{BULK_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}</select></td>
+                <td><select value={r.cycle} disabled={r.type !== 'maintenance'} onChange={(e) => set(i, 'cycle', e.target.value)}>{BULK_CYCLES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
+                <td><input value={r.asset} list="bulk-codes" placeholder="scan/type code" onChange={(e) => set(i, 'asset', e.target.value)} /></td>
+                <td><input value={r.details} placeholder="report / cause / remark" onChange={(e) => set(i, 'details', e.target.value)} /></td>
+                <td><input value={r.action} placeholder="work done" onChange={(e) => set(i, 'action', e.target.value)} /></td>
+                <td><input value={r.team} placeholder="crew" onChange={(e) => set(i, 'team', e.target.value)} /></td>
+                <td><button type="button" className="bg-x" title="Remove row" onClick={() => delRow(i)}>×</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="bulk-foot">
+        <button type="button" className="btn ghost sm" onClick={() => addRows(5)}>+ 5 rows</button>
+        <div className="bulk-spring" />
+        {result && (result.err
+          ? <span className="bulk-msg err">{result.err}</span>
+          : <span className={`bulk-msg${result.failed ? ' warn' : ' ok'}`}>Saved {result.created}{result.failed ? ` · ${result.failed} failed` : ''}</span>)}
+        <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Save all'}</button>
+      </div>
+      {result && result.errors && result.errors.length > 0 && (
+        <ul className="bulk-errs">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+      )}
+    </div>
+  )
+}
+
 export default function LogBook({ editId = null, focusDate = null, initialResp = null, initialAsset = null } = {}) {
   const { me, canWrite } = useMe()
   const authOn = me?.auth_enabled
@@ -765,6 +878,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [impBusy, setImpBusy] = useState(false)
   const [impResult, setImpResult] = useState(null)
   const [newOpen, setNewOpen] = useState(!!initialAsset)   // the add-entry form, toggled by ＋ (or opened from an asset page)
+  const [bulkOpen, setBulkOpen] = useState(false)          // spreadsheet-style bulk entry grid
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
   const [apiOk, setApiOk] = useState(null)
@@ -1174,9 +1288,16 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           <div className="asset-actions">
             {canWrite && (
               <button type="button" className={`icon-btn${newOpen ? ' on' : ''}`} title="New log entry"
-                      aria-label="New log entry" onClick={() => setNewOpen((v) => !v)}>
+                      aria-label="New log entry" onClick={() => { setNewOpen((v) => !v); setBulkOpen(false) }}>
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                   <path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
+              </button>
+            )}
+            {canWrite && (
+              <button type="button" className={`icon-btn${bulkOpen ? ' on' : ''}`} title="Bulk entry — spreadsheet grid"
+                      aria-label="Bulk entry" onClick={() => { setBulkOpen((v) => !v); setNewOpen(false) }}>
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4">
+                  <rect x="2.2" y="3" width="11.6" height="10" rx="1.2" /><path d="M2.2 6.4h11.6M2.2 9.7h11.6M6 3v10M10 3v10" strokeWidth="1.1" /></svg>
               </button>
             )}
             <button type="button" className="icon-btn" title="Download the entries in view (CSV)"
@@ -1200,6 +1321,11 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           </div>
         </div>
       </div>
+
+      {canWrite && bulkOpen && (
+        <BulkEntry assets={assets} defaultDate={logDate} systems={systems}
+                   onDone={() => { setBulkOpen(false); load() }} onClose={() => setBulkOpen(false)} />
+      )}
 
       {canWrite && newOpen && (
         <form className="entry-form card" onSubmit={add}>

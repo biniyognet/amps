@@ -52,6 +52,7 @@ class LogEntryIn(BaseModel):
     entered_by: str = ""                # ignored on authenticated deployments
     attended_by: str | None = None      # the crew that actually did the work
     consumables: str | None = None      # spares/materials consumed (free text)
+    action_taken: str | None = None     # the work done / remarks (old-sheet column)
     # a filled structured checksheet: {template, name, results:[{label,status,reading}]}
     checksheet: dict | None = None
     asset_code: str | None = None
@@ -380,6 +381,45 @@ _AUTO_FAILURE_KINDS = (LogEntryType.JOB_CARD, LogEntryType.RECTIFICATION)
 
 @router.post("", response_model=LogEntryOut, status_code=201)
 def add_entry(entry: LogEntryIn, db: Session = Depends(get_db), user=Depends(current_writer)):
+    obj, rect = _add_one(db, entry, user)
+    db.commit()
+    db.refresh(obj)
+    return _to_out(obj, rect if rect else None)
+
+
+class BulkIn(BaseModel):
+    entries: list[LogEntryIn]
+
+
+class BulkResult(BaseModel):
+    created: int
+    failed: int
+    errors: list[str]
+
+
+@router.post("/bulk", response_model=BulkResult)
+def bulk_add(body: BulkIn, db: Session = Depends(get_db), user=Depends(current_writer)):
+    """Spreadsheet-style bulk entry: create many log rows in one request. Each row
+    is committed independently, so one bad row never discards the good ones — the
+    failures come back with their row number and reason."""
+    created, errors = 0, []
+    for i, e in enumerate(body.entries):
+        try:
+            _add_one(db, e, user)
+            db.commit()
+            created += 1
+        except HTTPException as ex:
+            db.rollback()
+            errors.append(f"row {i + 1}: {ex.detail}")
+        except Exception as ex:  # noqa: BLE001 — surface any per-row failure, keep going
+            db.rollback()
+            errors.append(f"row {i + 1}: {str(ex)[:140]}")
+    return BulkResult(created=created, failed=len(errors), errors=errors[:60])
+
+
+def _add_one(db: Session, entry: LogEntryIn, user):
+    """Create one entry (+ auto failure-link + inline rectification). Flushes but
+    does NOT commit — the caller commits (single) or commits per row (bulk)."""
     etype = LogEntryType(entry.type)
     # A job card or a rectification is always tracked against a failure. Filed
     # directly on an asset, it attaches to that asset's open failure; when none is
@@ -426,9 +466,8 @@ def add_entry(entry: LogEntryIn, db: Session = Depends(get_db), user=Depends(cur
         rect = _create_entry(db, rect_in, user, rectifies=obj)
         if rect.at < obj.at:
             raise HTTPException(422, "rectification cannot precede the failure")
-    db.commit()
-    db.refresh(obj)
-    return _to_out(obj, rect if rect else None)
+    db.flush()
+    return obj, rect
 
 
 def _create_entry(db: Session, entry: LogEntryIn, user, rectifies: LogEntry | None = None) -> LogEntry:
@@ -492,6 +531,7 @@ def _create_entry(db: Session, entry: LogEntryIn, user, rectifies: LogEntry | No
         entered_by=author,
         attended_by=((entry.attended_by or "").strip()[:200] or None),
         consumables=((entry.consumables or "").strip() or None),
+        action_taken=((entry.action_taken or "").strip()[:2000] or None),
         checksheet=_dump_checksheet(entry.checksheet),
         asset=asset, corrects_id=entry.corrects_id,
         line_id=user.line_id,  # NULL = department-wide entry (HQ/admin)
