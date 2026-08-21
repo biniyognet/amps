@@ -760,6 +760,62 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
   const stationsFor = (sys) => (sys ? [...new Set(assets.filter((a) => a.system === sys).map((a) => a.location).filter(Boolean))]
     : [...new Set(assets.map((a) => a.location).filter(Boolean))]).sort()
   const assetsFor = (sys, stn) => assets.filter((a) => (!sys || a.system === sys) && (!stn || a.location === stn))
+  // editable column order — drives multi-cell paste and the fill-handle drag
+  const COLS = ['date', 'type', 'cycle', 'system', 'station', 'asset', 'details', 'action', 'team']
+  // write one value into a row, coercing/deriving per column (safe: bad values are ignored)
+  const applyCell = (row, col, raw) => {
+    const val = (raw ?? '').toString().trim()
+    if (col === 'date') { const iso = toISO(val); if (iso) row.date = iso; return }
+    if (col === 'type') { const t = BULK_TYPES.find((x) => x.toLowerCase() === val.toLowerCase()); if (t) row.type = t; return }
+    if (col === 'cycle') { const c = BULK_CYCLES.find((x) => x.toLowerCase() === val.toLowerCase()); if (c) row.cycle = c; return }
+    if (col === 'system') { row.system = sysList.find((s) => s.toLowerCase() === val.toLowerCase()) || val; row.station = ''; return }
+    if (col === 'station') { row.station = val; return }
+    if (col === 'asset') { row.asset = val; const h = byCode[val]; if (h) { row.system = h.system || row.system; row.station = h.location || row.station } return }
+    row[col] = val
+  }
+  // paste a copied block (TSV) starting at this cell — spreads across cols & down rows
+  const pasteInto = (i, col, e) => {
+    const text = (e.clipboardData || window.clipboardData)?.getData('text') || ''
+    if (!/[\t\n]/.test(text)) return                      // single value → let the browser paste normally
+    e.preventDefault()
+    const block = text.replace(/\r/g, '').replace(/\n+$/, '').split('\n').map((l) => l.split('\t'))
+    const c0 = COLS.indexOf(col)
+    setRows((rs) => {
+      const next = rs.map((r) => ({ ...r }))
+      block.forEach((line, r) => {
+        const ri = i + r
+        while (next.length <= ri) next.push(blank())
+        line.forEach((v, c) => { const cc = COLS[c0 + c]; if (cc) applyCell(next[ri], cc, v) })
+      })
+      return next
+    })
+  }
+  // Excel-style fill handle: drag the corner of a cell down to copy its value
+  const [fill, setFill] = useState(null)   // { col, src }
+  const [fillEnd, setFillEnd] = useState(null)
+  useEffect(() => {
+    if (!fill) return undefined
+    const up = () => {
+      setRows((rs) => {
+        if (fillEnd == null) return rs
+        const lo = Math.min(fill.src, fillEnd), hi = Math.max(fill.src, fillEnd)
+        const val = rs[fill.src][fill.col]
+        return rs.map((r, j) => {
+          if (j < lo || j > hi || j === fill.src) return r
+          const n = { ...r }; applyCell(n, fill.col, val); return n
+        })
+      })
+      setFill(null); setFillEnd(null)
+    }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [fill, fillEnd])   // eslint-disable-line react-hooks/exhaustive-deps
+  const inFill = (i, col) => fill && fill.col === col && fillEnd != null
+    && i >= Math.min(fill.src, fillEnd) && i <= Math.max(fill.src, fillEnd)
+  const handle = (i, col) => (
+    <span className="bg-handle" title="Drag down to fill"
+          onMouseDown={(e) => { e.preventDefault(); setFill({ col, src: i }); setFillEnd(i) }} />
+  )
   const [paste, setPaste] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
@@ -823,29 +879,31 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
                   placeholder="Copy rows from Excel/the old sheet and paste here — columns tab-separated, one entry per line." />
         <button type="button" className="btn preset sm" onClick={applyPaste} disabled={!paste.trim()}>Add pasted rows</button>
       </details>
+      <p className="bulk-hint">Tip: copy a block of cells from Excel and paste into any cell — it fills across &amp; down. Drag the small square at a cell's corner to copy its value down the rows.</p>
       <div className="tbl-wrap">
         <table className="bulk-grid">
           <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i}>
+              <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
                 <td className="dim bg-n">{i + 1}</td>
-                <td><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} /></td>
-                <td><select value={r.type} onChange={(e) => set(i, 'type', e.target.value)}>{BULK_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}</select></td>
-                <td><select value={r.cycle} disabled={r.type !== 'maintenance'} onChange={(e) => set(i, 'cycle', e.target.value)}>{BULK_CYCLES.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
-                <td><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}>
-                  <option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select></td>
-                <td><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}>
-                  <option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select></td>
-                <td>
-                  <input value={r.asset} list={`bc-${i}`} placeholder="scan/type code"
+                <td className={inFill(i, 'date') ? 'bg-fillrng' : ''}><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} onPaste={(e) => pasteInto(i, 'date', e)} />{handle(i, 'date')}</td>
+                <td className={inFill(i, 'type') ? 'bg-fillrng' : ''}><select value={r.type} onChange={(e) => set(i, 'type', e.target.value)}>{BULK_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}</select>{handle(i, 'type')}</td>
+                <td className={inFill(i, 'cycle') ? 'bg-fillrng' : ''}><select value={r.cycle} disabled={r.type !== 'maintenance'} onChange={(e) => set(i, 'cycle', e.target.value)}>{BULK_CYCLES.map((c) => <option key={c} value={c}>{c}</option>)}</select>{handle(i, 'cycle')}</td>
+                <td className={inFill(i, 'system') ? 'bg-fillrng' : ''}><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}>
+                  <option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'system')}</td>
+                <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}>
+                  <option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
+                <td className={inFill(i, 'asset') ? 'bg-fillrng' : ''}>
+                  <input value={r.asset} list={`bc-${i}`} placeholder="scan/type code" onPaste={(e) => pasteInto(i, 'asset', e)}
                          onChange={(e) => { const v = e.target.value; const hit = byCode[v]
                            setRows((rs) => rs.map((x, j) => (j === i ? { ...x, asset: v, system: hit?.system ?? x.system, station: hit?.location ?? x.station } : x))) }} />
                   <datalist id={`bc-${i}`}>{assetsFor(r.system, r.station).slice(0, 300).map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}</datalist>
+                  {handle(i, 'asset')}
                 </td>
-                <td><input value={r.details} placeholder="report / cause / remark" onChange={(e) => set(i, 'details', e.target.value)} /></td>
-                <td><input value={r.action} placeholder="work done" onChange={(e) => set(i, 'action', e.target.value)} /></td>
-                <td><input value={r.team} placeholder="crew" onChange={(e) => set(i, 'team', e.target.value)} /></td>
+                <td className={inFill(i, 'details') ? 'bg-fillrng' : ''}><input value={r.details} placeholder="report / cause / remark" onChange={(e) => set(i, 'details', e.target.value)} onPaste={(e) => pasteInto(i, 'details', e)} />{handle(i, 'details')}</td>
+                <td className={inFill(i, 'action') ? 'bg-fillrng' : ''}><input value={r.action} placeholder="work done" onChange={(e) => set(i, 'action', e.target.value)} onPaste={(e) => pasteInto(i, 'action', e)} />{handle(i, 'action')}</td>
+                <td className={inFill(i, 'team') ? 'bg-fillrng' : ''}><input value={r.team} placeholder="crew" onChange={(e) => set(i, 'team', e.target.value)} onPaste={(e) => pasteInto(i, 'team', e)} />{handle(i, 'team')}</td>
                 <td><button type="button" className="bg-x" title="Remove row" onClick={() => delRow(i)}>×</button></td>
               </tr>
             ))}

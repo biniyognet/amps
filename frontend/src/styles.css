@@ -1909,3 +1909,12 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
 .bulk-msg { font-size: 13px; font-weight: 600; }
 .bulk-msg.ok { color: #1a7a3a; } .bulk-msg.warn { color: #8a6100; } .bulk-msg.err { color: var(--critical); }
 .bulk-errs { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: #a32e2e; max-height: 140px; overflow-y: auto; }
+
+/* bulk grid: excel-like fill handle + paste range highlight */
+.bulk-grid td { position: relative; }
+.bg-handle { position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px; background: var(--accent);
+  border: 1px solid #fff; border-radius: 1px; cursor: crosshair; opacity: 0; transition: opacity .1s; }
+.bulk-grid td:hover .bg-handle { opacity: 1; }
+.bulk-grid td.bg-fillrng { background: var(--accent-soft); }
+.bulk-grid td.bg-fillrng .bg-handle { opacity: 1; }
+.bulk-hint { font-size: 11.5px; color: var(--ink-3); margin: 2px 0 8px; }
