@@ -132,6 +132,7 @@ class EntryRef(BaseModel):
     text: str
     asset_code: str | None
     attended_by: str | None
+    entered_by: str | None = None       # who raised it (Issued By, on a job card)
     consumables: str | None
     station: str | None = None
     action_taken: str | None = None
@@ -288,7 +289,7 @@ def _ref(x: LogEntry | None, attach: dict | None = None) -> "EntryRef | None":
         return None
     return EntryRef(id=x.id, log_date=x.log_date, at=x.at, fault_type=x.fault_type,
                     text=x.text, asset_code=x.asset.code if x.asset else None,
-                    attended_by=x.attended_by, consumables=x.consumables,
+                    attended_by=x.attended_by, entered_by=x.entered_by, consumables=x.consumables,
                     station=x.station or (x.asset.location.name if x.asset and x.asset.location else None),
                     action_taken=x.action_taken, via_job_card=bool(x.via_job_card),
                     checksheet=_load_checksheet(x.checksheet),
@@ -503,7 +504,12 @@ def _create_entry(db: Session, entry: LogEntryIn, user, rectifies: LogEntry | No
             raise HTTPException(422, "time must be HH:MM")
     at = datetime.combine(entry.log_date, when) if when else datetime.combine(entry.log_date, datetime.min.time())
     # Logged-in deployments: authorship comes from the session, never the form.
-    author = user.full_name if AUTH_ON else (entry.entered_by or "unknown")
+    # `entered_by` is the recorded issuer/author shown on the entry (e.g. the SSE
+    # who raised a job card, or the historical author during bulk entry). An
+    # explicit value wins; otherwise fall back to the session (auth) or "unknown".
+    # The audit trail always records the REAL actor (user.username) separately.
+    author = (entry.entered_by.strip() if (entry.entered_by or "").strip()
+              else (user.full_name if AUTH_ON else "unknown"))
     # system + category: explicit choice wins; else inherit from the asset
     system = (entry.system or "").strip()[:80] or _system_of(asset)
     category = (entry.category or "").strip()[:80] or _category_of(asset)

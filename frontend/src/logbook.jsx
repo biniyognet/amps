@@ -929,9 +929,9 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
    as the log-book bulk entry but with job-card columns. A job card auto-raises a
    failure and tags itself to it (backend), so filing one here starts the
    failure → job-card lifecycle the board tracks. */
-const JC_COLS = ['date', 'system', 'station', 'asset', 'fault', 'agency', 'detail']
+const JC_COLS = ['date', 'system', 'station', 'asset', 'fault', 'issuedby', 'agency', 'detail']
 export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, onDone, onClose }) {
-  const blank = () => ({ date: defaultDate, system: '', station: '', asset: '', fault: '', agency: '', detail: '' })
+  const blank = () => ({ date: defaultDate, system: '', station: '', asset: '', fault: '', issuedby: '', agency: '', detail: '' })
   const [rows, setRows] = useState(() => Array.from({ length: bulk ? 6 : 1 }, blank))
   const [paste, setPaste] = useState('')
   const [busy, setBusy] = useState(false)
@@ -988,7 +988,8 @@ export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, o
     const detail = (r.detail || '').trim(); const fault = (r.fault || '').trim()
     return { log_date: r.date || defaultDate, type: 'job_card', asset_code: (r.asset || '').trim() || null,
       text: detail.length >= 3 ? detail : (fault || 'Job card issued'), fault_type: fault.slice(0, 120) || null,
-      attended_by: (r.agency || '').trim() || null, system: (r.system || '').trim() || null, shift: 'G' }
+      attended_by: (r.agency || '').trim() || null, entered_by: (r.issuedby || '').trim(),
+      system: (r.system || '').trim() || null, shift: 'G' }
   }
   const submit = async () => {
     const live = rows.filter((r) => (r.asset || '').trim() && ((r.fault || '').trim() || (r.detail || '').trim()))
@@ -1018,7 +1019,7 @@ export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, o
       {bulk && <p className="bulk-hint">Tip: paste a block of cells from Excel into any cell, or drag a cell's corner square to fill down.</p>}
       <div className="tbl-wrap">
         <table className="bulk-grid jc-grid">
-          <thead><tr><th>#</th><th>Date</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued by</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
@@ -1033,6 +1034,7 @@ export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, o
                   {handle(i, 'asset')}
                 </td>
                 <td className={inFill(i, 'fault') ? 'bg-fillrng' : ''}><input value={r.fault} placeholder="the problem" onChange={(e) => set(i, 'fault', e.target.value)} onPaste={(e) => pasteInto(i, 'fault', e)} />{handle(i, 'fault')}</td>
+                <td className={inFill(i, 'issuedby') ? 'bg-fillrng' : ''}><input value={r.issuedby} placeholder="who raised it" onChange={(e) => set(i, 'issuedby', e.target.value)} onPaste={(e) => pasteInto(i, 'issuedby', e)} />{handle(i, 'issuedby')}</td>
                 <td className={inFill(i, 'agency') ? 'bg-fillrng' : ''}><input value={r.agency} placeholder="agency / dept" onChange={(e) => set(i, 'agency', e.target.value)} onPaste={(e) => pasteInto(i, 'agency', e)} />{handle(i, 'agency')}</td>
                 <td className={inFill(i, 'detail') ? 'bg-fillrng' : ''}><input value={r.detail} placeholder="JC no / details" onChange={(e) => set(i, 'detail', e.target.value)} onPaste={(e) => pasteInto(i, 'detail', e)} />{handle(i, 'detail')}</td>
                 <td><button type="button" className="bg-x" title="Remove row" onClick={() => delRow(i)}>×</button></td>

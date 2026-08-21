@@ -3177,11 +3177,12 @@ function LineDashboard({ go }) {
    first, with days-pending front and centre. Signed-in only (operational). */
 function exportJobCards(cards) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const head = ['Raised', 'Status', 'Asset', 'Station', 'Location', 'Fault', 'Issued to', 'Job card detail', 'Closed', 'Age (d)', 'Action taken']
+  const head = ['Raised', 'Status', 'Asset', 'Station', 'Location', 'Fault', 'Issued by', 'Issued to', 'Job card detail', 'Closed', 'Age (d)', 'Action taken']
   const stat = { open: 'Open', closed: 'Closed by agency', penalty: 'Penalty — we fixed' }
+  const iss = (v) => (v && v !== 'unknown' && !v.endsWith('-import') ? v : '')
   const rows = cards.map(({ f, jc, rb, status, age }) => [
     jc.log_date, stat[status] || status, f.asset_code || '', f.station || jc.station || '', f.category || '',
-    f.fault_type || tidyLog(f.text), jc.attended_by || '', tidyLog(jc.text),
+    f.fault_type || tidyLog(f.text), iss(jc.entered_by), jc.attended_by || '', tidyLog(jc.text),
     rb ? rb.log_date : '', age, rb ? (rb.action_taken || tidyLog(rb.text)) : ''].map(esc).join(','))
   const blob = new Blob([[head.map(esc).join(','), ...rows].join('\n')], { type: 'text/csv' })
   const a = document.createElement('a')
@@ -3198,6 +3199,7 @@ function JobCardsView({ line = '' }) {
   const [fAgency, setFAgency] = useState([])   // multi-select "Issued to" filter
   const [openCol, setOpenCol] = useState(null)
   const [jcAdd, setJcAdd] = useState(null)     // null | 'single' | 'bulk'
+  const [sort, setSort] = useState('recent')   // newest raised first — a just-raised card lands on top
   const [assets, setAssets] = useState([])
   const load = () => {
     const lq = line ? `&line=${encodeURIComponent(line)}` : ''
@@ -3221,15 +3223,21 @@ function JobCardsView({ line = '' }) {
   })
   const agencies = [...new Set(cardsAll.map((c) => c.jc.attended_by).filter(Boolean))].sort()
   const ql = q.trim().toLowerCase()
-  const matchQ = (c) => !ql || [c.f.asset_code, c.f.fault_type, c.f.text, c.f.station, c.f.category, c.jc.attended_by, c.jc.text].some((v) => (v || '').toLowerCase().includes(ql))
+  const matchQ = (c) => !ql || [c.f.asset_code, c.f.fault_type, c.f.text, c.f.station, c.f.category, c.jc.attended_by, c.jc.entered_by, c.jc.text].some((v) => (v || '').toLowerCase().includes(ql))
   // search + agency filter apply first, so the tab counts reflect the current view
   const cards = cardsAll.filter((c) => matchQ(c) && (!fAgency.length || fAgency.includes(c.jc.attended_by)))
   const open = cards.filter((c) => c.status === 'open')
   const closed = cards.filter((c) => c.status === 'closed')
   const penalty = cards.filter((c) => c.status === 'penalty')
   const TABS = [['open', 'Open', open], ['penalty', 'Penalty', penalty], ['closed', 'Closed', closed], ['all', 'All', cards]]
-  const shown = (TABS.find(([k]) => k === tab)?.[2] || cards)
-    .slice().sort((a, b) => tab === 'open' ? b.age - a.age : (b.jc.log_date < a.jc.log_date ? -1 : 1))
+  const SORTS = {
+    recent: ['Newest raised', (a, b) => (b.jc.log_date < a.jc.log_date ? -1 : b.jc.log_date > a.jc.log_date ? 1 : b.f.id - a.f.id)],
+    oldest: ['Oldest / longest pending', (a, b) => b.age - a.age],
+    asset: ['Asset code', (a, b) => (a.f.asset_code || '').localeCompare(b.f.asset_code || '')],
+    agency: ['Agency', (a, b) => (a.jc.attended_by || '').localeCompare(b.jc.attended_by || '')],
+    station: ['Station', (a, b) => (a.f.station || a.jc.station || '').localeCompare(b.f.station || b.jc.station || '')],
+  }
+  const shown = (TABS.find(([k]) => k === tab)?.[2] || cards).slice().sort(SORTS[sort][1])
   // avg turnaround of closed cards (raised→closed), for the chase metric
   const doneCards = [...closed, ...penalty]
   const avgTurn = doneCards.length ? Math.round(doneCards.reduce((s, c) => s + c.age, 0) / doneCards.length) : null
@@ -3256,6 +3264,9 @@ function JobCardsView({ line = '' }) {
                     onClick={() => setTab(k)}>{lbl} {list.length}</button>
           ))}
         </div>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort job cards" title="Sort">
+          {Object.entries(SORTS).map(([k, [lbl]]) => <option key={k} value={k}>{lbl}</option>)}
+        </select>
         {(q || fAgency.length) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]) }}>Clear</button>}
         <span className="asset-count">{shown.length} shown</span>
         <div className="asset-actions">
@@ -3293,11 +3304,12 @@ function JobCardsView({ line = '' }) {
           <table className="jc-table">
             <colgroup>
               <col style={{ width: 56 }} /><col style={{ width: 104 }} />
-              <col style={{ width: 130 }} /><col style={{ width: 72 }} /><col style={{ width: 110 }} /><col style={{ width: 160 }} />
-              <col style={{ width: 130 }} /><col style={{ width: 82 }} />
-              <col style={{ width: 82 }} /><col />{canWrite && <col style={{ width: 112 }} />}
+              <col style={{ width: 130 }} /><col style={{ width: 72 }} /><col style={{ width: 110 }} /><col style={{ width: 150 }} />
+              <col style={{ width: 108 }} /><col style={{ width: 118 }} /><col style={{ width: 78 }} />
+              <col style={{ width: 78 }} /><col />{canWrite && <col style={{ width: 112 }} />}
             </colgroup>
             <thead><tr><th>{tab === 'open' ? 'Pending' : 'Turnaround'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
+              <th>Issued by</th>
               <th className={fAgency.length ? 'th-filtered' : ''}>Issued to
                 <ColFilter open={openCol === 'ag'} onToggle={() => setOpenCol(openCol === 'ag' ? null : 'ag')}
                            onClose={() => setOpenCol(null)} values={fAgency}
@@ -3316,6 +3328,7 @@ function JobCardsView({ line = '' }) {
                   <td className="dim" data-l="Station">{f.station || jc.station || '—'}</td>
                   <td className="dim" data-l="Location">{f.category || '—'}</td>
                   <td className="wrap-cell" data-l="Fault">{f.fault_type ? <b>{f.fault_type}</b> : tidyLog(f.text)}</td>
+                  <td className="dim" data-l="Issued by">{jc.entered_by && jc.entered_by !== 'unknown' && !jc.entered_by.endsWith('-import') ? jc.entered_by : '—'}</td>
                   <td className="dim" data-l="Issued to">{jc.attended_by || '—'}</td>
                   <td className="dim dt" data-l="Raised">{jc.log_date}</td>
                   <td className="dim dt" data-l="Closed">{rb ? rb.log_date : '—'}</td>
@@ -3334,10 +3347,11 @@ function JobCardsView({ line = '' }) {
                     )}
                   </td>
                   {canWrite && (
-                    <td className="td-edit" data-l="Action">
+                    <td className="td-edit" data-l="Action" onClick={(e) => e.stopPropagation()}>
                       {status === 'open'
-                        ? <a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`} onClick={(e) => e.stopPropagation()}>✓ Rectify / close</a>
-                        : <EditLink id={f.id} date={f.log_date} label="Open in log book" />}
+                        ? <><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`}>✓ Rectify / close</a>
+                            <a className="mini-btn muted" href={`#/log?d=${jc.log_date}&edit=${jc.id}`}>Edit</a></>
+                        : <EditLink id={jc.id} date={jc.log_date} label="Edit / open" />}
                     </td>
                   )}
                 </tr>
