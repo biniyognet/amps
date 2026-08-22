@@ -314,7 +314,13 @@ function LiveDashboard({ go, initialLine = null }) {
   }
   const sortArrow = (k) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
   const COLS = [['code', 'Code'], ['name', 'Asset'], ['cls', 'Class'], ['location', 'Station'],
-    ['locationDetail', 'Location'], ['sys', 'System'], ['status', 'Status'], ['next_due', 'Next PM'], ['pm', 'PM state']]
+    ['locationDetail', 'Location'], ['sys', 'System'], ['status', 'Status'], ['last_done', 'Last PM'], ['pm', 'PM cycles']]
+  // per-cycle due counts across the current view — shown in the PM-cycles header (M/Q/HY/Y/5Y)
+  const cycleDue = { Monthly: 0, Quarterly: 0, 'Half-Yearly': 0, Yearly: 0, '5-Yearly': 0 }
+  base.forEach((a) => {
+    const cy = sched[assetKey(a)]?.cycles || {}
+    for (const [f, st] of Object.entries(cy)) if (st === 'overdue' || st === 'never') cycleDue[f] = (cycleDue[f] || 0) + 1
+  })
   // per-column header filters (Class/Location/System/Status), multi-select — off the ribbon
   const toggleIn = (set) => (v) => set((prev) => { const a = asArr(prev); return a.includes(v) ? a.filter((x) => x !== v) : [...a, v] })
   // PM-state column filter shares the ribbon's `filters` buckets, so the header
@@ -528,7 +534,14 @@ function LiveDashboard({ go, initialLine = null }) {
                       const cfOn = cf && (cf.text !== undefined ? !!cf.text : cf.values.length)
                       return (
                       <th key={k} className={`th-sort${sortKey === k ? ' active' : ''}${cfOn ? ' th-filtered' : ''}`}>
-                        <span className="th-lbl" onClick={() => toggleSort(k)} title={`Sort by ${lbl}`}>{lbl}{sortArrow(k)}</span>
+                        {k === 'pm'
+                          ? <span className="th-lbl pm-head" onClick={() => toggleSort(k)} title="Per-cycle due count — sort by PM state">
+                              {CYC_ABBR.filter(([f]) => cycleDue[f]).map(([f, ab]) => (
+                                <span key={f} className="pm-head-c" title={`${f} due: ${cycleDue[f]}`}>{ab}<b>{cycleDue[f]}</b></span>
+                              ))}
+                              {!CYC_ABBR.some(([f]) => cycleDue[f]) && <>PM cycles</>}{sortArrow(k)}
+                            </span>
+                          : <span className="th-lbl" onClick={() => toggleSort(k)} title={`Sort by ${lbl}`}>{lbl}{sortArrow(k)}</span>}
                         {cf && <ColFilter open={openCol === k} onToggle={() => setOpenCol(openCol === k ? null : k)}
                                           onClose={() => setOpenCol(null)} {...cf} />}
                       </th>
@@ -576,14 +589,9 @@ function LiveDashboard({ go, initialLine = null }) {
                         <td className="dim" data-l="System">{a.sys ?? '—'}</td>
                         <td data-l="Status"><StatusChip status={a.status} />
                           {codalExceeded(a) && <span className="codal-dot" title={`Past its ${a.codalLifeYears}-year codal life`} />}</td>
-                        <td className="dim dt" data-l="Next PM">{s?.next_due || '—'}</td>
-                        <td data-l="PM state">{s
-                          ? (() => {
-                              // a routine-overdue asset that was never once maintained shows the
-                              // "Never done" tag (like the asset-detail page) instead of "Overdue"
-                              const ds = s.never_done ? 'never' : s.state
-                              return <span className={schedChip(ds)} title={SCHED_TIP[ds]}><span className="dot" />{SCHED_LABEL[ds]}{s.overdue_count > 1 ? ` · ${s.overdue_count}` : ''}</span>
-                            })()
+                        <td className="dim dt" data-l="Last PM">{s?.last_done || '—'}</td>
+                        <td data-l="PM cycles">{s && s.cycles && Object.keys(s.cycles).length
+                          ? <PmMatrix cycles={s.cycles} />
                           : <span className="dim">—</span>}</td>
                       </tr>
                     )
@@ -1012,6 +1020,18 @@ function ColFilter({ open, onToggle, onClose, values, toggle, clear, opts, fmt, 
     </span>
   )
 }
+// PM cycle matrix (like the old status sheet): M · Q · HY · Y · 5Y, each cell
+// coloured by that cycle's state; a cycle not in the asset's plan is a dim dash.
+const CYC_ABBR = [['Monthly', 'M'], ['Quarterly', 'Q'], ['Half-Yearly', 'HY'], ['Yearly', 'Y'], ['5-Yearly', '5Y']]
+const cycStateClass = (st) => st === 'overdue' ? 'pmc-od' : st === 'never' ? 'pmc-never'
+  : st === 'due_soon' ? 'pmc-due' : st === 'ok' ? 'pmc-ok' : st === 'long_overdue' ? 'pmc-long' : 'pmc-none'
+const PmMatrix = ({ cycles = {} }) => (
+  <span className="pm-matrix">
+    {CYC_ABBR.filter(([f]) => f in cycles).map(([f, ab]) => (
+      <span key={f} className={`pmc ${cycStateClass(cycles[f])}`} title={`${f}: ${SCHED_LABEL[cycles[f]] || cycles[f]}`}>{ab}</span>
+    ))}
+  </span>
+)
 // per-tag hover explanation for the PM state chips
 const SCHED_TIP = {
   overdue: 'A routine (short-cycle) maintenance is past due — the asset was serviced before but has since lapsed.',

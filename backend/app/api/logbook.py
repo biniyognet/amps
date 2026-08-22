@@ -503,13 +503,17 @@ def _create_entry(db: Session, entry: LogEntryIn, user, rectifies: LogEntry | No
         except ValueError:
             raise HTTPException(422, "time must be HH:MM")
     at = datetime.combine(entry.log_date, when) if when else datetime.combine(entry.log_date, datetime.min.time())
-    # Logged-in deployments: authorship comes from the session, never the form.
-    # `entered_by` is the recorded issuer/author shown on the entry (e.g. the SSE
-    # who raised a job card, or the historical author during bulk entry). An
-    # explicit value wins; otherwise fall back to the session (auth) or "unknown".
-    # The audit trail always records the REAL actor (user.username) separately.
-    author = (entry.entered_by.strip() if (entry.entered_by or "").strip()
-              else (user.full_name if AUTH_ON else "unknown"))
+    # Authorship. On a logged-in deployment the SIGNED-IN user authors the entry;
+    # a deliberate override (e.g. a job card's "Issued by") is honoured, but the
+    # demo/default sentinel the form sends ("demo.visitor") must NEVER overwrite
+    # the real author — that regression mis-attributed every UI entry. On an open
+    # deployment the form supplies the name. The audit trail always records the
+    # REAL actor (user.username) separately, regardless of this field.
+    form_author = (entry.entered_by or "").strip()
+    if AUTH_ON:
+        author = form_author if (form_author and form_author != "demo.visitor") else user.full_name
+    else:
+        author = form_author or "unknown"
     # system + category: explicit choice wins; else inherit from the asset
     system = (entry.system or "").strip()[:80] or _system_of(asset)
     category = (entry.category or "").strip()[:80] or _category_of(asset)

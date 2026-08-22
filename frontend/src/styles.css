@@ -1918,3 +1918,18 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
 .bulk-grid td.bg-fillrng { background: var(--accent-soft); }
 .bulk-grid td.bg-fillrng .bg-handle { opacity: 1; }
 .bulk-hint { font-size: 11.5px; color: var(--ink-3); margin: 2px 0 8px; }
+
+/* PM cycle matrix (register) — like the old status sheet: M · Q · HY · Y · 5Y */
+.pm-matrix { display: inline-flex; gap: 3px; }
+.pmc { min-width: 20px; padding: 1px 4px; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-align: center;
+  border: 1px solid transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.pmc.pmc-ok { background: #e5f4ec; color: #1a7a3a; border-color: #c6e6d3; }
+.pmc.pmc-due { background: #fdf3d9; color: #8a6100; border-color: #f0dca8; }
+.pmc.pmc-od { background: #fdf1f1; color: #a32e2e; border-color: #f5d5d5; }
+.pmc.pmc-never { background: #f3eefb; color: #6a3fb0; border-color: #d9c9ee; }
+.pmc.pmc-long { background: #eef3f7; color: #3a5a72; border-color: #cbd9e4; }
+.pmc.pmc-none { background: #f4f4f2; color: var(--ink-3); }
+/* PM-cycles header: per-cycle due counts */
+.th-lbl.pm-head { display: inline-flex; gap: 7px; align-items: center; }
+.pm-head-c { font-size: 10px; color: var(--ink-3); text-transform: none; letter-spacing: 0; }
+.pm-head-c b { color: #a32e2e; margin-left: 2px; }

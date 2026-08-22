@@ -31,6 +31,8 @@ class AssetScheduleSummary(BaseModel):
     never_done: bool = False  # routine-overdue but never once maintained
     overdue_count: int      # routine (short-cycle) overdue only
     long_overdue_count: int = 0   # 5-Yearly overdue / never started
+    last_done: date | None = None   # most recent maintenance across all cycles
+    cycles: dict[str, str] = {}     # per-cycle state, e.g. {Monthly: overdue, Yearly: ok}
 
 
 @router.get("/schedule", response_model=list[AssetScheduleSummary])
@@ -77,9 +79,13 @@ def schedule_all(db: Session = Depends(get_db), user=Depends(optional_user)):
         freqs = plan_freqs.get(aid) or set(log_dates)
         if not freqs:
             continue
-        s = summarize_schedule(build_schedule(freqs, done))
+        sched_rows = build_schedule(freqs, done)
+        s = summarize_schedule(sched_rows)
         if s:
-            out.append(AssetScheduleSummary(asset_code=code_by[aid], line=line_by.get(aid), **s))
+            last_done = max((r["last_done"] for r in sched_rows if r["last_done"]), default=None)
+            cycles = {r["frequency"]: r["state"] for r in sched_rows}   # per-cycle state matrix
+            out.append(AssetScheduleSummary(asset_code=code_by[aid], line=line_by.get(aid),
+                                            last_done=last_done, cycles=cycles, **s))
     scope = scope_location_ids(db, user)
     if scope is not None:
         codes = {a.code for a in db.scalars(

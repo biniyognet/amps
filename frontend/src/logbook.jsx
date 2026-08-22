@@ -1332,7 +1332,9 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           time: tim || null,
           fault_type: type === 'failure' ? (faultType.trim() || null) : null,
           asset_code: assetCode.trim() || null,
-          text: text.trim(), entered_by: author.trim() || 'demo.visitor',
+          // on a logged-in deployment the session authors the entry — never send
+          // the demo default, which would overwrite the real signed-in author
+          text: text.trim(), entered_by: authOn ? '' : (author.trim() || 'demo.visitor'),
           attended_by: team.trim() || null,
           // only a rectification (or maintenance/general) consumes spares — a
           // failure, acknowledgement or job card does not
