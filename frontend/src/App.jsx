@@ -168,7 +168,7 @@ function usePersistedState(key, initial) {
 const assetKey = (a) => `${a.line || ''}|${a.code}`
 
 function LiveDashboard({ go, initialLine = null }) {
-  const { assets: all, sched, openFail, loading, error } = useLiveAssets()
+  const { assets: all, sched, openFail, loading, schedLoading, error } = useLiveAssets()
   const { me, canWrite } = useMe()
   const [line, setLine] = useState(initialLine)
   // multi-select state filter: an array of active bucket keys; empty = All.
@@ -460,6 +460,7 @@ function LiveDashboard({ go, initialLine = null }) {
                         title={FILTER_TIP(k, { base: base.length, faulty: faulty.length, overdue: overdue.length, never: neverDone.length, dueSoon: dueSoon.length, longOverdue: longOverdue.length, notScheduled: notScheduled.length })}
                         onClick={toggle}>{lbl}</button>
                 )})}
+              {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
             </div>
             {/* Class · Location · System · Status filters now live in the table
                 column headers (▾). Only depot stays here — it has no column. */}
@@ -2995,16 +2996,18 @@ function TagSheet() {
 /* ---------- home dashboard (signed-in landing) ---------- */
 
 function LineDashboard({ go }) {
-  const { assets: allAssets, sched, openFail, loading } = useLiveAssets()
+  const { assets: allAssets, sched, openFail, loading, schedLoading } = useLiveAssets()
   const assets = allAssets.filter((a) => a.status !== 'decommissioned' && a.status !== 'spare') // not in active service — not counted
   const { me } = useMe()
   const [stats, setStats] = useState(null)
   const [recent, setRecent] = useState([])
+  const [bkSys, setBkSys] = useState('')   // Overdue-breakup card: system filter ('' = all)
+  const [bkStn, setBkStn] = useState('')   // Overdue-breakup card: station filter ('' = all)
   useEffect(() => {
     getJSON('/api/logbook/failure-stats?days=180&months=6').then(setStats).catch(() => {})
     getJSON('/api/logbook?limit=6').then(setRecent).catch(() => {})
   }, [])
-  if (loading) return <p className="dim">Loading the dashboard…</p>
+  if (loading || schedLoading) return <p className="dim">Loading the dashboard…</p>
   const pm = (a) => sched[assetKey(a)]
   const stateOf = (a) => pm(a)?.state
   // PM-compliance breakdown across every asset. Routine (short-cycle) overdue is
@@ -3037,6 +3040,20 @@ function LineDashboard({ go }) {
     }
   })
   const topSystems = Object.entries(overdueBySystem).sort((a, b) => b[1] - a[1]).slice(0, 8)
+  // Overdue-breakup card: optional System + Station filter (default = all). Option
+  // lists and the filtered per-cycle tally are recomputed for the current picks.
+  const bkSystems = [...new Set(assets.map((a) => a.sys || 'Unclassified'))].sort()
+  const bkStations = [...new Set(assets.map((a) => a.location).filter(Boolean))].sort()
+  const bkMatch = (a) => (!bkSys || (a.sys || 'Unclassified') === bkSys) && (!bkStn || a.location === bkStn)
+  const bkByFreq = {}; let bkLapsed = 0, bkLong = 0
+  assets.forEach((a) => {
+    if (!bkMatch(a)) return
+    const s = pm(a)
+    if (s?.state === 'overdue' && !s.never_done) {   // lapsed only — matches the headline Overdue
+      if (s.next_frequency) bkByFreq[s.next_frequency] = (bkByFreq[s.next_frequency] || 0) + 1
+      bkLapsed += 1
+    } else if (s?.state === 'long_overdue') bkLong += 1
+  })
   const exceeded = assets.filter(codalExceeded).length
   const stations = new Set(assets.map((a) => a.location)).size
   const depots = new Set(assets.map((a) => a.depot).filter(Boolean)).size
@@ -3109,11 +3126,23 @@ function LineDashboard({ go }) {
       <div className="dash-grid">
         {/* overdue breakup by cycle */}
         <section className="card viz-card">
-          <h2 className="viz-h">Overdue breakup <span className="viz-note">lapsed routine cycles</span></h2>
-          {lapsed === 0 ? <p className="dim">No lapsed routine PM — every in-cycle asset is up to date. 👍</p> : (
+          <div className="viz-head-row">
+            <h2 className="viz-h">Overdue breakup <span className="viz-note">lapsed routine cycles</span></h2>
+            <div className="viz-filters">
+              <select className="viz-sel" value={bkSys} onChange={(e) => setBkSys(e.target.value)} aria-label="Filter breakup by system">
+                <option value="">All systems</option>
+                {bkSystems.map((sy) => <option key={sy} value={sy}>{sy}</option>)}
+              </select>
+              <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label="Filter breakup by station">
+                <option value="">All stations</option>
+                {bkStations.map((st) => <option key={st} value={st}>{st}</option>)}
+              </select>
+            </div>
+          </div>
+          {bkLapsed === 0 ? <p className="dim">No lapsed routine PM{bkSys || bkStn ? ' for this selection' : ''} — every in-cycle asset is up to date. 👍</p> : (
             <div className="breakup">
-              {SCHED_FREQS.filter((f) => overdueByFreq[f]).map((f) => {
-                const n = overdueByFreq[f]; const w = Math.round((n / lapsed) * 100)
+              {SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => {
+                const n = bkByFreq[f]; const w = Math.round((n / bkLapsed) * 100)
                 return (
                   <div className="bk-row" key={f}>
                     <span className="bk-lbl">{f}</span>
@@ -3122,11 +3151,11 @@ function LineDashboard({ go }) {
                   </div>
                 )
               })}
-              {bucket.long_overdue > 0 && (
+              {bkLong > 0 && (
                 <div className="bk-row bk-long">
                   <span className="bk-lbl">5-Yearly <span className="dim">(separate)</span></span>
                   <span className="bk-bar"><span className="bk-fill long" style={{ width: '100%' }} /></span>
-                  <span className="bk-n">{bucket.long_overdue}</span>
+                  <span className="bk-n">{bkLong}</span>
                 </div>
               )}
             </div>
@@ -3514,7 +3543,10 @@ const Ribbon = ({ lines }) => {
    Everything here is an aggregate figure — no fault text, no crew — so it needs
    no sign-in. */
 function useNetworkGlance() {
-  const { assets: allAssets, sched, loading } = useLiveAssets()
+  const { assets: allAssets, sched, loading: assetsLoading, schedLoading } = useLiveAssets()
+  // this is an aggregate glance (per-line overdue/due counts) — its numbers need
+  // the PM schedule, so it stays "loading" until the schedule has hydrated too.
+  const loading = assetsLoading || schedLoading
   const assets = allAssets.filter((a) => a.status !== 'decommissioned' && a.status !== 'spare') // not in active service — not counted
   const [fail, setFail] = useState(null)
   useEffect(() => {

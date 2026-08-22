@@ -1033,6 +1033,11 @@ tbody tr:hover .edit-link { color: var(--accent); }
 .viz-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 26px; }
 @media screen and (max-width: 860px) { .viz-grid2 { grid-template-columns: 1fr; } }
 .viz-card { padding: 16px 18px 14px; }
+.viz-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.viz-head-row .viz-h { margin: 0; }
+.viz-filters { display: flex; gap: 6px; flex-shrink: 0; }
+.viz-sel { font-size: 11px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface, #fff); color: var(--ink-1); max-width: 150px; }
+.viz-sel:focus { outline: none; border-color: var(--brand-2, #0078B4); }
 .viz-h { margin: 0 0 12px; display: flex; align-items: baseline; gap: 8px; }
 .viz-note { font-size: 11px; font-weight: 500; color: var(--ink-3); text-transform: none; letter-spacing: 0.01em; }
 .viz { width: 100%; height: auto; display: block; }
@@ -1669,6 +1674,9 @@ body:has(.gate) {
   border-radius: 999px; padding: 2px 8px; animation: gatePulse 2.4s infinite;
 }
 @keyframes gatePulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+.pm-loading { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-3); padding: 0 6px; user-select: none; }
+.pm-spin { width: 10px; height: 10px; border: 2px solid var(--line); border-top-color: var(--brand-2, #0078B4); border-radius: 50%; animation: pmSpin 0.7s linear infinite; }
+@keyframes pmSpin { to { transform: rotate(360deg) } }
 .gate-title { font-size: clamp(28px, 3vw, 40px); line-height: 1.12; margin: clamp(5px, 1vh, 9px) 0 5px; font-weight: 800; letter-spacing: -0.015em; color: var(--ink); }
 /* the full form reads as an engraved tagline, not a sentence */
 .gate-sub {

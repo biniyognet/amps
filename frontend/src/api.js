@@ -78,26 +78,33 @@ export async function apiLogout() {
 
 /** Register + dashboard source: every asset, plus PM items due within 60 days. */
 export function useLiveAssets() {
-  const [state, set] = useState({ assets: [], sched: {}, openFail: {}, loading: LIVE, error: null })
+  // Progressive (lazy) load: the asset list is the register's first paint, so it
+  // resolves on its own and flips `loading` off immediately. The heavier PM
+  // schedule (~1.5 MB) and open-failure map hydrate in the background and only
+  // gate `schedLoading` — the list is browsable/searchable/sortable at once,
+  // and PM-state columns + counts fill in a moment later. Aggregate views
+  // (dashboards) wait on `schedLoading` since their numbers need the schedule.
+  const [state, set] = useState({ assets: [], sched: {}, openFail: {}, loading: LIVE, schedLoading: LIVE, error: null })
   useEffect(() => {
     if (!LIVE) return undefined
     let alive = true
+    // 1) assets first — the register renders the instant these land
+    getJSON('/api/assets')
+      .then((assets) => alive && set((s) => ({ ...s, assets: assets.map(toView), loading: false, error: null })))
+      .catch((e) => alive && set((s) => ({ ...s, loading: false, schedLoading: false, error: String(e) })))
+    // 2) schedule + open failures hydrate after, without blocking the list.
+    // codes repeat across lines, so both are keyed by `line|code` (the backend
+    // keys open-failures the same way) — a Green asset never picks up a Blue
+    // asset's schedule/job card of the same code.
     Promise.all([
-      getJSON('/api/assets'),
       getJSON('/api/maintenance/schedule').catch(() => []),
-      // {asset_code: open_failure_count} — public aggregate for the register flag
       getJSON('/api/logbook/open-failures-by-asset').catch(() => ({})),
-    ])
-      .then(([assets, sched, openFail]) => alive && set({
-        assets: assets.map(toView),
-        // codes repeat across lines, so schedule + failures are keyed by
-        // `line|code` (the backend keys open-failures the same way) — a Green
-        // asset never picks up a Blue asset's schedule/job card of the same code
-        sched: Object.fromEntries(sched.map((s) => [`${s.line || ''}|${s.asset_code}`, s])),
-        openFail: openFail || {},
-        loading: false, error: null,
-      }))
-      .catch((e) => alive && set({ assets: [], sched: {}, openFail: {}, loading: false, error: String(e) }))
+    ]).then(([sched, openFail]) => alive && set((s) => ({
+      ...s,
+      sched: Object.fromEntries(sched.map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
+      openFail: openFail || {},
+      schedLoading: false,
+    })))
     return () => { alive = false }
   }, [])
   return state

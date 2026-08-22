@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.auth import current_user, current_writer, optional_user, scope_location_ids
 from app.db import audit, get_db
@@ -107,6 +107,25 @@ def _to_out(a: Asset) -> AssetOut:
     )
 
 
+def _to_out_slim(a: Asset) -> AssetOut:
+    """List-row serializer: same shape as _to_out but drops the three heavy
+    free-text fields (make_model, description, remarks) that no register/tag/
+    dashboard list renders — they're only shown on the asset detail page, which
+    fetches the full record via /api/assets/{code}. Trims the list payload the
+    coordinators' laptops parse on every register load."""
+    return AssetOut(
+        id=a.id, code=a.code, name=a.name,
+        asset_class=a.asset_class.name, location=a.location.name,
+        make_model=None, status=a.status.value,
+        criticality=a.criticality.value, system=a.system,
+        line=a.location.parent.name if a.location.parent else None,
+        commissioned_on=a.commissioned_on,
+        description=None, remarks=None,
+        codal_life_years=a.codal_life_years, depot=a.depot,
+        location_detail=a.location_detail,
+    )
+
+
 def _get_or_create_class(db: Session, name: str) -> AssetClass:
     obj = db.scalar(select(AssetClass).where(AssetClass.name == name))
     if not obj:
@@ -172,14 +191,19 @@ def visible_asset(db: Session, code: str, user) -> Asset:
 
 @router.get("", response_model=list[AssetOut])
 def list_assets(db: Session = Depends(get_db), user=Depends(optional_user)):
-    q = select(Asset)
+    # Eager-load the relationships _to_out touches (class, location, its parent
+    # line) so the register list is one query, not 1 + 3·N lazy round-trips.
+    q = select(Asset).options(
+        joinedload(Asset.asset_class),
+        joinedload(Asset.location).joinedload(Location.parent),
+    )
     scope = scope_location_ids(db, user)
     if scope is not None:
         q = q.where(Asset.location_id.in_(scope))
     # a depot-scoped account (e.g. an SSE) sees only its depot's assets
     if getattr(user, "depot", None):
         q = q.where(Asset.depot == user.depot)
-    return [_to_out(a) for a in db.scalars(q).all()]
+    return [_to_out_slim(a) for a in db.scalars(q).all()]
 
 
 def _line_site(db: Session, line: str | None):
