@@ -517,8 +517,12 @@ def _create_entry(db: Session, entry: LogEntryIn, user, rectifies: LogEntry | No
     # system + category: explicit choice wins; else inherit from the asset
     system = (entry.system or "").strip()[:80] or _system_of(asset)
     category = (entry.category or "").strip()[:80] or _category_of(asset)
-    # maintenance is a night-shift job — enforce it regardless of client
-    shift = ShiftCode.NIGHT if etype == LogEntryType.MAINTENANCE else ShiftCode(entry.shift)
+    # the shift is whatever the user records — maintenance is no longer forced to
+    # night (it happens across shifts). Bad code falls back to General.
+    try:
+        shift = ShiftCode(entry.shift)
+    except ValueError:
+        shift = ShiftCode.GENERAL
     # Recovery moment: failure rows only, and never before the start.
     ended_at = None
     if etype == LogEntryType.FAILURE and entry.end_date:
@@ -1387,7 +1391,7 @@ async def import_history(request: Request, line: str | None = None,
             attended = (get("attended_by") or "imported record")[:120]
             new = LogEntry(
                 at=start, log_date=start.date(),
-                shift=ShiftCode.NIGHT if etype == LogEntryType.MAINTENANCE else ShiftCode.GENERAL,
+                shift=ShiftCode.GENERAL,   # sheets carry no shift — don't assume night
                 type=etype,
                 subtype=_maint_subtype(get("type")) if etype == LogEntryType.MAINTENANCE else None,
                 system=system, category=category,

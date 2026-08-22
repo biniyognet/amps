@@ -848,7 +848,7 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
       subtype: isM ? (r.cycle || null) : null, text,
       system: (r.system || '').trim() || null,
       action_taken: (r.action || '').trim() || null, attended_by: (r.team || '').trim() || null,
-      asset_code: (r.asset || '').trim() || null, shift: isM ? 'N' : 'G',
+      asset_code: (r.asset || '').trim() || null, shift: 'G',
     }
   }
   const submit = async () => {
@@ -1547,11 +1547,8 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             {/* row 1 — shift › type › (frequency|state) › system › class › asset id */}
             <section className="fg">
               <div className="fg-fields">
-                {/* maintenance is always a night-shift job — lock the shift to N */}
                 <label>Shift
-                  <select value={type === 'maintenance' ? 'N' : shift} disabled={type === 'maintenance'}
-                          onChange={(e) => setShift(e.target.value)}
-                          title={type === 'maintenance' ? 'Maintenance runs on the night shift' : 'Shift'}>
+                  <select value={shift} onChange={(e) => setShift(e.target.value)} title="Shift">
                     {ENTRY_SHIFTS.map((s) => <option key={s} value={s}>{s} — {SHIFT_LABEL[s]}</option>)}
                   </select>
                 </label>
@@ -1560,8 +1557,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                     add form — a new failure's response is filed right here; an
                     existing failure's response is filed by editing that failure. */}
                 <label>Type
-                  <select value={type}
-                          onChange={(e) => { setType(e.target.value); if (e.target.value === 'maintenance') setShift('N') }}>
+                  <select value={type} onChange={(e) => setType(e.target.value)}>
                     {['maintenance', 'failure', 'general'].map((t) => <option key={t} value={t}>{TYPE_LABEL[t] || t}</option>)}
                   </select>
                 </label>
