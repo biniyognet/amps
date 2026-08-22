@@ -319,7 +319,7 @@ function LiveDashboard({ go, initialLine = null }) {
   const cycleDue = { Monthly: 0, Quarterly: 0, 'Half-Yearly': 0, Yearly: 0, '5-Yearly': 0 }
   base.forEach((a) => {
     const cy = sched[assetKey(a)]?.cycles || {}
-    for (const [f, st] of Object.entries(cy)) if (st === 'overdue' || st === 'never') cycleDue[f] = (cycleDue[f] || 0) + 1
+    for (const [f, st] of Object.entries(cy)) if (st === 'overdue') cycleDue[f] = (cycleDue[f] || 0) + 1  // lapsed overdue only, not never-serviced
   })
   // per-column header filters (Class/Location/System/Status), multi-select — off the ribbon
   const toggleIn = (set) => (v) => set((prev) => { const a = asArr(prev); return a.includes(v) ? a.filter((x) => x !== v) : [...a, v] })
