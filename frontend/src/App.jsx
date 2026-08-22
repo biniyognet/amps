@@ -14,6 +14,12 @@ import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLo
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+// a back link that returns to the actual previous page (history), falling back to
+// a fixed route when there is no in-app history (e.g. arrived by direct link).
+const BackCrumb = ({ fallback = '#/', label = '← Back' }) => (
+  <a className="crumb" href={fallback}
+     onClick={(e) => { if (window.history.length > 1) { e.preventDefault(); window.history.back() } }}>{label}</a>
+)
 import QR, { assetUrl } from './qr.jsx'
 import DutyRoster from './roster.jsx'
 import LogBook, { AttachmentUpload, JobCardEntry } from './logbook.jsx'
@@ -1310,7 +1316,7 @@ function LiveAssetDetail({ code }) {
   if (error || !a) {
     return (
       <>
-        <a className="crumb" href="#/">← Assets</a>
+        <BackCrumb fallback="#/assets" />
         <div className="card offline-note">
           {error && !String(error).includes('404')
             ? <>Backend unreachable — {error}.</>
@@ -1325,7 +1331,7 @@ function LiveAssetDetail({ code }) {
   const lastServiced = maint.length ? maint[0].log_date : null
   return (
     <>
-      <a className="crumb" href="#/">← Assets</a>
+      <BackCrumb fallback="#/assets" />
       <div className="asset-passport" style={{ '--line-c': accent }}>
         {/* hero: the asset's identity, health and QR in one glance — the face
             of the QR-scan page a visitor or manager lands on */}

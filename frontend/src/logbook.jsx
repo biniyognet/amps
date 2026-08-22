@@ -372,6 +372,8 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
   const [team, setTeam] = useState(entry.attended_by || '')
   const [consumables, setConsumables] = useState(entry.consumables || '')
   const [tim, setTim] = useState(hhmm(entry.at))
+  const [eDate, setEDate] = useState(entry.log_date)   // the entry's date — editable in a correction
+  const [eShift, setEShift] = useState(entry.shift)    // and its shift
   const [faultType, setFaultType] = useState(entry.fault_type || '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -454,7 +456,7 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           corrects_id: entry.id,
-          log_date: entry.log_date, shift: entry.shift, type: entry.type,
+          log_date: eDate || entry.log_date, shift: eShift || entry.shift, type: entry.type,
           subtype: entry.subtype || null,
           system: system || null, category: category || null,
           asset_code: assetCode.trim() || null,
@@ -523,7 +525,20 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
       )}
 
       <div className="fg-set">
-        {/* row 1 — system › class › asset id (type & shift are fixed context, shown in the header) */}
+        {/* row 0 — date & shift are editable in the correction */}
+        <section className="fg">
+          <div className="fg-fields">
+            <label>Date
+              <input type="date" value={eDate} max={today()} onChange={(e) => setEDate(e.target.value || entry.log_date)} />
+            </label>
+            <label>Shift
+              <select value={eShift} onChange={(e) => setEShift(e.target.value)}>
+                {ENTRY_SHIFTS.map((s) => <option key={s} value={s}>{s} — {SHIFT_LABEL[s]}</option>)}
+              </select>
+            </label>
+          </div>
+        </section>
+        {/* row 1 — system › class › asset id */}
         <section className="fg">
           <div className="fg-fields">
             <label>System
