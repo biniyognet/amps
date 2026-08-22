@@ -283,6 +283,7 @@ function LiveDashboard({ go, initialLine = null }) {
     : k === 'not_scheduled' ? !sched[assetKey(a)]
     : k === 'never' ? dispState(a) === 'never'
     : k === 'overdue' ? (stateOf(a) === 'overdue' && dispState(a) !== 'never')
+    : k.startsWith('cyc:') ? (sched[assetKey(a)]?.cycles?.[k.slice(4)] === 'overdue')  // a specific cycle overdue
     : stateOf(a) === k
   let shown = filters.length === 0 ? base
     : base.filter((a) => filters.some((k) => inBucket(k, a)))
@@ -325,8 +326,8 @@ function LiveDashboard({ go, initialLine = null }) {
   const toggleIn = (set) => (v) => set((prev) => { const a = asArr(prev); return a.includes(v) ? a.filter((x) => x !== v) : [...a, v] })
   // PM-state column filter shares the ribbon's `filters` buckets, so the header
   // funnel and the ribbon chips stay in sync.
-  const PM_OPTS = ['overdue', 'never', 'due_soon', 'long_overdue', 'ok', 'not_scheduled']
-  const PM_LBL = { overdue: 'Overdue', never: 'Awaiting 1st service', due_soon: 'Due soon', long_overdue: '5-Yearly', ok: 'On schedule', not_scheduled: 'Unscheduled' }
+  const PM_OPTS = ['overdue', 'cyc:Monthly', 'cyc:Quarterly', 'cyc:Half-Yearly', 'cyc:Yearly', 'never', 'due_soon', 'long_overdue', 'ok', 'not_scheduled']
+  const PM_LBL = { overdue: 'Overdue (any cycle)', 'cyc:Monthly': 'Monthly overdue', 'cyc:Quarterly': 'Quarterly overdue', 'cyc:Half-Yearly': 'Half-Yearly overdue', 'cyc:Yearly': 'Yearly overdue', never: 'Awaiting 1st service', due_soon: 'Due soon', long_overdue: '5-Yearly', ok: 'On schedule', not_scheduled: 'Unscheduled' }
   const colFilters = {
     code: { text: fCode, setText: setFCode },
     name: { text: fName, setText: setFName },
