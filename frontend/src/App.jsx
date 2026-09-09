@@ -3766,12 +3766,23 @@ function useNetworkGlance() {
   const perLine = {}
   for (const a of assets) {
     const ln = a.line || '—'
-    const p = (perLine[ln] ||= { assets: 0, overdue: 0, dueSoon: 0, exceeded: 0 })
+    // per-line mini-breakdown for the landing dashboards: on-schedule, due-soon,
+    // lapsed-overdue, awaiting-1st (never) — mirrors the LineDashboard buckets.
+    const p = (perLine[ln] ||= { assets: 0, ok: 0, dueSoon: 0, overdue: 0, never: 0, exceeded: 0 })
     p.assets += 1
-    const s = stateOf(a)
-    if (s === 'overdue') p.overdue += 1
-    else if (s === 'due_soon') p.dueSoon += 1
+    const s = sched[assetKey(a)]
+    const st = s?.state
+    if (s?.never_done) p.never += 1
+    else if (st === 'overdue') p.overdue += 1
+    else if (st === 'due_soon') p.dueSoon += 1
+    else if (st === 'ok') p.ok += 1
     if (codalExceeded(a)) p.exceeded += 1
+  }
+  // compliance over in-cycle assets (serviced or lapsed), excluding never/unscheduled
+  for (const p of Object.values(perLine)) {
+    const inCycle = p.ok + p.dueSoon + p.overdue
+    p.inCycle = inCycle
+    p.compliance = inCycle > 0 ? Math.round(((p.ok + p.dueSoon) / inCycle) * 100) : null
   }
   const openByLine = (fail && fail.by_line_open) || {}
   const net = {
@@ -3815,26 +3826,46 @@ function Landing() {
             ) : lines.map((l) => {
               const p = perLine[l.name] || {}
               const open = openByLine[l.name] || 0
-              const chips = []
-              if (open) chips.push(['alert', `${open} open`])
-              if (p.overdue) chips.push(['warn', `${p.overdue} overdue`])
-              if (p.exceeded) chips.push(['warn', `${p.exceeded} past life`])
-              const clear = failReady && !loading && chips.length === 0
+              const ready = failReady && !loading
+              // mini compliance bar segments (only non-zero) — same colours as
+              // the LineDashboard hood: on-schedule / due-soon / overdue / awaiting
+              const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
+                .filter(([, n]) => n > 0)
+              const segTot = segs.reduce((s, [, n]) => s + n, 0) || 1
+              const clear = ready && !open && !p.overdue && !p.exceeded
               return (
                 <a key={l.name} className={`land-tile${l.initiator ? ' initiator' : ''}`}
                    href={`#/line/${encodeURIComponent(l.name)}`}
                    style={{ '--line-c': lineColor(l.name) }}>
                   {l.initiator && <Alpona />}
-                  <span className="gate-line-dot" />
-                  <span className="land-tile-name">{l.name}
-                    {l.initiator && <span className="gate-initiator-chip">সূচনা · initiator</span>}
-                  </span>
-                  <span className="land-tile-sub">{l.assets} assets · {l.stations} locations</span>
-                  <span className="land-tile-health">
-                    {chips.map(([c, t]) => <span key={t} className={`land-hchip ${c}`}>{t}</span>)}
-                    {clear && <span className="land-hchip ok">All clear</span>}
-                  </span>
-                  <span className="land-tile-go">View →</span>
+                  <div className="lt-head">
+                    <span className="gate-line-dot" />
+                    <span className="land-tile-name">{l.name}
+                      {l.initiator && <span className="gate-initiator-chip">সূচনা · initiator</span>}
+                    </span>
+                    {p.compliance != null && (
+                      <span className={`lt-compl ${p.compliance >= 90 ? 'good' : p.compliance >= 70 ? 'warn' : 'bad'}`}>
+                        {p.compliance}%<small>compliance</small>
+                      </span>
+                    )}
+                  </div>
+                  <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations</span>
+                  {ready && segTot > 1 && (
+                    <span className="lt-bar" aria-hidden="true">
+                      {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
+                    </span>
+                  )}
+                  <div className="lt-foot">
+                    <span className="lt-stats">
+                      {ready ? <>
+                        <span className="lt-stat od"><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
+                        <span className="lt-stat"><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
+                        {open ? <span className="lt-stat al"><b>{open}</b> open</span> : null}
+                        {clear && <span className="land-hchip ok">All clear</span>}
+                      </> : <span className="lt-stat dim">loading…</span>}
+                    </span>
+                    <span className="land-tile-go">View →</span>
+                  </div>
                 </a>
               )
             })}

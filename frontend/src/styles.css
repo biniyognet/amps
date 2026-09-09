@@ -1852,25 +1852,30 @@ body:has(.gate) {
   flex: 1 1 auto; min-width: 0; align-content: start;
   display: grid; grid-template-columns: 1fr 1fr; gap: clamp(10px, 1.8vh, 16px) 16px;
 }
-/* pastel fill: the line colour softened into paper, dark ink on top */
+/* modern line card: a light ground with only a faint line-colour tint, crisp
+   brand ink on top (readable on every line incl. yellow), a slim accent rail
+   via ::before, and a soft neutral shadow — no chunky inset rail, no heavy glow */
 .land-tile {
   display: flex; flex-direction: column; gap: 3px;
-  padding: clamp(14px, 2.2vh, 22px) 22px clamp(11px, 1.8vh, 18px);
+  padding: clamp(14px, 2.2vh, 22px) 22px clamp(11px, 1.8vh, 18px) 26px;
   min-height: clamp(96px, 14.5vh, 140px); position: relative; overflow: hidden;
-  /* deeper watercolor wash: line colour pools at the top-left and thins out,
-     with a solid line-colour rail on the left edge */
   background:
-    radial-gradient(130% 160% at 0% 0%, color-mix(in srgb, var(--line-c, #93A7B5) 14%, transparent), transparent 58%),
-    linear-gradient(145deg, color-mix(in srgb, var(--line-c, #93A7B5) 34%, #fffdf8), color-mix(in srgb, var(--line-c, #93A7B5) 16%, #fffdf8) 72%);
-  border: 1px solid color-mix(in srgb, var(--line-c, #93A7B5) 48%, #ece6da);
-  box-shadow: inset 5px 0 0 var(--line-c, #93A7B5);
-  border-radius: 14px; color: #26221d;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--line-c, #93A7B5) 9%, transparent), transparent 55%),
+    color-mix(in srgb, var(--line-c, #93A7B5) 4%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--line-c, #93A7B5) 20%, var(--border));
+  border-radius: var(--r-lg); color: var(--ink);
+  box-shadow: 0 1px 2px rgba(11, 42, 63, .04), 0 10px 30px -20px rgba(11, 42, 63, .22);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.land-tile::before {   /* slim rounded accent rail — replaces the inset shadow */
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--line-c, #93A7B5); border-radius: var(--r-lg) 0 0 var(--r-lg);
 }
 .land-tile:hover {
   transform: translateY(-2px);
-  box-shadow: inset 5px 0 0 var(--line-c, #93A7B5),
-              0 14px 34px color-mix(in srgb, var(--line-c, #57524a) 38%, transparent);
+  border-color: color-mix(in srgb, var(--line-c, #93A7B5) 38%, var(--border));
+  box-shadow: 0 2px 4px rgba(11, 42, 63, .05),
+              0 16px 34px -18px color-mix(in srgb, var(--line-c, #0B2A3F) 40%, rgba(11, 42, 63, .35));
 }
 .land-tile:focus-visible { outline: 2px solid var(--line-c, var(--accent)); outline-offset: 2px; }
 .gate-line-dot {
@@ -1914,21 +1919,41 @@ body:has(.gate) {
   font-size: 11px; font-weight: 650; padding: 2px 9px; border-radius: 99px;
   letter-spacing: .01em; font-variant-numeric: tabular-nums;
 }
-.land-hchip.alert { background: color-mix(in srgb, var(--critical) 15%, #fffdf8); color: var(--critical); border: 1px solid color-mix(in srgb, var(--critical) 30%, transparent); }
-.land-hchip.warn { background: #fdf3d9; color: #8a6100; border: 1px solid #f0dca8; }
-.land-hchip.ok { background: color-mix(in srgb, #0f7a3d 12%, #fffdf8); color: #0f7a3d; border: 1px solid color-mix(in srgb, #0f7a3d 26%, transparent); }
-.land-tile-name { font-size: 20px; font-weight: 750; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; letter-spacing: -0.01em; color: color-mix(in srgb, var(--line-c, #26221d) 55%, #0B2A3F); }
-.land-tile-sub { font-size: 13px; color: color-mix(in srgb, var(--line-c, #5a544c) 28%, #57524a); font-variant-numeric: tabular-nums; }
-.land-tile-go { font-size: 13px; font-weight: 650; margin-top: 8px; color: color-mix(in srgb, var(--line-c, #5a544c) 78%, #0B2A3F); }
+.land-hchip.alert { background: color-mix(in srgb, var(--critical) 12%, var(--surface)); color: var(--critical); border: 1px solid color-mix(in srgb, var(--critical) 28%, transparent); }
+.land-hchip.warn { background: color-mix(in srgb, var(--warning) 12%, var(--surface)); color: #8a6100; border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent); }
+.land-hchip.ok { background: color-mix(in srgb, var(--good) 12%, var(--surface)); color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 26%, transparent); }
+.land-tile-name { font-size: 18px; font-weight: 750; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; letter-spacing: -0.01em; color: var(--ink); }
+.land-tile-sub { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.land-tile-go { font-size: 12.5px; font-weight: 650; color: color-mix(in srgb, var(--line-c, var(--accent)) 62%, var(--ink)); flex: 0 0 auto; }
+
+/* mini-dashboard tile parts */
+.lt-head { display: flex; align-items: center; gap: 9px; }
+.lt-head .gate-line-dot { margin-bottom: 0; flex: 0 0 auto; }
+.lt-head .land-tile-name { flex: 1 1 auto; }
+.lt-compl { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; flex: 0 0 auto;
+  font-size: 21px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.lt-compl.good { color: #1a7a3a; } .lt-compl.warn { color: #8a6100; } .lt-compl.bad { color: var(--critical); }
+.lt-compl small { font-size: 8.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-top: 3px; }
+.lt-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: #EEF2F5; margin-top: 9px; }
+.lt-seg { min-width: 2px; }
+.lt-seg.seg-ok { background: #22a355; } .lt-seg.seg-due { background: var(--warning); }
+.lt-seg.seg-od { background: var(--critical); } .lt-seg.seg-never { background: #9b8bd4; }
+.lt-foot { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.lt-stats { display: flex; align-items: center; gap: 12px; flex: 1 1 auto; flex-wrap: wrap; }
+.lt-stat { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lt-stat b { font-weight: 800; color: var(--ink-2); font-size: 13px; margin-right: 2px; }
+.lt-stat.od b { color: var(--critical); } .lt-stat.al b { color: var(--critical); }
+.lt-stat.dim { color: var(--ink-3); }
 .land-tile.initiator {
   grid-column: 1 / -1; min-height: clamp(110px, 17vh, 160px);
-  padding: clamp(16px, 2.6vh, 26px) 24px clamp(12px, 2vh, 20px);
+  padding: clamp(16px, 2.6vh, 26px) 24px clamp(12px, 2vh, 20px) 26px;
   background:
-    radial-gradient(130% 160% at 0% 0%, color-mix(in srgb, var(--line-c, #93A7B5) 18%, transparent), transparent 58%),
-    linear-gradient(145deg, color-mix(in srgb, var(--line-c, #93A7B5) 44%, #fffdf8), color-mix(in srgb, var(--line-c, #93A7B5) 22%, #fffdf8) 72%);
-  border-color: color-mix(in srgb, var(--line-c, #93A7B5) 58%, #ece6da);
+    radial-gradient(120% 150% at 0% 0%, color-mix(in srgb, var(--line-c, #93A7B5) 13%, transparent), transparent 56%),
+    color-mix(in srgb, var(--line-c, #93A7B5) 6%, var(--surface));
+  border-color: color-mix(in srgb, var(--line-c, #93A7B5) 28%, var(--border));
 }
-.land-tile.initiator .land-tile-name { font-size: 23px; }
+.land-tile.initiator .land-tile-name { font-size: 21px; }
+.land-tile.initiator .lt-compl { font-size: 26px; }
 .gate-initiator-chip {
   font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
   color: color-mix(in srgb, var(--line-c, #0f7a3d) 62%, #26221d);
