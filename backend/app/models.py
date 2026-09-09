@@ -433,3 +433,34 @@ class ChecksheetFormat(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
     approved_by: Mapped[str | None] = mapped_column(String(120))
     approved_at: Mapped[datetime | None]
+
+
+class Correspondence(Base):
+    """Correspondence trail — official letters and emails a section sends or
+    receives, imported from the line's coordination sheet.
+
+    A read-mostly register: one row per letter/email, optionally naming the
+    assets it concerns (free text, as the source records it) so it can be
+    surfaced next to the asset history later. `mode` distinguishes a physical
+    letter from an email; `ref_no` is the letter/reference number.
+    """
+    __tablename__ = "correspondence"
+    __table_args__ = (UniqueConstraint("line_id", "seq", name="uq_corr_line_seq"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    line_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))  # the line's register
+    seq: Mapped[int | None]                      # SL in the source sheet (stable key per line)
+    corr_date: Mapped[date | None]               # the letter/email date
+    mode: Mapped[str] = mapped_column(String(16), default="letter")  # letter | email
+    ref_no: Mapped[str | None] = mapped_column(String(200))          # letter / reference number
+    subject: Mapped[str | None] = mapped_column(Text)
+    related_assets: Mapped[str | None] = mapped_column(Text)         # asset(s) it concerns (free text)
+    brief: Mapped[str | None] = mapped_column(Text)                  # short description / summary
+    sender: Mapped[str | None] = mapped_column(Text)                 # FROM
+    recipient: Mapped[str | None] = mapped_column(Text)              # TO
+    copy_to: Mapped[str | None] = mapped_column(Text)
+    link: Mapped[str | None] = mapped_column(Text)                   # scan / document URL
+    ocr: Mapped[str | None] = mapped_column(Text)                    # extracted text (searchable)
+    drafting_date: Mapped[date | None]
+    drafting_by: Mapped[str | None] = mapped_column(String(200))
+    at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

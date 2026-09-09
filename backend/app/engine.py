@@ -52,7 +52,7 @@ def priority_score(criticality, overdue):
 # Display label → interval in days, shortest first. A longer interval is the
 # more comprehensive service, and it *covers* every shorter cycle under it.
 SCHEDULE_FREQ = {
-    "Monthly": 30, "Quarterly": 91, "Half-Yearly": 182, "Yearly": 365, "5-Yearly": 1825,
+    "Weekly": 7, "Monthly": 30, "Quarterly": 91, "Half-Yearly": 182, "Yearly": 365, "5-Yearly": 1825,
 }
 DUE_SOON_DAYS = 30   # a next-due within this window is "due soon", not yet overdue
 
@@ -116,9 +116,14 @@ def summarize_schedule(rows):
     state = ("overdue" if overdue else "due_soon" if due_soon
              else "long_overdue" if long_overdue else "ok")
     # "never done": the asset is routine-overdue AND no routine cycle was ever
-    # performed (every outstanding routine row is 'never') — a fresh asset with no
-    # maintenance history at all, distinct from one that lapsed after being done.
-    never_done = bool(overdue) and all(r["state"] == "never" for r in overdue)
+    # performed — a fresh asset with no maintenance history at all, distinct from
+    # one that lapsed after being done. Must look at EVERY routine row, not just
+    # the outstanding ones: a pump with Quarterly recorded but Yearly still blank
+    # has a routine PM on record (Quarterly='ok'), so it is NOT awaiting its first
+    # service — it is merely overdue on the Yearly. Checking only `overdue` (which
+    # excludes the done 'ok' rows) wrongly flagged every such pump as never-done.
+    routine = [r for r in rows if not _is_long(r)]
+    never_done = bool(overdue) and all(r["state"] == "never" for r in routine)
     return {
         "next_frequency": nxt["frequency"] if nxt else (
             overdue[0]["frequency"] if overdue else long_overdue[0]["frequency"] if long_overdue else None),

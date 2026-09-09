@@ -277,8 +277,12 @@ def create_asset(asset: AssetIn, db: Session = Depends(get_db), user=Depends(cur
 #   Monthly … 5-Yearly  the PM cycles this asset needs — one column per cycle;
 #                    put TRUE (or a tick) in each cycle that applies. All blank ⇒
 #                    the schedule is inferred from the logbook instead.
-#   last_maintenance last PM date (YYYY-MM-DD) — seeds the schedule for history
-#                    recorded before the logbook; the log takes over after.
+#   last_maintenance last PM date (YYYY-MM-DD) — records a MAINTENANCE log entry
+#                    (one per cycle above) dated that day, so the asset is no
+#                    longer "awaiting 1st service" and next-due is computed from
+#                    it. Applied to assets already on the register too, and
+#                    dedup-safe, so re-uploading a sheet with new dates just adds
+#                    the missing PM records.
 SAMPLE_CSV = """code,name,asset_class,location,line,system,make_model,criticality,status,commissioned_on,description,remarks,codal_life_years,Monthly,Quarterly,Half-Yearly,Yearly,5-Yearly,last_maintenance
 B2HB11,VCB,33KV SWITCHGEAR,Baranagar,Blue Line,HT · 33kV,"SIEMENS LTD.,INDIA",A,in_service,2019-03-15,33kV vacuum circuit breaker — incomer feeder,Under AMC,25,,,,TRUE,,2025-11-06
 LP-C-01(BARA),Concourse Light Panel,DISTRIBUTION BOARD,Baranagar,Blue Line,LT · LT Panels,,B,in_service,,Concourse lighting distribution panel,,15,,TRUE,,TRUE,,2026-01-10
@@ -351,9 +355,31 @@ def import_sample():
 
 class ImportOut(BaseModel):
     created: int
-    skipped: int
+    skipped: int            # asset already existed (not re-created) — still updated below
     failed: int
+    plans_added: int = 0    # pm_plans created for new/existing assets
+    logs_added: int = 0     # maintenance logs created from last_maintenance dates
     errors: list[str]  # first errors, "line N: reason"
+
+
+def _get_or_create_asset(db: Session, asset: AssetIn, user) -> tuple[Asset, bool]:
+    """Resolve the asset for an import row at its own location, creating it if
+    absent. Returns (asset, created?). Unlike the bare create path this does NOT
+    409 on an existing code — an import that carries a maintenance plan or a
+    last_maintenance date must still be applied to an asset already on the
+    register (that was the silent gap: existing rows were skipped whole, so a
+    newly-added last-maintenance date never seeded the schedule)."""
+    if user.line_id is not None:
+        my_line = db.get(Location, user.line_id).name
+        if asset.line and asset.line != my_line:
+            raise HTTPException(403, f"your account manages {my_line} only")
+        asset.line = my_line
+    loc = _get_or_create_location(db, asset.location, asset.line)
+    existing = db.scalar(select(Asset).where(Asset.code == asset.code,
+                                             Asset.location_id == loc.id))
+    if existing:
+        return existing, False
+    return _create_one(db, asset, user), True
 
 
 @router.post("/import", response_model=ImportOut)
@@ -369,7 +395,7 @@ async def import_csv(request: Request, db: Session = Depends(get_db),
     if missing:
         raise HTTPException(422, f"missing required columns: {', '.join(missing)}")
 
-    created = skipped = failed = 0
+    created = skipped = failed = plans_added = logs_added = 0
     errors: list[str] = []
     for n, raw in enumerate(rows, start=2):
         fields = {k: (raw.get(k) or "").strip()
@@ -388,18 +414,53 @@ async def import_csv(request: Request, db: Session = Depends(get_db),
             else:
                 del fields["commissioned_on"]
         try:
-            obj = _create_one(db, AssetIn(**fields), user)
-            # optional maintenance plan — seed pm_plans from the cycle columns
+            obj, was_created = _get_or_create_asset(db, AssetIn(**fields), user)
+            if was_created:
+                created += 1
+            else:
+                skipped += 1  # already on the register — still apply plan + last PM below
+
+            # maintenance plan — ensure a pm_plan exists for each cycle column.
+            # Idempotent: never a second plan for a cycle the asset already has.
             cycles = _cycles_from_row(raw)
             if cycles:
                 cycles = sorted(cycles, key=lambda x: SCHEDULE_FREQ[x])
-                seed = _parse_date(raw.get("last_maintenance") or "")
-                for f in cycles:
-                    db.add(PMPlan(asset_id=obj.id, frequency=f, last_done_seed=seed))
-                audit(db, "asset", obj.id, "pm_plan",
-                      detail="imported: " + ", ".join(cycles), actor=user.username)
+                have = {p.frequency for p in db.scalars(
+                    select(PMPlan).where(PMPlan.asset_id == obj.id)).all()}
+                new_cycles = [f for f in cycles if f not in have]
+                for f in new_cycles:
+                    db.add(PMPlan(asset_id=obj.id, frequency=f))
+                    plans_added += 1
+                if new_cycles:
+                    audit(db, "asset", obj.id, "pm_plan",
+                          detail="imported: " + ", ".join(new_cycles), actor=user.username)
+
+            # last_maintenance -> a real MAINTENANCE log entry (the source of
+            # truth), one per applicable cycle, so it clears "awaiting 1st
+            # service" and drives next-due via the normal log path. Dedup on
+            # (asset, date, cycle) makes re-imports idempotent.
+            lm = _parse_date(raw.get("last_maintenance") or "")
+            if lm:
+                subs = cycles or [p.frequency for p in db.scalars(
+                    select(PMPlan).where(PMPlan.asset_id == obj.id)).all()
+                    if p.frequency in SCHEDULE_FREQ]
+                for f in (subs or [None]):
+                    dup = db.scalar(select(LogEntry).where(
+                        LogEntry.asset_id == obj.id, LogEntry.log_date == lm,
+                        LogEntry.subtype == f,
+                        LogEntry.type == LogEntryType.MAINTENANCE))
+                    if dup:
+                        continue
+                    db.add(LogEntry(
+                        asset_id=obj.id, log_date=lm, type=LogEntryType.MAINTENANCE,
+                        subtype=f, line_id=obj.line_id,
+                        attended_by="Register import", entered_by=user.username,
+                        text=(f"{f or 'PM'} maintenance completed on "
+                              f"{lm.isoformat()} — recorded from the asset "
+                              f"register (pre-logbook); details not captured.")))
+                    logs_added += 1
+
             db.commit()  # per row: one bad row can never sink the batch
-            created += 1
         except HTTPException as e:
             db.rollback()
             if e.status_code == 409:
@@ -418,7 +479,8 @@ async def import_csv(request: Request, db: Session = Depends(get_db),
             failed += 1
             if len(errors) < 20:
                 errors.append(f"line {n}: {type(e).__name__}: {str(e.orig or e)[:120]}")
-    return ImportOut(created=created, skipped=skipped, failed=failed, errors=errors)
+    return ImportOut(created=created, skipped=skipped, failed=failed,
+                     plans_added=plans_added, logs_added=logs_added, errors=errors)
 
 
 @router.get("/{code}", response_model=AssetOut)
@@ -604,7 +666,14 @@ def set_plan(code: str, plan: PlanIn, db: Session = Depends(get_db),
              user=Depends(current_writer)):
     """Set the asset's maintenance plan — which cycles it needs, with optional
     seed dates. Replaces the plan wholesale; the change is audited. Writers only,
-    line-scoped (a plan on an asset outside your line 404s)."""
+    line-scoped (a plan on an asset outside your line 404s).
+
+    A seed (last-done) date is a claim that a PM was performed that day, so it
+    also lands a real MAINTENANCE log entry — the logbook is AMPS's source of
+    truth, so the date is visible and auditable there, not just a hidden baseline
+    on the plan. Dedup on (asset, date, cycle) keeps re-saving the plan
+    idempotent; the seed is kept too (harmless — the schedule takes the max of
+    log and seed — and it keeps the plan editor's date field populated)."""
     a = visible_asset(db, code, user)
     bad = [f for f in plan.frequencies if f not in SCHEDULE_FREQ]
     if bad:
@@ -615,8 +684,23 @@ def set_plan(code: str, plan: PlanIn, db: Session = Depends(get_db),
         db.delete(p)
     db.flush()
     new = set(plan.frequencies)
+    logged: list[str] = []
     for f in sorted(new, key=lambda x: SCHEDULE_FREQ[x]):
-        db.add(PMPlan(asset_id=a.id, frequency=f, last_done_seed=plan.seeds.get(f)))
+        seed = plan.seeds.get(f)
+        db.add(PMPlan(asset_id=a.id, frequency=f, last_done_seed=seed))
+        if seed:
+            dup = db.scalar(select(LogEntry).where(
+                LogEntry.asset_id == a.id, LogEntry.log_date == seed,
+                LogEntry.subtype == f, LogEntry.type == LogEntryType.MAINTENANCE))
+            if not dup:
+                db.add(LogEntry(
+                    asset_id=a.id, log_date=seed, type=LogEntryType.MAINTENANCE,
+                    subtype=f, line_id=a.line_id,
+                    attended_by="PM plan (last-done)", entered_by=user.username,
+                    text=(f"{f} maintenance completed on {seed.isoformat()} — "
+                          f"recorded via the asset's maintenance plan; details "
+                          f"not captured.")))
+                logged.append(f"{f}@{seed.isoformat()}")
     if old != new:
         added = sorted(new - old, key=lambda x: SCHEDULE_FREQ[x])
         removed = sorted(old - new, key=lambda x: SCHEDULE_FREQ[x])
@@ -626,6 +710,9 @@ def set_plan(code: str, plan: PlanIn, db: Session = Depends(get_db),
         if removed:
             parts.append("removed " + ", ".join(removed))
         audit(db, "asset", a.id, "pm_plan", detail="; ".join(parts), actor=user.username)
+    if logged:
+        audit(db, "asset", a.id, "pm_log", detail="last-done logged: " + ", ".join(logged),
+              actor=user.username)
     db.commit()
     db.refresh(a)
     return _asset_schedule(db, a)

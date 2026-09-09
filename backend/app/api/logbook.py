@@ -1224,7 +1224,10 @@ def _maint_subtype(type_text: str) -> str | None:
     t = (type_text or "").upper()
     if "HALF" in t: return "Half-Yearly"
     if "QUARTER" in t: return "Quarterly"
+    # 'MONTH' before 'WEEK' so a 'Weekly & Monthly' cell reads as the longer
+    # (monthly) cycle it fulfils; a plain 'Weekly' falls through to Weekly.
     if "MONTH" in t: return "Monthly"
+    if "WEEK" in t: return "Weekly"
     if "YEAR" in t: return "Yearly"
     if "MAINT" in t or "TESTING" in t: return "Special"
     return None
