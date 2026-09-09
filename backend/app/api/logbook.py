@@ -578,10 +578,14 @@ def list_entries(log_date: date | None = None, shift: str | None = None,
     say "1-100 of 3,966" instead of silently showing a truncated page — a
     year of this book is thousands of entries."""
     # The bulk ledger is login-only; the QR walk-up (a single asset's log,
-    # scoped by asset_code) stays open. Without a scope, an anonymous request
-    # could pull the whole 18,000-row operational book — so require a session.
-    if asset_code is None and is_anonymous(user):
+    # scoped by asset_code) stays open. A single LINE's recent log is also open
+    # to anonymous readers (the public per-line dashboard shows it) but capped so
+    # it can never pull the whole 18,000-row operational book without a session.
+    anon = is_anonymous(user)
+    if anon and asset_code is None and not (line and line.strip()):
         raise HTTPException(401, "login required")
+    if anon:
+        limit = min(limit, 25)
     filters = []
     # An edit is a NEW entry that corrects an older one (append-only). The list
     # shows only the latest version of each chain — the entry it superseded is

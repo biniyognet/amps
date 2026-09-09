@@ -3028,9 +3028,13 @@ function TagSheet() {
 
 /* ---------- home dashboard (signed-in landing) ---------- */
 
-function LineDashboard({ go }) {
+function LineDashboard({ go, initialLine = null }) {
   const { assets: allAssets, sched, openFail, loading, schedLoading } = useLiveAssets()
-  const assets = allAssets.filter((a) => a.status !== 'decommissioned' && a.status !== 'spare') // not in active service — not counted
+  // initialLine scopes the whole overview to one line — used for the public,
+  // no-login per-line dashboard reached from the landing (officers view without
+  // signing in). Without it, the view spans whatever the caller can see.
+  const assets = allAssets.filter((a) => a.status !== 'decommissioned' && a.status !== 'spare'
+    && (!initialLine || a.line === initialLine)) // not in active service — not counted
   const { me } = useMe()
   const [stats, setStats] = useState(null)
   const [recent, setRecent] = useState([])
@@ -3038,9 +3042,10 @@ function LineDashboard({ go }) {
   const [bkStn, setBkStn] = useState('')   // Overdue-breakup card: station filter ('' = all)
   const [now, setNow] = useState(() => new Date())   // live clock in the toolbar
   useEffect(() => {
-    getJSON('/api/logbook/failure-stats?days=180&months=6').then(setStats).catch(() => {})
-    getJSON('/api/logbook?limit=6').then(setRecent).catch(() => {})
-  }, [])
+    const lq = initialLine ? `&line=${encodeURIComponent(initialLine)}` : ''
+    getJSON(`/api/logbook/failure-stats?days=180&months=6${lq}`).then(setStats).catch(() => {})
+    getJSON(`/api/logbook?limit=6${lq}`).then(setRecent).catch(() => {})
+  }, [initialLine])
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
   // Dock the hood beneath the sticky topbar like the register's toolbar: measure
   // the topbar's real height into --topbar-h so the hood parks exactly under it
@@ -3109,9 +3114,12 @@ function LineDashboard({ go }) {
   const depots = new Set(assets.map((a) => a.depot).filter(Boolean)).size
   const openF = assets.reduce((n, a) => n + (openFail[assetKey(a)]?.open || 0) + (openFail[assetKey(a)]?.ack || 0) + (openFail[assetKey(a)]?.jobcard || 0), 0)
   const trend = stats ? stats.per_month.map((m) => ({ label: new Date(`${m.month}-01T00:00:00`).toLocaleString(undefined, { month: 'short' }), count: m.count })) : []
-  const line = me?.line || ORG
-  const failLine = me?.line || (assets[0] && assets[0].line)
+  const line = initialLine || me?.line || ORG
+  const failLine = initialLine || me?.line || (assets[0] && assets[0].line)
   const failHref = failLine ? `#/line/${encodeURIComponent(failLine)}/failures` : '#/'
+  // scoped register link — the line's own register for the public per-line view,
+  // else the caller's global register
+  const regHref = initialLine ? `#/line/${encodeURIComponent(initialLine)}/assets` : '#/assets'
 
   // stacked compliance bar segments (ordered best → worst); never-serviced and
   // unscheduled shown as neutral onboarding backlog, not as breakdowns
@@ -3201,7 +3209,7 @@ function LineDashboard({ go }) {
         </div>
         <div className="h-meter" role="img" aria-label="PM compliance breakdown">
           {segs.map(([k, label, n, cls]) => (
-            <a key={k} className={`h-col ${cls}`} href="#/assets" style={{ flex: `${n} 1 0` }} title={`${label}: ${n.toLocaleString()}`}>
+            <a key={k} className={`h-col ${cls}`} href={regHref} style={{ flex: `${n} 1 0` }} title={`${label}: ${n.toLocaleString()}`}>
               <span className={`h-seg cc-seg ${cls}`} />
               <span className="h-cn">{n.toLocaleString()}</span>
               <span className="h-cl">{label}</span>
@@ -3248,7 +3256,7 @@ function LineDashboard({ go }) {
             )}
           </div>
         )}
-        <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
+        <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
       {/* overdue by system */}
@@ -3268,7 +3276,7 @@ function LineDashboard({ go }) {
             })}
           </div>
         )}
-        <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
+        <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
       {/* recent logbook */}
@@ -3635,7 +3643,7 @@ function DocsView() {
 /* Live deployments only show modules whose backend exists; the rest join the
    nav release by release. The demo build keeps the full walkthrough. */
 const NAV = LIVE ? [
-  ['/', 'Home'],
+  ['/', 'Dashboard'],
   ['/assets', 'Assets'],
   ['/log', 'Log book'],
   ['/failures', 'Failures'],
@@ -3913,19 +3921,35 @@ function LoginPage() {
 
 /* ---------- one line, view-only (from a landing square) ---------- */
 
+/* A line's public dashboard (maintenance overview) — the default when a line is
+   opened, so officers get the at-a-glance view with no login. Assets/Failures
+   are one tab away. */
 function LineView({ name }) {
   const { me } = useMe()
-  // anon has the topbar tabs (Lines · Assets · Failures); only the signed-in
-  // admin, whose global nav has no per-line failures, needs the in-view link
-  const anon = LIVE && me?.auth_enabled && me?.username === 'viewer'
+  const enc = encodeURIComponent(name)
   return (
     <>
-      {!anon && (
-        <div className="line-subnav">
-          {!me?.line && <a className="crumb" href="#/">← All lines</a>}
-          <a className="btn ghost sm" href={`#/line/${encodeURIComponent(name)}/failures`}>Failures →</a>
-        </div>
-      )}
+      <div className="line-subnav">
+        {!me?.line && <a className="crumb" href="#/">← All lines</a>}
+        <a className="btn ghost sm" href={`#/line/${enc}/assets`}>Assets →</a>
+        <a className="btn ghost sm" href={`#/line/${enc}/failures`}>Failures →</a>
+      </div>
+      <LineDashboard go={(r) => { location.hash = r }} initialLine={name} />
+    </>
+  )
+}
+
+/* A line's asset register (the table) — reached from the dashboard or /line/<name>/assets */
+function LineAssets({ name }) {
+  const { me } = useMe()
+  const enc = encodeURIComponent(name)
+  return (
+    <>
+      <div className="line-subnav">
+        {!me?.line && <a className="crumb" href="#/">← All lines</a>}
+        <a className="btn ghost sm" href={`#/line/${enc}`}>← Dashboard</a>
+        <a className="btn ghost sm" href={`#/line/${enc}/failures`}>Failures →</a>
+      </div>
       <LiveDashboard go={(r) => { location.hash = r }} initialLine={name} />
     </>
   )
@@ -3973,7 +3997,8 @@ export default function App() {
   // a line's own failures board lives under the line: /line/<name>/failures.
   // Match that first so the plain line route doesn't swallow the suffix.
   const lineFailMatch = routePath.match(/^\/line\/(.+)\/failures$/)
-  const lineMatch = !lineFailMatch && routePath.match(/^\/line\/(.+)$/)
+  const lineAssetsMatch = !lineFailMatch && routePath.match(/^\/line\/(.+)\/assets$/)
+  const lineMatch = !lineFailMatch && !lineAssetsMatch && routePath.match(/^\/line\/(.+)$/)
   const failLine = lineFailMatch ? safeDecode(lineFailMatch[1]) : null
   const letterMatch = routePath.match(/^\/procurement\/([^/]+)\/letter$/)
   const csMatch = routePath.match(/^\/checksheet\/(wo|pm)\/([^/]+)(?:\/(.+))?$/)
@@ -3984,7 +4009,7 @@ export default function App() {
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}landing-art.webp`} />
@@ -3995,7 +4020,7 @@ export default function App() {
   if (anonymous) {
     if (routePath === '/login') return <>{siteArt}<LoginPage /></>
     if (onLanding) return <>{siteArt}<Landing /></> // full-screen, own chrome
-    const navLine = failLine || (lineMatch ? decodeURIComponent(lineMatch[1]) : null)
+    const navLine = failLine || (lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : null) || (lineMatch ? decodeURIComponent(lineMatch[1]) : null)
     return (
       <>{siteArt}
       <div className="shell" style={navLine ? { '--nav-c': lineColor(navLine) } : undefined}>
@@ -4005,7 +4030,8 @@ export default function App() {
             <a href="#/" className={!navLine ? 'active' : ''}>Lines</a>
             {navLine && !assetMatch && (
               <>
-                <a href={`#/line/${encodeURIComponent(navLine)}`} className={lineMatch ? 'active' : ''}>Assets</a>
+                <a href={`#/line/${encodeURIComponent(navLine)}`} className={lineMatch ? 'active' : ''}>Dashboard</a>
+                <a href={`#/line/${encodeURIComponent(navLine)}/assets`} className={lineAssetsMatch ? 'active' : ''}>Assets</a>
                 <a href={`#/line/${encodeURIComponent(navLine)}/failures`} className={failLine ? 'active' : ''}>Failures</a>
               </>
             )}
@@ -4016,6 +4042,7 @@ export default function App() {
         {routePath === '/guide' ? <DocsView />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
+          : lineAssetsMatch ? <LineAssets name={safeDecode(lineAssetsMatch[1])} />
           : <LineView name={decodeURIComponent(lineMatch[1])} />}
         <footer className="foot">{ORG} · maintenance records · <AmpsLink />, MIT © 2026 <FootSig /></footer>
       </div>
@@ -4023,7 +4050,8 @@ export default function App() {
     )
   }
 
-  const navLine = lineMatch ? decodeURIComponent(lineMatch[1]) : (signedIn && me.line) || null
+  const navLine = lineMatch ? decodeURIComponent(lineMatch[1])
+    : lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : (signedIn && me.line) || null
   return (
     <>{siteArt}
     <div className="shell" style={navLine ? { '--nav-c': lineColor(navLine) } : undefined}>
@@ -4054,6 +4082,7 @@ export default function App() {
 
       {assetMatch ? (LIVE ? <LiveAssetDetail code={assetCode} /> : <AssetDetail code={assetCode} />)
         : lineFailMatch ? (LIVE ? <LineFailures name={failLine} /> : <Failures />)
+        : lineAssetsMatch ? (LIVE ? <LineAssets name={safeDecode(lineAssetsMatch[1])} /> : <NotYet />)
         : lineMatch ? (LIVE ? <LineView name={decodeURIComponent(lineMatch[1])} /> : <NotYet />)
         : letterMatch ? (LIVE ? <NotYet /> : <ProposalLetter prId={letterMatch[1]} />)
         : csMatch ? (LIVE ? <NotYet /> : <Checksheet kind={csMatch[1]} a1={csMatch[2]} a2={csMatch[3]} />)
