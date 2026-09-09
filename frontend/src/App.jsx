@@ -195,6 +195,15 @@ function LiveDashboard({ go, initialLine = null }) {
   const [impResult, setImpResult] = useState(null)
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
+  // printing renders the WHOLE filtered set (not just the on-screen page) so a
+  // printout is never silently truncated to 150 rows; the effect prints after the
+  // full table has painted, then restores the paged view.
+  const [printAll, setPrintAll] = useState(false)
+  useEffect(() => {
+    if (!printAll) return
+    const t = setTimeout(() => { window.print(); setPrintAll(false) }, 80)
+    return () => clearTimeout(t)
+  }, [printAll])
   useEffect(() => { setLine(initialLine) }, [initialLine])
   // freeze the toolbar + table header: measure the sticky topbar and this
   // toolbar so the header parks exactly beneath them however the row wraps
@@ -313,6 +322,11 @@ function LiveDashboard({ go, initialLine = null }) {
   const pageCount = Math.max(1, Math.ceil(shown.length / REG_PAGE))
   const pageSafe = Math.min(page, pageCount - 1)
   const pageRows = shown.slice(pageSafe * REG_PAGE, (pageSafe + 1) * REG_PAGE)
+  // when printing, render every filtered row so the printout is complete
+  const renderRows = printAll ? shown : pageRows
+  // SL (serial) numbering — absolute position in the filtered set, so a printout
+  // of a paged view still numbers continuously
+  const rowOffset = printAll ? 0 : pageSafe * REG_PAGE
   useEffect(() => { setPage(0) }, [filters.join(','), q, fSystem, fClass, fLocation, fStatus, fLocDet.join(','), fCode, fName, sortKey, sortDir]) // eslint-disable-line
 
   const toggleSort = (k) => {
@@ -347,17 +361,29 @@ function LiveDashboard({ go, initialLine = null }) {
   }
   const [openCol, setOpenCol] = useState(null)
 
-  // download the table exactly as filtered & sorted, as CSV
+  // download the FULL filtered & sorted set as CSV — EVERY asset field plus the
+  // derived schedule (last/next PM, per-cycle state) and failure counts, not just
+  // the columns shown on screen. A complete data extract, BOM-prefixed for Excel.
+  const CSV_CYC = ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly']
   const exportCsv = () => {
     const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
-    const head = [...COLS.map(([, l]) => l), 'Open failures', 'Acknowledged', 'Job card']
-    const body = shown.map((a) => {
+    const head = ['SL', 'Code', 'Asset', 'Class', 'System', 'Station', 'Location', 'Status',
+      'Criticality', 'Depot', 'Make / model', 'Commissioned', 'Codal life (yrs)',
+      'Last PM', 'Next due', 'PM state', ...CSV_CYC.map((c) => `${c} state`),
+      'Open failures', 'Acknowledged', 'Job card', 'Line']
+    const body = shown.map((a, i) => {
       const s = sched[assetKey(a)]
-      return [a.code, a.name, a.cls, a.location, a.sys || '', STATUS_LABEL[a.status] || a.status,
-        s?.next_due || '', s ? SCHED_LABEL[s.state] : '', openN(a) || '', ackN(a) || '', jobN(a) || ''].map(cell).join(',')
+      const cyc = s?.cycles || {}
+      return [i + 1, a.code, a.name, a.cls, a.sys || '', a.location, a.locationDetail || '',
+        STATUS_LABEL[a.status] || a.status, a.criticality || '', a.depot || '',
+        a.makeModel || '', a.commissionedOn || '', a.codalLifeYears ?? '',
+        s?.last_done || '', s?.next_due || '',
+        s ? (SCHED_LABEL[dispState(a)] || SCHED_LABEL[s.state] || '') : '',
+        ...CSV_CYC.map((c) => (cyc[c] ? (SCHED_LABEL[cyc[c]] || cyc[c]) : '')),
+        openN(a) || '', ackN(a) || '', jobN(a) || '', a.line || ''].map(cell).join(',')
     })
     const csv = [head.map(cell).join(','), ...body].join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
     a.download = `amps-assets-${effLine ? effLine.replace(/\s+/g, '-').toLowerCase() + '-' : ''}${new Date().toISOString().slice(0, 10)}.csv`
@@ -489,8 +515,8 @@ function LiveDashboard({ go, initialLine = null }) {
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
               </button>
-              <button type="button" className="icon-btn" title="Print the filtered table"
-                      aria-label="Print filtered table" onClick={() => window.print()}>
+              <button type="button" className="icon-btn" title="Print the filtered table (landscape, compact)"
+                      aria-label="Print filtered table" onClick={() => setPrintAll(true)}>
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
               </button>
@@ -533,10 +559,16 @@ function LiveDashboard({ go, initialLine = null }) {
           {shown.length === 0 ? (
             <div className="card"><p className="dim" style={{ margin: 0 }}>No assets match — clear the search or filters.</p></div>
           ) : (
-            <div className="card tbl-wrap freeze-head">
-              <table className="sortable">
+            <div className="card tbl-wrap freeze-head reg-print">
+              <table className="sortable reg-table">
+                <colgroup>
+                  <col className="c-sl" /><col className="c-code" /><col className="c-asset" /><col className="c-class" />
+                  <col className="c-station" /><col className="c-loc" /><col className="c-system" />
+                  <col className="c-status" /><col className="c-lastpm" /><col className="c-pm" />
+                </colgroup>
                 <thead>
                   <tr>
+                    <th className="sl-col">SL</th>
                     {COLS.map(([k, lbl]) => {
                       const cf = colFilters[k]
                       const cfOn = cf && (cf.text !== undefined ? !!cf.text : cf.values.length)
@@ -557,7 +589,7 @@ function LiveDashboard({ go, initialLine = null }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((a) => {
+                  {renderRows.map((a, i) => {
                     const s = sched[assetKey(a)]
                     const nOpen = openN(a), nAck = ackN(a), nJob = jobN(a)
                     const nOut = nOpen + nAck + nJob  // outstanding failures on the asset
@@ -573,6 +605,7 @@ function LiveDashboard({ go, initialLine = null }) {
                           className={nOpen ? 'row-faulty' : nAck ? 'row-ack' : nJob ? 'row-job' : ''}
                           onClick={() => go(`/asset/${a.code}`)}
                           onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${a.code}`)}>
+                        <td className="sl-col">{rowOffset + i + 1}</td>
                         <td className="code" data-l="Code">{a.code}</td>
                         <td data-l="Asset">{a.name}
                           {nOpen > 0 && <span className="fault-badge" title={`${nOpen} open breakdown${nOpen > 1 ? 's' : ''} — unresolved, no response logged yet`}>⚠ {nOpen} open</span>}
@@ -3003,9 +3036,22 @@ function LineDashboard({ go }) {
   const [recent, setRecent] = useState([])
   const [bkSys, setBkSys] = useState('')   // Overdue-breakup card: system filter ('' = all)
   const [bkStn, setBkStn] = useState('')   // Overdue-breakup card: station filter ('' = all)
+  const [now, setNow] = useState(() => new Date())   // live clock in the toolbar
   useEffect(() => {
     getJSON('/api/logbook/failure-stats?days=180&months=6').then(setStats).catch(() => {})
     getJSON('/api/logbook?limit=6').then(setRecent).catch(() => {})
+  }, [])
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
+  // Dock the hood beneath the sticky topbar like the register's toolbar: measure
+  // the topbar's real height into --topbar-h so the hood parks exactly under it
+  // however the nav wraps (a fixed guess left a gap / overlap on some widths).
+  useEffect(() => {
+    const tb = document.querySelector('.topbar')
+    if (!tb || typeof ResizeObserver === 'undefined') return
+    const set = () => document.documentElement.style.setProperty('--topbar-h', `${tb.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set); ro.observe(tb)
+    return () => ro.disconnect()
   }, [])
   if (loading || schedLoading) return <p className="dim">Loading the dashboard…</p>
   const pm = (a) => sched[assetKey(a)]
@@ -3027,7 +3073,11 @@ function LineDashboard({ go }) {
   // compliance measured over assets already in the maintenance cycle (serviced at
   // least once) — never-serviced assets are a separate onboarding backlog
   const inCycle = scheduled - neverN
-  const compliance = inCycle > 0 ? Math.round((bucket.ok / inCycle) * 100) : (scheduled ? 100 : 0)
+  // "compliant" = not lapsed: an asset on schedule (ok) OR approaching its next
+  // due date (due_soon) is still within its maintenance window. Only genuinely
+  // overdue (lapsed) routine PM counts against compliance.
+  const compliant = bucket.ok + bucket.due_soon
+  const compliance = inCycle > 0 ? Math.round((compliant / inCycle) * 100) : (scheduled ? 100 : 0)
   // routine overdue broken up by the overdue cycle (Monthly / Quarterly / …)
   // and by asset class — so the PCEE sees WHERE the backlog is concentrated
   const overdueByFreq = {}
@@ -3075,154 +3125,175 @@ function LineDashboard({ go }) {
   ].filter(([, , n]) => n > 0)
 
   const tile = (v, k, cls, to, sub) => (
-    <a className={`tile dash-tile${cls ? ' ' + cls : ''}`} href={to} role="button">
-      <div className="v">{v}</div><div className="k">{k}</div>{sub && <div className="note">{sub}</div>}
+    <a className={`bento-stat${cls ? ' ' + cls : ''}`} href={to} role="button">
+      <div className="v">{v}</div><div className="k">{k}</div>{sub && <div className="n">{sub}</div>}
     </a>
   )
+  // compact inline stat for the merged header strip — value over label only
+  const hstat = (v, k, cls, to) => (
+    <a className={`h-stat${cls ? ' ' + cls : ''}`} href={to} role="button">
+      <span className="v">{v}</span><span className="k">{k}</span>
+    </a>
+  )
+  const complClass = compliance >= 90 ? 'good' : compliance >= 70 ? 'warn' : 'bad'
+  // Export the dashboard summary — the KPI figures + overdue breakup — as a CSV,
+  // matching the asset register's download action so the toolbar behaves alike.
+  const exportSummary = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const rows = [
+      ['AMPS — ' + line + ' — Maintenance Overview'],
+      ['Generated', now.toLocaleString()],
+      [],
+      ['Metric', 'Count'],
+      ['Total assets', total], ['On schedule', bucket.ok], ['Due soon', bucket.due_soon],
+      ['Overdue (lapsed)', lapsed], ['Awaiting 1st service', neverN],
+      ['5-Yearly overhaul', bucket.long_overdue], ['Unscheduled', bucket.none],
+      ['Open failures', openF], ['Exceeded codal life', exceeded],
+      ['PM compliance %', compliance],
+      [],
+      ['Overdue breakup', 'Count'],
+      ...SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => [f, bkByFreq[f]]),
+      ...(bkLong ? [['5-Yearly (separate)', bkLong]] : []),
+      [],
+      ['Overdue by system', 'Count'],
+      ...topSystems.map(([c, n]) => [c, n]),
+    ]
+    const blob = new Blob([rows.map((r) => r.map(esc).join(',')).join('\n')], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = `amps-overview-${line.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
   return (
     <>
-      <div className="page-head dash-head">
-        <h1>{line} · Maintenance Overview</h1>
-        <span className="dash-asof">as of {new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+      <div className="card dash-hood">
+      <div className="dash-toolbar">
+        <h1 className="dash-title">{line} · Maintenance Overview</h1>
+        <span className="dash-crumb">Preventive-maintenance compliance & asset health</span>
+        <span className="dash-clock" role="timer" aria-label="Current date and time">
+          <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
+          <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+        </span>
+        <div className="asset-actions">
+          <button type="button" className="icon-btn" title="Download the overview (CSV)"
+                  aria-label="Download overview" onClick={exportSummary}>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
+          </button>
+          <button type="button" className="icon-btn" title="Print this dashboard"
+                  aria-label="Print dashboard" onClick={() => window.print()}>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
+          </button>
+        </div>
       </div>
 
-      {/* headline compliance summary */}
-      <section className="card compliance-card">
-        <div className="cc-top">
-          <div className="cc-hero">
-            <div className={`cc-pct ${compliance >= 90 ? 'good' : compliance >= 70 ? 'warn' : 'bad'}`}>{compliance}%</div>
-            <div className="cc-hero-k">PM compliance<span className="dim"> · {bucket.ok.toLocaleString()} of {inCycle.toLocaleString()} in-cycle assets on schedule</span></div>
-          </div>
-          <div className="cc-figures">
-            <div className="cc-fig"><b>{total.toLocaleString()}</b><span>Total assets</span></div>
-            <div className="cc-fig"><b className="good">{bucket.ok.toLocaleString()}</b><span>On schedule</span></div>
-            <div className="cc-fig"><b className={lapsed ? 'warn' : 'good'}>{lapsed.toLocaleString()}</b><span>Overdue (lapsed)</span></div>
-            <div className="cc-fig"><b className="neutral">{neverN.toLocaleString()}</b><span>Awaiting 1st service</span></div>
+      {/* merged compliance + breakdown strip — one deduped row.
+          Left: the compliance headline. Right: the stacked bar on top, with each
+          state's figure sitting directly under its own coloured segment (the
+          legend IS the breakdown — no duplicate KPI row). */}
+      <section className="hstrip">
+        <div className="h-compl">
+          <span className={`h-pct ${complClass}`}>{compliance}%</span>
+          <div className="h-txt">
+            <span className="h-pk">PM compliance</span>
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule</span>
           </div>
         </div>
-        <div className="cc-bar" role="img" aria-label="PM compliance breakdown">
-          {segs.map(([k, , n, cls]) => (
-            <div key={k} className={`cc-seg ${cls}`} style={{ flexGrow: n }} title={`${n} ${SCHED_LABEL[k] || k}`} />
-          ))}
-        </div>
-        <div className="cc-legend">
+        <div className="h-meter" role="img" aria-label="PM compliance breakdown">
           {segs.map(([k, label, n, cls]) => (
-            <span key={k} className="cc-leg"><span className={`cc-dot ${cls}`} />{label} <b>{n.toLocaleString()}</b></span>
+            <a key={k} className={`h-col ${cls}`} href="#/assets" style={{ flex: `${n} 1 0` }} title={`${label}: ${n.toLocaleString()}`}>
+              <span className={`h-seg cc-seg ${cls}`} />
+              <span className="h-cn">{n.toLocaleString()}</span>
+              <span className="h-cl">{label}</span>
+            </a>
           ))}
         </div>
       </section>
-
-      {/* KPI tiles — overdue split routine vs 5-yearly */}
-      <div className="kpis dash-kpis">
-        {tile(total.toLocaleString(), 'Assets', '', '#/assets', `${stations} locations · ${depots || 1} depot${depots > 1 ? 's' : ''}`)}
-        {tile(bucket.ok.toLocaleString(), 'On schedule', bucket.ok ? 'ok' : '', '#/assets', `${compliance}% of scheduled`)}
-        {tile(bucket.due_soon.toLocaleString(), 'Due soon', bucket.due_soon ? 'warn' : '', '#/assets', 'within 30 days')}
-        {tile(lapsed.toLocaleString(), 'Overdue', lapsed ? 'warn' : 'ok', '#/assets', 'lapsed routine PM')}
-        {tile(neverN.toLocaleString(), 'Awaiting 1st service', neverN ? 'neutral' : '', '#/assets', 'never yet serviced')}
-        {tile(bucket.long_overdue.toLocaleString(), '5-Yearly', bucket.long_overdue ? 'neutral' : '', '#/assets', 'overhaul / not started')}
-        {tile(openF.toLocaleString(), 'Open failures', openF ? 'alert' : '', failHref, 'awaiting rectification')}
       </div>
 
-      <div className="dash-grid">
-        {/* overdue breakup by cycle */}
-        <section className="card viz-card">
-          <div className="viz-head-row">
-            <h2 className="viz-h">Overdue breakup <span className="viz-note">lapsed routine cycles</span></h2>
-            <div className="viz-filters">
-              <select className="viz-sel" value={bkSys} onChange={(e) => setBkSys(e.target.value)} aria-label="Filter breakup by system">
-                <option value="">All systems</option>
-                {bkSystems.map((sy) => <option key={sy} value={sy}>{sy}</option>)}
-              </select>
-              <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label="Filter breakup by station">
-                <option value="">All stations</option>
-                {bkStations.map((st) => <option key={st} value={st}>{st}</option>)}
-              </select>
-            </div>
+      <div className="dash-grid3">
+      {/* overdue breakup by cycle */}
+      <section className="card viz-card">
+        <div className="viz-head-row">
+          <h2 className="viz-h">Overdue breakup <span className="viz-note">lapsed cycles</span></h2>
+          <div className="viz-filters">
+            <select className="viz-sel" value={bkSys} onChange={(e) => setBkSys(e.target.value)} aria-label="Filter breakup by system">
+              <option value="">All systems</option>
+              {bkSystems.map((sy) => <option key={sy} value={sy}>{sy}</option>)}
+            </select>
+            <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label="Filter breakup by station">
+              <option value="">All stations</option>
+              {bkStations.map((st) => <option key={st} value={st}>{st}</option>)}
+            </select>
           </div>
-          {bkLapsed === 0 ? <p className="dim">No lapsed routine PM{bkSys || bkStn ? ' for this selection' : ''} — every in-cycle asset is up to date. 👍</p> : (
-            <div className="breakup">
-              {SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => {
-                const n = bkByFreq[f]; const w = Math.round((n / bkLapsed) * 100)
-                return (
-                  <div className="bk-row" key={f}>
-                    <span className="bk-lbl">{f}</span>
-                    <span className="bk-bar"><span className="bk-fill" style={{ width: `${Math.max(w, 3)}%` }} /></span>
-                    <span className="bk-n">{n}</span>
-                  </div>
-                )
-              })}
-              {bkLong > 0 && (
-                <div className="bk-row bk-long">
-                  <span className="bk-lbl">5-Yearly <span className="dim">(separate)</span></span>
-                  <span className="bk-bar"><span className="bk-fill long" style={{ width: '100%' }} /></span>
-                  <span className="bk-n">{bkLong}</span>
+        </div>
+        {bkLapsed === 0 ? <p className="dim">No lapsed routine PM{bkSys || bkStn ? ' for this selection' : ''} — every in-cycle asset is up to date. 👍</p> : (
+          <div className="breakup">
+            {SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => {
+              const n = bkByFreq[f]; const w = Math.round((n / bkLapsed) * 100)
+              return (
+                <div className="bk-row" key={f}>
+                  <span className="bk-lbl">{f}</span>
+                  <span className="bk-bar"><span className="bk-fill" style={{ width: `${Math.max(w, 3)}%` }} /></span>
+                  <span className="bk-n">{n}</span>
                 </div>
-              )}
-            </div>
-          )}
-          <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
-        </section>
-
-        {/* overdue by system (HT · 33kV, LT · ECS, …) */}
-        <section className="card viz-card">
-          <h2 className="viz-h">Overdue by system <span className="viz-note">top {topSystems.length}</span></h2>
-          {topSystems.length === 0 ? <p className="dim">No routine PM overdue.</p> : (
-            <div className="breakup">
-              {topSystems.map(([c, n]) => {
-                const w = Math.round((n / topSystems[0][1]) * 100)
-                return (
-                  <div className="bk-row" key={c}>
-                    <span className="bk-lbl bk-cls" title={c}>{c}</span>
-                    <span className="bk-bar"><span className="bk-fill" style={{ width: `${Math.max(w, 3)}%` }} /></span>
-                    <span className="bk-n">{n}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
-        </section>
-      </div>
-
-      <div className="dash-grid">
-        {/* failures per month */}
-        <section className="card viz-card">
-          <h2 className="viz-h">Failures per month <span className="viz-note">last 6 months</span></h2>
-          {trend.length ? <TrendChart data={trend} /> : <p className="dim">No failure data.</p>}
-          <p className="viz-insight"><a className="crumb" href={failHref}>Open the failures dashboard →</a></p>
-        </section>
-        <section className="card viz-card">
-          <h2 className="viz-h">Recent logbook <span className="viz-note">latest entries</span></h2>
-          {recent.length === 0 ? <p className="dim">No entries yet.</p> : (
-            <div className="dash-recent">
-              {recent.map((e) => (
-                <a key={e.id} className="dr-row" href={e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}>
-                  <span className={`chip ${e.type === 'failure' ? 'd-overdue' : ''}`}><span className="dot" />{e.type}</span>
-                  <span className="dr-txt">{tidyLog(e.text).slice(0, 64)}</span>
-                  <span className="dim dt dr-date">{e.log_date}</span>
-                </a>
-              ))}
-            </div>
-          )}
-          <p className="viz-insight"><a className="crumb" href="#/log">Open the log book →</a></p>
-        </section>
-        <section className="card viz-card asset-health">
-          <h2 className="viz-h">Asset health <span className="viz-note">condition flags</span></h2>
-          <div className="ah-list">
-            <a className="ah-row" href="#/assets"><span className="ah-dot bad" />Exceeded codal life<span className="ah-n">{exceeded}</span></a>
-            <a className="ah-row" href={failHref}><span className="ah-dot bad" />Open failures<span className="ah-n">{openF}</span></a>
-            <a className="ah-row" href="#/assets"><span className="ah-dot warn" />5-Yearly overhaul due<span className="ah-n">{bucket.long_overdue}</span></a>
-            <a className="ah-row" href="#/assets"><span className="ah-dot none" />Not yet scheduled<span className="ah-n">{bucket.none}</span></a>
+              )
+            })}
+            {bkLong > 0 && (
+              <div className="bk-row bk-long">
+                <span className="bk-lbl">5-Yearly <span className="dim">(sep.)</span></span>
+                <span className="bk-bar"><span className="bk-fill long" style={{ width: '100%' }} /></span>
+                <span className="bk-n">{bkLong}</span>
+              </div>
+            )}
           </div>
-          <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
-        </section>
-      </div>
+        )}
+        <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
+      </section>
 
-      <div className="dash-links">
-        {[['#/assets', 'Assets', 'register, QR & schedules'], ['#/log', 'Log book', 'daily shift log'],
-          [failHref, 'Failures', 'breakdowns & recovery'], ['#/tags', 'QR tags', 'print asset tags']].map(([to, t, s]) => (
-          <a key={to} className="dash-link card" href={to}><b>{t}</b><span className="dim">{s}</span></a>
-        ))}
+      {/* overdue by system */}
+      <section className="card viz-card">
+        <h2 className="viz-h">Overdue by system <span className="viz-note">top {topSystems.length}</span></h2>
+        {topSystems.length === 0 ? <p className="dim">No routine PM overdue.</p> : (
+          <div className="breakup">
+            {topSystems.map(([c, n]) => {
+              const w = Math.round((n / topSystems[0][1]) * 100)
+              return (
+                <div className="bk-row" key={c}>
+                  <span className="bk-lbl bk-cls" title={c}>{c}</span>
+                  <span className="bk-bar"><span className="bk-fill sys" style={{ width: `${Math.max(w, 3)}%` }} /></span>
+                  <span className="bk-n">{n}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <p className="viz-insight"><a className="crumb" href="#/assets">Open the register →</a></p>
+      </section>
+
+      {/* recent logbook */}
+      <section className="card viz-card">
+        <h2 className="viz-h">Recent logbook <span className="viz-note">latest entries</span></h2>
+        {recent.length === 0 ? <p className="dim">No entries yet.</p> : (
+          <div className="dash-recent">
+            {recent.map((e) => (
+              <a key={e.id} className="dr-row" href={e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}>
+                <span className={`chip ${e.type === 'failure' ? 'd-overdue' : ''}`}><span className="dot" />{e.type}</span>
+                <span className="dr-txt">{tidyLog(e.text).slice(0, 72)}</span>
+                <span className="dim dt dr-date">{e.log_date}</span>
+              </a>
+            ))}
+          </div>
+        )}
+        <p className="viz-insight"><a className="crumb" href="#/log">Open the log book →</a></p>
+      </section>
+
+      {/* failures per month — last card */}
+      <section className="card viz-card">
+        <h2 className="viz-h">Failures / month <span className="viz-note">last 6</span></h2>
+        {trend.length ? <TrendChart data={trend} compact /> : <p className="dim">No failure data.</p>}
+        <p className="viz-insight"><a className="crumb" href={failHref}>Open the failures dashboard →</a></p>
+      </section>
       </div>
     </>
   )
@@ -3359,10 +3430,10 @@ function JobCardsView({ line = '' }) {
         <div className="card tbl-wrap">
           <table className="jc-table">
             <colgroup>
-              <col style={{ width: 56 }} /><col style={{ width: 104 }} />
-              <col style={{ width: 130 }} /><col style={{ width: 72 }} /><col style={{ width: 110 }} /><col style={{ width: 150 }} />
-              <col style={{ width: 108 }} /><col style={{ width: 118 }} /><col style={{ width: 78 }} />
-              <col style={{ width: 78 }} /><col />{canWrite && <col style={{ width: 112 }} />}
+              <col style={{ width: 46 }} /><col style={{ width: 84 }} />
+              <col style={{ width: 112 }} /><col style={{ width: 88 }} /><col style={{ width: 86 }} /><col style={{ width: 150 }} />
+              <col style={{ width: 92 }} /><col style={{ width: 100 }} /><col style={{ width: 80 }} />
+              <col style={{ width: 80 }} /><col />{canWrite && <col style={{ width: 98 }} />}
             </colgroup>
             <thead><tr><th>{tab === 'open' ? 'Pending' : 'Turnaround'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
               <th>Issued by</th>
@@ -3420,9 +3491,146 @@ function JobCardsView({ line = '' }) {
   )
 }
 
+/* ---------- correspondence (letters & emails) ---------- */
+function CorrespondenceView({ line = '' }) {
+  const { me } = useMe()
+  const [rows, setRows] = useState(null)
+  const [error, setError] = useState(null)
+  const [q, setQ] = useState('')
+  const [mode, setMode] = useState('all')   // all | letter | email
+  useEffect(() => {
+    const lq = line ? `?line=${encodeURIComponent(line)}` : ''
+    getJSON(`/api/correspondence${lq}`).then((r) => setRows(r || [])).catch((e) => setError(String(e)))
+  }, [line])
+  if (error) return <div className="card offline-note">Backend unreachable — {error}.</div>
+  if (rows === null) return <p className="dim">Loading correspondence…</p>
+  const line_ = me?.line || ''
+  const letters = rows.filter((r) => r.mode === 'letter')
+  const emails = rows.filter((r) => r.mode === 'email')
+  const linked = rows.filter((r) => r.related_assets && !['-', '___', ''].includes((r.related_assets || '').trim()))
+  const ql = q.trim().toLowerCase()
+  const MODES = [['all', 'All', rows], ['letter', 'Letters', letters], ['email', 'Emails', emails]]
+  const shown = rows.filter((r) => (mode === 'all' || r.mode === mode)
+    && (!ql || [r.ref_no, r.subject, r.related_assets, r.brief, r.sender, r.recipient].some((v) => (v || '').toLowerCase().includes(ql))))
+  const fmt = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+  const oneLine = (s, n = 90) => { const t = (s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t }
+  return (
+    <>
+      <div className="page-head"><h1>Correspondence {line_ && <span className="dim">· {line_}</span>}</h1></div>
+      <p className="dim" style={{ marginTop: -6 }}>Official letters and emails, with the scanned document and the asset(s) each concerns.</p>
+      <div className="kpis dash-kpis" style={{ marginBottom: 14 }}>
+        <div className="tile"><div className="v">{rows.length}</div><div className="k">Total</div><div className="note">on record</div></div>
+        <div className="tile"><div className="v">{letters.length}</div><div className="k">Letters</div></div>
+        <div className="tile"><div className="v">{emails.length}</div><div className="k">Emails</div></div>
+        <div className="tile ok"><div className="v">{linked.length}</div><div className="k">Asset-linked</div><div className="note">names equipment</div></div>
+      </div>
+      <div className="asset-toolbar">
+        <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
+               placeholder="Search subject, ref no., asset, sender…" aria-label="Search correspondence" />
+        <div className="asset-filter" role="tablist" aria-label="Mode">
+          {MODES.map(([k, lbl, list]) => (
+            <button key={k} type="button" className={`btn preset ${mode === k ? 'active' : ''}`}
+                    onClick={() => setMode(k)}>{lbl} {list.length}</button>
+          ))}
+        </div>
+        {q && <button type="button" className="btn ghost sm" onClick={() => setQ('')}>Clear</button>}
+        <span className="asset-count">{shown.length} shown</span>
+      </div>
+      {shown.length === 0 ? (
+        <div className="card"><p className="dim" style={{ margin: 0 }}>No correspondence in this view.</p></div>
+      ) : (
+        <div className="card tbl-wrap">
+          <table className="jc-table">
+            <colgroup>
+              <col style={{ width: 96 }} /><col style={{ width: 64 }} /><col style={{ width: 150 }} />
+              <col /><col style={{ width: 150 }} /><col style={{ width: 160 }} /><col style={{ width: 56 }} />
+            </colgroup>
+            <thead><tr><th>Date</th><th>Mode</th><th>Ref no.</th><th>Subject</th><th>Related assets</th><th>From → To</th><th>Doc</th></tr></thead>
+            <tbody>
+              {shown.map((r) => (
+                <tr key={r.id}>
+                  <td className="dim">{fmt(r.date)}</td>
+                  <td><span className={`corr-mode ${r.mode}`}>{r.mode === 'email' ? 'Email' : 'Letter'}</span></td>
+                  <td className="wrap-cell"><span className="code">{oneLine(r.ref_no, 40) || '—'}</span></td>
+                  <td className="wrap-cell" title={r.brief || ''}>{oneLine(r.subject, 120) || '—'}</td>
+                  <td className="wrap-cell dim">{oneLine(r.related_assets, 60) || '—'}</td>
+                  <td className="wrap-cell dim">{oneLine(r.sender, 26)}{r.recipient ? ` → ${oneLine(r.recipient, 26)}` : ''}</td>
+                  <td>{r.link && /^https?:\/\//.test(r.link)
+                    ? <a className="mini-btn" href={r.link} target="_blank" rel="noreferrer">Open</a>
+                    : <span className="dim">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 /* ---------- shell + hash router ---------- */
 
 const routeFromHash = () => location.hash.replace(/^#/, '') || '/'
+
+/* ---------- Guide: a coordinator how-to (public read) ---------- */
+function DocsView() {
+  return (
+    <div className="docs">
+      <h1 className="docs-h1">AMPS — Coordinator's Guide</h1>
+      <p className="docs-lead">A short guide to bringing your depot's assets on to AMPS and keeping the
+        maintenance logs current. Any difficulty, contact the AMPS coordination desk.</p>
+
+      <section className="card docs-sec">
+        <h2>1 · How AMPS is organised</h2>
+        <ul>
+          <li>AMPS is <b>depot-wise</b>. Each line has one or more depots; each depot has its own
+            <b> Assets</b> and <b>Logs</b> tab pair in the coordination sheet.</li>
+          <li>Your login is <b>scoped to your depot</b> — you see and edit only your own depot.</li>
+          <li>The <b>Green Line (CPD)</b> register is the reference standard for format.</li>
+        </ul>
+      </section>
+
+      <section className="card docs-sec">
+        <h2>2 · Onboarding your assets</h2>
+        <ol>
+          <li>Open your depot's <b>Assets</b> tab in the coordination sheet.</li>
+          <li>Fill <b>one row per asset</b>. The mandatory columns are
+            <span className="docs-k">code</span>, <span className="docs-k">name</span>,
+            <span className="docs-k">asset_class</span> and <span className="docs-k">location</span> (station) —
+            a row missing any of these cannot be imported.</li>
+          <li>Optional but useful: <span className="docs-k">system</span>, <span className="docs-k">make_model</span>,
+            <span className="docs-k">criticality</span> (A/B/C), <span className="docs-k">status</span>,
+            <span className="docs-k">commissioned_on</span>, <span className="docs-k">description</span>,
+            <span className="docs-k">remarks</span>, <span className="docs-k">codal_life_years</span>, and the
+            PM-cycle ticks (<span className="docs-k">Monthly … 5-Yearly</span>).</li>
+          <li>Start with a <b>minimum working set</b> — you can add more rows any time; they are imported phase-wise.</li>
+        </ol>
+        <p className="docs-note">The coordination desk imports the sheet — you do not need to re-enter anything
+          in the app. Existing rows are skipped on re-import, so it is always safe to add more.</p>
+      </section>
+
+      <section className="card docs-sec">
+        <h2>3 · Recording maintenance (the important part)</h2>
+        <ul>
+          <li>Open <b>Log book</b> and add an entry against the asset's <b>code</b>, choosing the cycle
+            (Monthly / Quarterly / Half-Yearly / Yearly).</li>
+          <li>To enter many at once, use the <b>grid (▦)</b> — you can paste rows straight from Excel.</li>
+          <li>Record a <b>failure</b> as it happens and close it with a <b>rectification</b>; downtime is then
+            worked out automatically. A <b>job card</b> to an agency is logged the same way.</li>
+          <li><b>Why it matters:</b> the Dashboard / KPI is built from the logs. Assets without logs do not
+            reflect the true maintenance status of the line — so the logs, not just the asset list, are the goal.</li>
+        </ul>
+      </section>
+
+      <section className="card docs-sec">
+        <h2>4 · Getting help</h2>
+        <p>The coordination desk will assist with onboarding, orientation and any format question. If a row
+          won't import, it is almost always a blank <span className="docs-k">asset_class</span> or
+          <span className="docs-k">location</span> — fill it and tell the desk, and it will be picked up the same day.</p>
+      </section>
+    </div>
+  )
+}
 
 /* Live deployments only show modules whose backend exists; the rest join the
    nav release by release. The demo build keeps the full walkthrough. */
@@ -3432,7 +3640,9 @@ const NAV = LIVE ? [
   ['/log', 'Log book'],
   ['/failures', 'Failures'],
   ['/job-cards', 'Job cards'],
+  ['/letters', 'Letters'],
   ['/printables', 'Printables'],
+  ['/guide', 'Guide'],
 ] : [
   ['/', 'Assets'],
   ['/planner', 'Planner'],
@@ -3743,7 +3953,7 @@ export default function App() {
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && !assetMatch && !lineMatch && !lineFailMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}landing-art.webp`} />
@@ -3768,10 +3978,12 @@ export default function App() {
                 <a href={`#/line/${encodeURIComponent(navLine)}/failures`} className={failLine ? 'active' : ''}>Failures</a>
               </>
             )}
+            <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>Guide</a>
             <a href="#/login" className="btn login-btn">Sign in</a>
           </nav>
         </header>
-        {failLine ? <LineFailures name={failLine} />
+        {routePath === '/guide' ? <DocsView />
+          : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
           : <LineView name={decodeURIComponent(lineMatch[1])} />}
         <footer className="foot">{ORG} · maintenance records · <AmpsLink />, MIT © 2026 <FootSig /></footer>
@@ -3821,10 +4033,12 @@ export default function App() {
         /* legacy top-level /failures now redirects to the signed-in line's board */
         : routePath === '/failures' ? (LIVE ? <FailuresRedirect me={me} go={go} /> : <Failures />)
         : routePath === '/job-cards' ? (LIVE ? <JobCardsView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
+        : routePath === '/letters' ? (LIVE ? <CorrespondenceView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
         : routePath === '/spares' ? (LIVE ? <NotYet /> : <Spares />)
         : routePath === '/procurement' ? (LIVE ? <NotYet /> : <Procurement />)
         : routePath === '/printables' ? <Printables initial={routeQuery.get('t') || 'qr'} />
         : routePath === '/tags' ? <Printables initial="qr" />
+        : routePath === '/guide' ? <DocsView />
         : routePath === '/about' ? <AboutPage />
         : routePath === '/assets' ? (LIVE ? <LiveDashboard go={go} /> : <Dashboard go={go} />)
         : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}

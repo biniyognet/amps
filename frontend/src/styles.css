@@ -56,7 +56,10 @@ img, svg { max-width: 100%; }
 
 a { color: inherit; text-decoration: none; }
 
-.shell { max-width: 1360px; margin: 0 auto; padding: 0 20px 48px; }
+/* AMPS is a data-dense ops tool — use most of the viewport instead of a narrow
+   boxed column. ~94% of the width on normal screens, capped so ultra-wide
+   monitors don't stretch rows to unreadable lengths. */
+.shell { max-width: 1760px; margin: 0 auto; padding: 0 20px 48px; }
 
 /* ---- header ---- */
 /* topbar speaks the landing's letterhead language: emblem, engraved
@@ -276,10 +279,15 @@ tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px;
 
 /* Job-cards table: fixed column layout so Asset/Fault get real width instead of
    being crushed by the attachment-heavy detail cell. Scrolls-x on narrow. */
-.jc-table { table-layout: fixed; min-width: 1120px; }
+.jc-table { table-layout: fixed; width: 100%; min-width: 1024px; }
 .jc-table td { vertical-align: top; }
 .jc-table td.code { max-width: none; white-space: normal; overflow-wrap: anywhere; }
 .jc-table td[data-l="Fault"] { white-space: normal; }
+/* The Fault + Detail cells use .wrap-cell, whose global 260px min-width forced
+   the table ~500px past its colgroup and off-screen. Inside the fixed-layout
+   job-card table let those cells size to their columns and wrap instead. */
+.jc-table .wrap-cell { min-width: 0; max-width: none; overflow-wrap: anywhere; }
+.jc-table .dim, .jc-table td { overflow-wrap: anywhere; }
 
 /* unified failure sub-groups (open / acknowledged / job card / resolved) */
 .logsub { margin: 10px 0 4px; padding-left: 12px; border-left: 3px solid var(--sg, #d9d2c2); }
@@ -565,6 +573,71 @@ td .chip.d-none { color: var(--ink-3); }
   /* asset detail: keep the passport tidy on paper */
   .asset-passport { gap: 10px; }
   .wo, .sect, .asset-facts, .asset-hero { break-inside: avoid; }
+}
+
+/* ===== asset register: proportional columns (desktop) + landscape compact print =====
+   Fixed layout so the table fills the width and columns get sensible proportions —
+   Code & Asset get room, Location no longer forces the old 260px min-width and hogs
+   space. Long MET codes/names wrap within their own column instead of squeezing the
+   rest. Applies from 1025px up; tablet/mobile keep their existing responsive views. */
+@media screen and (min-width: 1025px) {
+  /* AUTO layout (robust) — just reshape the constraints that were making
+     Location too wide and Code/Asset too narrow:
+       · Location (.wrap-cell) was forced to a 260px min-width globally
+       · the code cell was capped at 26ch globally
+     Freeing those lets the table auto-balance across the now-wider shell. */
+  .reg-table { width: 100%; }
+  .reg-table .wrap-cell { min-width: 90px; max-width: 190px; }
+  /* cap the code column so typical codes sit on one line and only the rare very
+     long MET codes wrap — without letting it stretch the whole column wide */
+  .reg-table td.code { min-width: 110px; max-width: 30ch; white-space: normal; overflow-wrap: anywhere; }
+  .reg-table td[data-l="Asset"] { min-width: 200px; }
+}
+
+/* SL (serial) column: print-only — hidden in the on-screen register */
+.sl-col { display: none !important; }
+
+@media print {
+  /* the register prints on its own LANDSCAPE page; other printables (checksheets,
+     order sheets, asset passport) keep their portrait @page rules. */
+  @page reg-land { size: A4 landscape; margin: 7mm; }
+  .reg-print, .print-caption { page: reg-land; }
+  /* only the register table + its caption print — strip the app chrome & controls */
+  .topbar, .foot, .nav, .site-art, .art-watermark, .log-pager, .col-filter,
+  .preset-bar { display: none !important; }
+  /* the SL column appears on paper, numbered continuously */
+  .reg-table .sl-col { display: table-cell !important; text-align: right; color: #555; }
+  /* compact, paper-saving grid — ONE uniform text size across every cell so rows
+     read evenly (the monospace code cell no longer looks larger) */
+  .reg-table { table-layout: fixed; width: 100%; }
+  .reg-table th, .reg-table td, .reg-table td * { font-size: 8.3px !important; line-height: 1.25 !important; }
+  .reg-table thead { display: table-header-group; }          /* header repeats every page */
+  .reg-table th, .reg-table td { padding: 1.5px 4px !important; vertical-align: top; }
+  .reg-table thead th { background: #e8eef4 !important; font-weight: 700;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .reg-table tbody tr { break-inside: avoid; }
+  /* landscape column widths — the Asset ID (Code) gets the MOST room so long MET
+     codes wrap far less; wrap only at spaces/hyphens, never mid-token */
+  .reg-table .c-sl      { width: 3.5%; }
+  .reg-table .c-code    { width: 23%; }
+  .reg-table .c-asset   { width: 17%; }
+  .reg-table .c-class   { width: 8%; }
+  .reg-table .c-station { width: 8%; }
+  .reg-table .c-loc     { width: 12%; }
+  .reg-table .c-system  { width: 8.5%; }
+  .reg-table .c-status  { width: 7%; }
+  .reg-table .c-lastpm  { width: 6%; }
+  .reg-table .c-pm      { width: 7%; }
+  .reg-table td.code, .reg-table td[data-l="Asset"],
+  .reg-table td[data-l="Location"], .reg-table td[data-l="Station"] {
+    white-space: normal; overflow-wrap: break-word; word-break: normal; }
+  .reg-table .wrap-cell { min-width: 0; max-width: none; white-space: normal; }
+  /* drop on-screen affordances that only waste ink */
+  .reg-table .fault-actions, .reg-table .fault-badge, .reg-table .codal-dot { display: none !important; }
+  .reg-table .th-lbl { cursor: default; }
+  /* status renders as plain text, PM matrix squares stay but shrink */
+  .reg-table .chip { border: none !important; background: none !important; padding: 0 !important; color: #000 !important; }
+  .reg-table .pmc { width: 11px; height: 11px; }
 }
 /* ---- Printables: blank maintenance checksheets ---- */
 .cs-formats { display: grid; grid-template-columns: 250px 1fr; gap: 16px; align-items: start; }
@@ -1193,6 +1266,88 @@ tbody tr:hover .edit-link { color: var(--accent); }
 .ah-dot.bad { background: var(--critical); } .ah-dot.warn { background: var(--warning); } .ah-dot.none { background: #cfc9bd; }
 .ah-n { margin-left: auto; font-weight: 750; font-variant-numeric: tabular-nums; }
 
+/* ============ DASHBOARD REFRESH (LineDashboard, 2026-09-10) ============
+   Boxed layout (shares .shell width + scrolls like every other page). The
+   compliance summary is a single unified HEADER BAND (pct + stacked bar +
+   legend + figures inline), then a 7-up KPI row and a 3-column card grid. */
+/* dashboard toolbar — same ribbon language as the asset register's .asset-toolbar.
+   Lives inside .dash-hood (a sticky header that pulls up under the nav). */
+/* DOCKED like the register's toolbar: sticky beneath the topbar, whose real
+   height is measured into --topbar-h so it parks exactly under the nav however
+   it wraps. The card's own backdrop-blur frosts cards scrolling behind it. */
+.dash-hood { position: sticky; top: calc(var(--topbar-h, 72px) - 2px); z-index: 30;
+  margin: -8px 0 12px; padding: 0; overflow: hidden;
+  background: rgba(255, 255, 255, .9); }   /* opaque enough to cleanly dock over scrolled cards */
+.dash-toolbar { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
+  padding: 9px 16px; border-bottom: 1px solid var(--border-2, #EAF1F6); }
+.dash-toolbar .asset-actions { display: flex; gap: 5px; }
+.dash-title { margin: 0; font-size: 16px; font-weight: 750; letter-spacing: -.01em; flex: 0 0 auto; }
+.dash-crumb { font-size: 11.5px; color: var(--ink-2); flex: 0 1 auto; }
+.dash-clock { margin-left: auto; display: flex; align-items: baseline; gap: 7px; flex: 0 0 auto;
+  font-variant-numeric: tabular-nums; padding: 2px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: rgba(255,255,255,.6); }
+.dc-date { font-size: 11px; color: var(--ink-2); font-weight: 600; }
+.dc-time { font-size: 14px; font-weight: 700; letter-spacing: .02em; color: var(--accent); }
+.dash-toolbar .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--border); background: #fff; color: var(--ink-2); cursor: pointer; transition: .12s; }
+.dash-toolbar .icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+/* merged compliance + breakdown strip — ONE deduped row.
+   Left = compliance headline; right = the stacked bar on top with each state's
+   figure sitting directly beneath its own coloured segment (bar segments and
+   legend cells share the same flex-grow, so they line up). The legend IS the
+   breakdown — no separate legend list, no duplicate KPI row. */
+.hstrip { display: flex; align-items: stretch; gap: 0; padding: 0; }
+.h-compl { display: flex; align-items: baseline; gap: 9px; padding: 10px 16px; flex: 0 0 auto;
+  border-right: 1px solid var(--border-2, #EAF1F6); }
+.h-pct { font-size: 30px; font-weight: 800; letter-spacing: -.035em; line-height: .9; font-variant-numeric: tabular-nums; }
+.h-pct.good { color: #1a7a3a; } .h-pct.warn { color: #8a6100; } .h-pct.bad { color: var(--critical); }
+.h-txt { display: flex; flex-direction: column; gap: 2px; }
+.h-pk { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); line-height: 1.15; }
+.h-cap { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.h-cap b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+/* Each state is ONE flex column: its bar segment on top and its figure below,
+   so the number always sits directly under its colour (perfect alignment,
+   whatever the proportions). min-width keeps thin segments legible. */
+.h-meter { flex: 1; display: flex; align-items: flex-start; gap: 0; padding: 10px 14px; min-width: 0; }
+.h-col { flex-grow: 1; min-width: 56px; display: flex; flex-direction: column; gap: 7px;
+  text-decoration: none; color: inherit; overflow: hidden; }
+.h-seg { height: 12px; display: block; }
+/* Overdue in maroon/red to match the overdue-breakup bars (.bk-fill = --critical),
+   so "overdue" reads the same colour everywhere on the dashboard. */
+.h-seg.seg-od { background: var(--critical); }
+.h-col:first-child .h-seg { border-radius: 6px 0 0 6px; }
+.h-col:last-child .h-seg { border-radius: 0 6px 6px 0; }
+.h-col:not(:first-child) .h-seg { box-shadow: -1px 0 0 rgba(255,255,255,.6); }  /* hairline segment divider */
+.h-cn { font-size: 15px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.h-col.seg-od .h-cn { color: var(--critical); } .h-col.seg-due .h-cn { color: #8a6100; }
+.h-cl { font-size: 9.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.h-col:hover .h-cl { color: var(--accent); }
+
+/* card grid — boxed, 2 columns (bigger cards): maintenance breakups on top,
+   recent logbook + failures below; asset-health dropped. */
+.dash-grid3 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dash-grid3 > .viz-card { display: flex; flex-direction: column; padding: 13px 16px 12px; }
+.dash-grid3 .viz-h { margin-bottom: 10px; }
+.dash-grid3 .viz-insight { margin-top: auto; margin-bottom: 0; padding-top: 10px; }
+.dash-grid3 .breakup { gap: 9px; }
+.dash-grid3 .bk-lbl { flex-basis: 96px; }
+.dash-grid3 .bk-cls { flex-basis: 112px; }
+.dash-grid3 .bk-bar { height: 9px; }
+.dash-grid3 .bk-fill.sys { background: linear-gradient(90deg, var(--accent), var(--accent-line)); }
+.dash-grid3 .dr-row { padding: 6px 0; }
+.dash-grid3 .viz { max-height: 180px; width: 100%; }
+
+@media screen and (max-width: 900px) {
+  .dash-hood { position: static; }   /* stop sticking once it wraps */
+  .hstrip { flex-wrap: wrap; }
+  .h-compl { flex: 1 1 100%; border-right: 0; border-bottom: 1px solid var(--border-2, #EAF1F6); }
+  .h-meter { flex: 1 1 100%; }
+}
+@media screen and (max-width: 680px) {
+  .dash-grid3 { grid-template-columns: 1fr; }
+}
+
 .hbars { padding: 2px 0; }
 .bar-row { display: grid; grid-template-columns: 108px 1fr 44px; align-items: center; gap: 10px; padding: 5.5px 0; }
 .bar-label { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1737,13 +1892,20 @@ body:has(.gate) {
   color: var(--ink-3); padding-left: 2px;
 }
 .land-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+/* Unified with the dashboard KPI stats: brand-token frosted card + accent
+   left-stripe, so the landing "at a glance" panel matches the signed-in view. */
 .land-kpi {
-  background: color-mix(in srgb, #fffdf8 88%, transparent); border: 1px solid #ece6da;
-  border-radius: 11px; padding: 10px 13px 9px; text-align: left;
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 11px 13px 10px; text-align: left; position: relative; overflow: hidden;
+  backdrop-filter: var(--card-blur); -webkit-backdrop-filter: var(--card-blur);
+  box-shadow: 0 1px 2px rgba(11,42,63,.04), 0 8px 24px -16px rgba(11,42,63,.18);
+  transition: transform .12s, box-shadow .12s;
 }
-.land-kpi .v { font-size: clamp(20px, 2.6vh, 27px); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; color: #26221d; }
-.land-kpi .k { font-size: 11.5px; color: #6b6459; margin-top: 1px; }
+.land-kpi:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -14px rgba(11,42,63,.4); }
+.land-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent-line); }
+.land-kpi.alert::before { background: var(--critical); } .land-kpi.warn::before { background: var(--warning); }
+.land-kpi .v { font-size: clamp(20px, 2.6vh, 27px); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--ink); }
+.land-kpi .k { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; font-weight: 600; }
 .land-kpi.alert .v { color: var(--critical); }
 .land-kpi.warn .v { color: #8a6100; }
 /* per-line health chips on each tile */
@@ -1941,3 +2103,24 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
 .th-lbl.pm-head { display: inline-flex; gap: 7px; align-items: center; }
 .pm-head-c { font-size: 10px; color: var(--ink-3); text-transform: none; letter-spacing: 0; }
 .pm-head-c b { color: #a32e2e; margin-left: 2px; }
+
+/* correspondence mode chip (Letter / Email) */
+.corr-mode { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); white-space: nowrap; }
+.corr-mode.letter { background: #eef4fb; color: #245b8f; border-color: #cfe0f0; }
+.corr-mode.email { background: #fff2e6; color: #a4560f; border-color: #f4d6b8; }
+
+/* ---- Coordinator Guide (Docs) ---- */
+.docs { max-width: 900px; margin: 0 auto; }
+.docs-h1 { font-size: 26px; font-weight: 720; letter-spacing: -0.01em; margin: 6px 0 4px; }
+.docs-lead { font-size: 15px; color: var(--ink-2); line-height: 1.6; margin: 0 0 18px; max-width: 720px; }
+.docs-sec { padding: 18px 22px; margin-bottom: 14px; }
+.docs-sec h2 { font-size: 16px; font-weight: 680; margin: 0 0 10px; color: var(--ink); }
+.docs-sec ul, .docs-sec ol { margin: 0; padding-left: 20px; }
+.docs-sec li { font-size: 14px; line-height: 1.7; color: var(--ink-1, var(--ink)); margin-bottom: 5px; }
+.docs-sec b { font-weight: 620; color: var(--ink); }
+.docs-note { font-size: 13px; color: var(--ink-3); font-style: italic; margin: 10px 0 0;
+  padding-top: 8px; border-top: 1px solid #EEF4F8; }
+.docs-k { display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px; background: #f3f6f9; border: 1px solid var(--border); border-radius: 5px;
+  padding: 0 5px; margin: 0 2px; color: #245b8f; white-space: nowrap; }
