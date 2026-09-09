@@ -3100,11 +3100,12 @@ function LineDashboard({ go, initialLine = null }) {
   const bkSystems = [...new Set(assets.map((a) => a.sys || 'Unclassified'))].sort()
   const bkStations = [...new Set(assets.map((a) => a.location).filter(Boolean))].sort()
   const bkMatch = (a) => (!bkSys || (a.sys || 'Unclassified') === bkSys) && (!bkStn || a.location === bkStn)
-  const bkByFreq = {}; let bkLapsed = 0, bkLong = 0
+  const bkByFreq = {}; let bkLapsed = 0, bkLong = 0, bkNever = 0
   assets.forEach((a) => {
     if (!bkMatch(a)) return
     const s = pm(a)
-    if (s?.state === 'overdue' && !s.never_done) {   // lapsed only — matches the headline Overdue
+    if (s?.never_done) bkNever += 1                  // awaiting 1st service — shown apart
+    else if (s?.state === 'overdue') {               // lapsed only — matches the headline Overdue
       if (s.next_frequency) bkByFreq[s.next_frequency] = (bkByFreq[s.next_frequency] || 0) + 1
       bkLapsed += 1
     } else if (s?.state === 'long_overdue') bkLong += 1
@@ -3161,6 +3162,7 @@ function LineDashboard({ go, initialLine = null }) {
       [],
       ['Overdue breakup', 'Count'],
       ...SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => [f, bkByFreq[f]]),
+      ...(bkNever ? [['Awaiting 1st service (separate)', bkNever]] : []),
       ...(bkLong ? [['5-Yearly (separate)', bkLong]] : []),
       [],
       ['Overdue by system', 'Count'],
@@ -3235,10 +3237,10 @@ function LineDashboard({ go, initialLine = null }) {
             </select>
           </div>
         </div>
-        {bkLapsed === 0 ? <p className="dim">No lapsed routine PM{bkSys || bkStn ? ' for this selection' : ''} — every in-cycle asset is up to date. 👍</p> : (
+        {bkLapsed === 0 && bkNever === 0 && bkLong === 0 ? <p className="dim">No lapsed routine PM{bkSys || bkStn ? ' for this selection' : ''} — every in-cycle asset is up to date. 👍</p> : (
           <div className="breakup">
             {SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => {
-              const n = bkByFreq[f]; const w = Math.round((n / bkLapsed) * 100)
+              const n = bkByFreq[f]; const w = bkLapsed ? Math.round((n / bkLapsed) * 100) : 0
               return (
                 <div className="bk-row" key={f}>
                   <span className="bk-lbl">{f}</span>
@@ -3247,6 +3249,13 @@ function LineDashboard({ go, initialLine = null }) {
                 </div>
               )
             })}
+            {bkNever > 0 && (
+              <div className="bk-row bk-never">
+                <span className="bk-lbl">Awaiting 1st <span className="dim">(sep.)</span></span>
+                <span className="bk-bar"><span className="bk-fill never" style={{ width: '100%' }} /></span>
+                <span className="bk-n">{bkNever}</span>
+              </div>
+            )}
             {bkLong > 0 && (
               <div className="bk-row bk-long">
                 <span className="bk-lbl">5-Yearly <span className="dim">(sep.)</span></span>
@@ -3924,34 +3933,32 @@ function LoginPage() {
 /* A line's public dashboard (maintenance overview) — the default when a line is
    opened, so officers get the at-a-glance view with no login. Assets/Failures
    are one tab away. */
+/* Line context (All lines · Dashboard · Assets · Failures) lives in the topbar
+   nav as compact chrome-style controls — see LineNav — so these views render
+   just their content. */
 function LineView({ name }) {
-  const { me } = useMe()
-  const enc = encodeURIComponent(name)
-  return (
-    <>
-      <div className="line-subnav">
-        {!me?.line && <a className="crumb" href="#/">← All lines</a>}
-        <a className="btn ghost sm" href={`#/line/${enc}/assets`}>Assets →</a>
-        <a className="btn ghost sm" href={`#/line/${enc}/failures`}>Failures →</a>
-      </div>
-      <LineDashboard go={(r) => { location.hash = r }} initialLine={name} />
-    </>
-  )
+  return <LineDashboard go={(r) => { location.hash = r }} initialLine={name} />
 }
 
-/* A line's asset register (the table) — reached from the dashboard or /line/<name>/assets */
 function LineAssets({ name }) {
-  const { me } = useMe()
-  const enc = encodeURIComponent(name)
+  return <LiveDashboard go={(r) => { location.hash = r }} initialLine={name} />
+}
+
+/* the per-line control cluster that sits in the topbar nav when a line is open:
+   a back-chevron to all lines, then Dashboard / Assets / Failures for the line */
+function LineNav({ line, active, showAllLines }) {
+  const enc = encodeURIComponent(line)
   return (
-    <>
-      <div className="line-subnav">
-        {!me?.line && <a className="crumb" href="#/">← All lines</a>}
-        <a className="btn ghost sm" href={`#/line/${enc}`}>← Dashboard</a>
-        <a className="btn ghost sm" href={`#/line/${enc}/failures`}>Failures →</a>
-      </div>
-      <LiveDashboard go={(r) => { location.hash = r }} initialLine={name} />
-    </>
+    <span className="line-nav">
+      {showAllLines && (
+        <a className="ln-btn ln-back" href="#/" title="All lines" aria-label="All lines">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+        </a>
+      )}
+      <a href={`#/line/${enc}`} className={`ln-btn${active === 'dash' ? ' active' : ''}`}>Dashboard</a>
+      <a href={`#/line/${enc}/assets`} className={`ln-btn${active === 'assets' ? ' active' : ''}`}>Assets</a>
+      <a href={`#/line/${enc}/failures`} className={`ln-btn${active === 'failures' ? ' active' : ''}`}>Failures</a>
+    </span>
   )
 }
 
@@ -4027,14 +4034,9 @@ export default function App() {
         <header className="topbar">
   <Brand />
           <nav className="nav">
-            <a href="#/" className={!navLine ? 'active' : ''}>Lines</a>
-            {navLine && !assetMatch && (
-              <>
-                <a href={`#/line/${encodeURIComponent(navLine)}`} className={lineMatch ? 'active' : ''}>Dashboard</a>
-                <a href={`#/line/${encodeURIComponent(navLine)}/assets`} className={lineAssetsMatch ? 'active' : ''}>Assets</a>
-                <a href={`#/line/${encodeURIComponent(navLine)}/failures`} className={failLine ? 'active' : ''}>Failures</a>
-              </>
-            )}
+            {navLine && !assetMatch
+              ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
+              : <a href="#/" className={!navLine ? 'active' : ''}>Lines</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>Guide</a>
             <a href="#/login" className="btn login-btn">Sign in</a>
           </nav>
@@ -4058,6 +4060,10 @@ export default function App() {
       <header className="topbar">
 <Brand />
         <nav className="nav">
+          {(lineMatch || lineAssetsMatch || lineFailMatch) && navLine && (
+            <LineNav line={navLine} showAllLines={!me?.line}
+                     active={lineAssetsMatch ? 'assets' : lineFailMatch ? 'failures' : 'dash'} />
+          )}
           {NAV.map(([path, label]) => {
             // Failures is per-line now: send a coordinator to their own line's
             // board, an admin to the line in view (or the redirect picker).

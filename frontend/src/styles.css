@@ -1148,6 +1148,19 @@ tbody tr:hover .edit-link { color: var(--accent); }
 .viz-compact .viz-val { font-size: 11px; }
 .fail-log-h { margin-top: 4px; }
 .line-subnav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+/* per-line control cluster in the topbar nav — a compact chrome-style segmented
+   group: back-chevron to all lines, then Dashboard / Assets / Failures. Tinted
+   with the line colour via --nav-c so it reads as "you are in this line". */
+.line-nav { display: inline-flex; align-items: center; gap: 1px; padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--nav-c, var(--border)) 34%, var(--border));
+  border-radius: 99px; background: rgba(255, 255, 255, .5); margin-right: 4px; }
+.ln-btn { font-size: 13px; font-weight: 600; color: var(--ink-2); padding: 4px 12px; border-radius: 99px;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background .12s, color .12s; }
+.ln-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--nav-c, var(--accent)) 10%, #fff); }
+.ln-btn.active { color: #fff; font-weight: 700; background: var(--nav-c, var(--accent));
+  box-shadow: 0 2px 8px -3px color-mix(in srgb, var(--nav-c, var(--accent)) 70%, transparent); }
+.ln-btn.ln-back { padding: 4px 8px; color: var(--ink-3); }
+.ln-btn.ln-back:hover { color: var(--nav-c, var(--accent)); background: transparent; }
 .ef-hint { font-size: 12px; color: #6b6000; margin: 2px 0 0; }
 /* failure two-flag checkboxes (acknowledge + rectify) */
 .fail-flags { display: flex; flex-direction: column; gap: 7px; }
@@ -1253,9 +1266,14 @@ tbody tr:hover .edit-link { color: var(--accent); }
 .bk-bar { flex: 1 1 auto; height: 10px; background: #f1f0ee; border-radius: 6px; overflow: hidden; }
 .bk-fill { display: block; height: 100%; background: var(--critical); border-radius: 6px; }
 .bk-fill.long { background: #6b8ca6; }
+.bk-fill.never { background: #9b8bd4; }   /* awaiting-1st violet — matches the hood */
 .bk-n { flex: 0 0 auto; font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
-.bk-long { border-top: 1px dashed #e5e2da; padding-top: 8px; margin-top: 2px; }
+.bk-long, .bk-never { border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 2px; }
 .bk-long .bk-lbl { color: #3a5a72; }
+.bk-never .bk-lbl { color: #6a5aa0; }
+/* the separate awaiting/5-yearly rows are counts, not proportional bars — dim
+   the full-width fill so they don't read as "100% overdue" */
+.bk-never .bk-fill, .bk-long .bk-fill { opacity: .5; }
 
 /* asset-health list */
 .ah-list { display: flex; flex-direction: column; }
