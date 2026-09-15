@@ -3849,7 +3849,11 @@ function Landing() {
               const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
                 .filter(([, n]) => n > 0)
               const segTot = segs.reduce((s, [, n]) => s + n, 0) || 1
-              const clear = ready && !open && !p.overdue && !p.exceeded
+              // a line can be onboarded (assets present) yet carry no PM schedule
+              // yet — no plans, no logs. That's "schedule pending", NOT all-clear.
+              const scheduled = (p.ok || 0) + (p.dueSoon || 0) + (p.overdue || 0) + (p.never || 0)
+              const pending = ready && (p.assets || l.assets) > 0 && scheduled === 0
+              const clear = ready && scheduled > 0 && !open && !p.overdue && !p.exceeded
               return (
                 <a key={l.name} className={`land-tile${l.initiator ? ' initiator' : ''}`}
                    href={`#/line/${encodeURIComponent(l.name)}`}
@@ -3872,14 +3876,17 @@ function Landing() {
                       {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
                     </span>
                   )}
+                  {pending && (
+                    <span className="lt-bar pending" aria-hidden="true"><span className="lt-seg seg-pending" style={{ flexGrow: 1 }} /></span>
+                  )}
                   <div className="lt-foot">
                     <span className="lt-stats">
-                      {ready ? <>
+                      {ready ? (pending ? <span className="lt-stat dim">schedule pending</span> : <>
                         <span className="lt-stat od"><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
                         <span className="lt-stat"><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
                         {open ? <span className="lt-stat al"><b>{open}</b> open</span> : null}
                         {clear && <span className="land-hchip ok">All clear</span>}
-                      </> : <span className="lt-stat dim">loading…</span>}
+                      </>) : <span className="lt-stat dim">loading…</span>}
                     </span>
                     <span className="land-tile-go">View →</span>
                   </div>
