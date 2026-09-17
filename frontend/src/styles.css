@@ -2171,3 +2171,16 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
 .docs-k { display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 12px; background: #f3f6f9; border: 1px solid var(--border); border-radius: 5px;
   padding: 0 5px; margin: 0 2px; color: #245b8f; white-space: nowrap; }
+
+/* ---- change-password modal ---- */
+.modal-backdrop { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center;
+  justify-content: center; padding: 20px; background: rgba(11, 42, 63, .38); backdrop-filter: blur(2px); }
+.modal-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: 0 12px 40px -12px rgba(11, 42, 63, .5); padding: 20px; }
+.modal-h { margin: 0 0 14px; font-size: 16px; color: var(--ink); }
+.modal-lbl { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 12px; }
+.modal-in { display: block; width: 100%; margin-top: 5px; padding: 8px 10px; font-size: 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: #fff; color: var(--ink); box-sizing: border-box; }
+.modal-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.modal-err { color: var(--critical); font-size: 12.5px; margin: 2px 0 10px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }

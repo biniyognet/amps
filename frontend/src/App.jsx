@@ -10,7 +10,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout } from './api.js'
+import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -3985,8 +3985,61 @@ function FailuresRedirect({ me }) {
   return <p className="dim">Opening the failures board…</p>
 }
 
+function ChangePasswordModal({ onClose }) {
+  const [cur, setCur] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [done, setDone] = useState(false)
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr('')
+    if (next.length < 8) { setErr('New password must be at least 8 characters.'); return }
+    if (next !== confirm) { setErr('New password and confirmation do not match.'); return }
+    setBusy(true)
+    try {
+      await apiChangePassword(cur, next)
+      setDone(true)
+    } catch (e2) { setErr(e2.message || 'Could not change password.') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        {done ? (
+          <>
+            <h3 className="modal-h">Password changed ✓</h3>
+            <p className="dim">Your password has been updated. Use it next time you sign in.</p>
+            <div className="modal-actions"><button className="btn" type="button" onClick={onClose}>Done</button></div>
+          </>
+        ) : (
+          <form onSubmit={submit}>
+            <h3 className="modal-h">Change password</h3>
+            <label className="modal-lbl">Current password
+              <input className="modal-in" type="password" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} required />
+            </label>
+            <label className="modal-lbl">New password <span className="dim">(min 8 characters)</span>
+              <input className="modal-in" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} required />
+            </label>
+            <label className="modal-lbl">Confirm new password
+              <input className="modal-in" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+            </label>
+            {err && <p className="modal-err">{err}</p>}
+            <div className="modal-actions">
+              <button className="btn ghost sm" type="button" onClick={onClose} disabled={busy}>Cancel</button>
+              <button className="btn" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Update password'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [route, setRoute] = useState(routeFromHash)
+  const [pwOpen, setPwOpen] = useState(false)
   const { me, loading: meLoading } = useMe()
   useEffect(() => {
     const onHash = () => { setRoute(routeFromHash()); window.scrollTo(0, 0) }
@@ -4087,6 +4140,7 @@ export default function App() {
             <span className="who">
               <span className="dot" style={{ background: lineColor(me.line || '') }} />
               {me.full_name}{me.line ? ` · ${me.line}` : ''}
+              <button className="mini-btn" type="button" onClick={() => setPwOpen(true)}>Change password</button>
               <button className="mini-btn muted" type="button" onClick={apiLogout}>Sign out</button>
             </span>
           )}
@@ -4116,6 +4170,7 @@ export default function App() {
         : routePath === '/assets' ? (LIVE ? <LiveDashboard go={go} /> : <Dashboard go={go} />)
         : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}
 
+      {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
       <footer className="foot">
         {LIVE
           ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>

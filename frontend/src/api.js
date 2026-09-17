@@ -76,6 +76,17 @@ export async function apiLogout() {
   location.reload()
 }
 
+/** Self-service password change for the signed-in user. */
+export async function apiChangePassword(current_password, new_password) {
+  const r = await fetch(`${API}/api/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_password, new_password }),
+  })
+  if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || 'could not change password')
+  return r.json()
+}
+
 /** Register + dashboard source: every asset, plus PM items due within 60 days. */
 export function useLiveAssets() {
   // Progressive (lazy) load: the asset list is the register's first paint, so it

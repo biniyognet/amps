@@ -271,3 +271,56 @@ def create_user(body: UserIn, admin=Depends(require_admin), db: Session = Depend
     db.refresh(user)
     return UserOut(id=user.id, username=user.username, full_name=user.full_name,
                    role=user.role.value, line=user.line.name if user.line else None)
+
+
+# ---- password change / reset ------------------------------------------------
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class PasswordReset(BaseModel):
+    new_password: str
+
+
+def _validate_new_password(pw: str):
+    if len(pw or "") < 8:
+        raise HTTPException(422, "new password must be at least 8 characters")
+
+
+@router.post("/change-password")
+def change_password(body: PasswordChange, response: Response,
+                    user=Depends(current_user), db: Session = Depends(get_db)):
+    """Self-service password change for the signed-in user (profile menu)."""
+    if not AUTH_ON:
+        raise HTTPException(400, "authentication is disabled on this deployment")
+    if is_anonymous(user):
+        raise HTTPException(403, "sign in to change your password")
+    u = db.scalar(select(User).where(User.username == user.username))
+    if not u or not verify_password(body.current_password, u.password_hash):
+        raise HTTPException(401, "current password is incorrect")
+    _validate_new_password(body.new_password)
+    if verify_password(body.new_password, u.password_hash):
+        raise HTTPException(422, "new password must differ from the current one")
+    u.password_hash = hash_password(body.new_password)
+    audit(db, "user", u.id, "password_changed", actor=u.username)
+    db.commit()
+    # rotate the session so the change takes effect cleanly on this device
+    response.set_cookie(COOKIE, make_token(u.username), httponly=True,
+                        samesite="lax", max_age=SESSION_HOURS * 3600, path="/")
+    return {"ok": True}
+
+
+@router.post("/users/{user_id}/reset-password", dependencies=[Depends(require_admin)])
+def reset_password(user_id: int, body: PasswordReset,
+                   admin=Depends(require_admin), db: Session = Depends(get_db)):
+    """Admin resets any user's password to a temporary value."""
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "user not found")
+    _validate_new_password(body.new_password)
+    u.password_hash = hash_password(body.new_password)
+    audit(db, "user", u.id, "password_reset", actor=admin.username)
+    db.commit()
+    return {"ok": True, "username": u.username}
