@@ -13,6 +13,13 @@ export const ORG = import.meta.env.VITE_AMPS_ORG || 'Demo Metro Line'
 
 const API = import.meta.env.VITE_AMPS_API ?? '' // same-origin by default
 
+// Asset codes can contain '/' (e.g. "EXF- CHEMICAL/OIL/GREASE ROOM (CPD)"). A
+// single-encoded '%2F' in a URL PATH segment is rejected by the router as a
+// separator, so path-param codes are DOUBLE-encoded here — the server decodes
+// one layer, the handler (_code) decodes the other. Query params use plain
+// encodeURIComponent. Idempotent for ordinary codes.
+export const encPath = (c) => encodeURIComponent(encodeURIComponent(c))
+
 export async function getJSON(path) {
   const r = await fetch(`${API}${path}`)
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -133,8 +140,8 @@ export function useLiveAsset(code) {
     let alive = true
     set({ asset: null, history: [], log: [], loading: true, error: null })
     Promise.all([
-      getJSON(`/api/assets/${encodeURIComponent(code)}`),
-      getJSON(`/api/assets/${encodeURIComponent(code)}/history`).catch(() => []),
+      getJSON(`/api/assets/${encPath(code)}`),
+      getJSON(`/api/assets/${encPath(code)}/history`).catch(() => []),
       getJSON(`/api/logbook?asset_code=${encodeURIComponent(code)}&limit=500`).catch(() => []),
     ])
       .then(([a, history, log]) => alive && set({ asset: toView(a), history, log, loading: false, error: null }))

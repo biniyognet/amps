@@ -10,7 +10,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword } from './api.js'
+import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -1097,7 +1097,7 @@ function useAssetSchedule(code) {
   const [nonce, setNonce] = useState(0)
   useEffect(() => {
     let alive = true
-    getJSON(`/api/assets/${encodeURIComponent(code)}/schedule`)
+    getJSON(`/api/assets/${encPath(code)}/schedule`)
       .then((s) => alive && setSchedule(s)).catch(() => alive && setSchedule(null))
     return () => { alive = false }
   }, [code, nonce])
@@ -1166,7 +1166,7 @@ function PlanEditor({ code, schedule, onSaved }) {
     try {
       const seedPayload = {}
       for (const f of checked) if (seeds[f]) seedPayload[f] = seeds[f]
-      const res = await fetch(`/api/assets/${encodeURIComponent(code)}/plan`, {
+      const res = await fetch(`/api/assets/${encPath(code)}/plan`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ frequencies: [...checked], seeds: seedPayload }),
       })
@@ -1317,7 +1317,7 @@ function AssetAudit({ code }) {
   const [rows, setRows] = useState(null)
   useEffect(() => {
     let alive = true
-    getJSON(`/api/assets/${encodeURIComponent(code)}/audit`)
+    getJSON(`/api/assets/${encPath(code)}/audit`)
       .then((r) => alive && setRows(r)).catch(() => alive && setRows([]))
     return () => { alive = false }
   }, [code])

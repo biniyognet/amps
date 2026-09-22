@@ -6,6 +6,15 @@
 import csv
 import io
 from datetime import date, datetime
+from urllib.parse import unquote
+
+
+def _code(code: str) -> str:
+    """Path-param asset codes are double-encoded by the client so that codes
+    containing '/' (e.g. 'EXF- CHEMICAL/OIL/GREASE ROOM (CPD)') survive routing —
+    a single-encoded '%2F' is rejected as a path separator. The server decodes
+    once, we decode the remaining layer here. Idempotent for ordinary codes."""
+    return unquote(code)
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ValidationError
@@ -485,7 +494,7 @@ async def import_csv(request: Request, db: Session = Depends(get_db),
 
 @router.get("/{code}", response_model=AssetOut)
 def get_asset(code: str, db: Session = Depends(get_db), user=Depends(optional_user)):
-    return _to_out(visible_asset(db, code, user))
+    return _to_out(visible_asset(db, _code(code), user))
 
 
 def _line_of(a: Asset) -> str | None:
@@ -590,7 +599,7 @@ class AuditOut(BaseModel):
 def asset_audit(code: str, db: Session = Depends(get_db), user=Depends(current_user)):
     """The change history for one asset, newest first. Writers only — the
     walk-up QR surface shows the record, not who has edited it."""
-    a = visible_asset(db, code, user)
+    a = visible_asset(db, _code(code), user)
     rows = db.scalars(
         select(AuditLog).where(AuditLog.entity == "asset", AuditLog.entity_id == a.id)
         .order_by(AuditLog.at.desc(), AuditLog.id.desc())
@@ -653,7 +662,7 @@ def _asset_schedule(db: Session, a: Asset) -> ScheduleOut:
 def asset_schedule(code: str, db: Session = Depends(get_db), user=Depends(optional_user)):
     """One asset's maintenance schedule — open like the rest of the walk-up
     record (single-asset scope). Plan-driven when a plan exists, else inferred."""
-    return _asset_schedule(db, visible_asset(db, code, user))
+    return _asset_schedule(db, visible_asset(db, _code(code), user))
 
 
 class PlanIn(BaseModel):
@@ -674,7 +683,7 @@ def set_plan(code: str, plan: PlanIn, db: Session = Depends(get_db),
     on the plan. Dedup on (asset, date, cycle) keeps re-saving the plan
     idempotent; the seed is kept too (harmless — the schedule takes the max of
     log and seed — and it keeps the plan editor's date field populated)."""
-    a = visible_asset(db, code, user)
+    a = visible_asset(db, _code(code), user)
     bad = [f for f in plan.frequencies if f not in SCHEDULE_FREQ]
     if bad:
         raise HTTPException(422, f"unknown frequency: {', '.join(bad)}")
@@ -732,7 +741,7 @@ class HistoryItem(BaseModel):
 def asset_history(code: str, db: Session = Depends(get_db), user=Depends(optional_user)):
     """The asset's history card — every work order, newest first.
     This is the screen a supervisor opens after scanning the QR tag."""
-    obj = visible_asset(db, code, user)
+    obj = visible_asset(db, _code(code), user)
     orders = db.scalars(
         select(WorkOrder).where(WorkOrder.asset_id == obj.id)
         .order_by(WorkOrder.opened_at.desc())
