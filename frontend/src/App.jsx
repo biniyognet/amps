@@ -3557,22 +3557,24 @@ function CorrespondenceView({ line = '' }) {
         <div className="card"><p className="dim" style={{ margin: 0 }}>No correspondence in this view.</p></div>
       ) : (
         <div className="card tbl-wrap">
-          <table className="jc-table">
+          <table className="jc-table corr-table">
+            {/* proportional widths (sum 100%) so all 7 columns fit the card at
+                any width — no 1024px min-width / horizontal scroll (see .corr-table) */}
             <colgroup>
-              <col style={{ width: 96 }} /><col style={{ width: 64 }} /><col style={{ width: 150 }} />
-              <col /><col style={{ width: 150 }} /><col style={{ width: 160 }} /><col style={{ width: 56 }} />
+              <col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '15%' }} />
+              <col style={{ width: '30%' }} /><col style={{ width: '15%' }} /><col style={{ width: '18%' }} /><col style={{ width: '6%' }} />
             </colgroup>
             <thead><tr><th>Date</th><th>Mode</th><th>Ref no.</th><th>Subject</th><th>Related assets</th><th>From → To</th><th>Doc</th></tr></thead>
             <tbody>
               {shown.map((r) => (
                 <tr key={r.id}>
-                  <td className="dim">{fmt(r.date)}</td>
-                  <td><span className={`corr-mode ${r.mode}`}>{r.mode === 'email' ? 'Email' : 'Letter'}</span></td>
-                  <td className="wrap-cell"><span className="code">{oneLine(r.ref_no, 40) || '—'}</span></td>
-                  <td className="wrap-cell" title={r.brief || ''}>{oneLine(r.subject, 120) || '—'}</td>
-                  <td className="wrap-cell dim">{oneLine(r.related_assets, 60) || '—'}</td>
-                  <td className="wrap-cell dim">{oneLine(r.sender, 26)}{r.recipient ? ` → ${oneLine(r.recipient, 26)}` : ''}</td>
-                  <td>{r.link && /^https?:\/\//.test(r.link)
+                  <td className="dim" data-l="Date">{fmt(r.date)}</td>
+                  <td data-l="Mode"><span className={`corr-mode ${r.mode}`}>{r.mode === 'email' ? 'Email' : 'Letter'}</span></td>
+                  <td className="wrap-cell" data-l="Ref no."><span className="code">{oneLine(r.ref_no, 40) || '—'}</span></td>
+                  <td className="wrap-cell" data-l="Subject" title={r.brief || ''}>{oneLine(r.subject, 120) || '—'}</td>
+                  <td className="wrap-cell dim" data-l="Related assets">{oneLine(r.related_assets, 60) || '—'}</td>
+                  <td className="wrap-cell dim" data-l="From → To">{oneLine(r.sender, 26)}{r.recipient ? ` → ${oneLine(r.recipient, 26)}` : ''}</td>
+                  <td data-l="Doc">{r.link && /^https?:\/\//.test(r.link)
                     ? <a className="mini-btn" href={r.link} target="_blank" rel="noreferrer">Open</a>
                     : <span className="dim">—</span>}</td>
                 </tr>
