@@ -4048,6 +4048,20 @@ export default function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+  // Measure the sticky topbar's real height into --topbar-h at the SHELL level so
+  // every docked bar (register/logbook toolbars, dashboard hood, letters filter)
+  // parks flush under the nav on ALL routes. Re-runs per route because the nav's
+  // height changes with it; the Letters view had no measurer of its own and fell
+  // back to the 78px guess, opening a gap under the shorter nav while docked.
+  useEffect(() => {
+    const tb = document.querySelector('.topbar')
+    if (!tb) return undefined
+    const set = () => document.documentElement.style.setProperty('--topbar-h', `${tb.offsetHeight}px`)
+    set()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(set); ro.observe(tb)
+    return () => ro.disconnect()
+  }, [route])
   const go = (r) => { location.hash = r }
   const authOn = LIVE && me?.auth_enabled
   const signedIn = authOn && me.username !== 'viewer'
