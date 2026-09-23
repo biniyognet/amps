@@ -280,9 +280,10 @@ tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px;
 /* Job-cards table: fixed column layout so Asset/Fault get real width instead of
    being crushed by the attachment-heavy detail cell. Scrolls-x on narrow. */
 .jc-table { table-layout: fixed; width: 100%; min-width: 1024px; }
-/* Correspondence has only 7 columns with percentage widths, so it fits any
-   card width — drop the 1024px floor that forces horizontal scroll on the box. */
-.jc-table.corr-table { min-width: 0; }
+/* Tables whose colgroup is in percentages fit any card width — drop the 1024px
+   floor that forces horizontal scroll on the box (correspondence, job cards,
+   failures). Columns wrap into their share instead of side-scrolling. */
+.jc-table.corr-table, .jc-table.fit-card { min-width: 0; }
 .jc-table td { vertical-align: top; }
 .jc-table td.code { max-width: none; white-space: normal; overflow-wrap: anywhere; }
 .jc-table td[data-l="Fault"] { white-space: normal; }

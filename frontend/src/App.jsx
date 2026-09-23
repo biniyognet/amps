@@ -2003,7 +2003,14 @@ function LiveFailures({ line = '' }) {
       <>
       <h2 className="fail-log-h">{{ open: 'Open failures', acknowledged: 'Acknowledged failures', job_card: 'Job card issued', resolved: 'Resolved failures' }[state]} <span className="dim" style={{ fontWeight: 400, fontSize: 15 }}>· {shown.length}</span></h2>
       <div className="card tbl-wrap">
-        <table>
+        <table className="jc-table fit-card">
+          {/* percentage widths so every column fits the card (no h-scroll);
+              the Fault column flexes into the remaining width */}
+          <colgroup>
+            <col style={{ width: '12%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
+            <col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '12%' }} />
+            <col />{canWrite && <col style={{ width: '9%' }} />}
+          </colgroup>
           <thead><tr><th>Asset</th><th>Class</th><th>Occurred</th><th>Restored</th><th>Down</th><th>State</th><th>Team</th><th>Fault → what happened</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
           <tbody>
             {shown.map((f) => (
@@ -2528,10 +2535,13 @@ function PrintablesNav({ active }) {
     <span className="showcase" onClick={(e) => e.stopPropagation()}>
       <button type="button" className={`nav-drop${active ? ' active' : ''}${open ? ' open' : ''}`}
               onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="true">
-        Printables <span className="caret">▾</span>
+        More <span className="caret">▾</span>
       </button>
       {open && (
         <div className="showcase-menu" role="menu">
+          <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
+            <span className="sc-name">Letters</span><span className="sc-sub">official correspondence — letters & emails on record</span>
+          </a>
           <a className="sc-item" role="menuitem" href="#/printables?t=qr" onClick={() => go('qr')}>
             <span className="sc-name">QR asset tags</span><span className="sc-sub">printable QR labels for every asset</span>
           </a>
@@ -3445,12 +3455,14 @@ function JobCardsView({ line = '' }) {
         <div className="card"><p className="dim" style={{ margin: 0 }}>{tab === 'open' ? 'No open job cards — nothing to chase. 👍' : 'None in this view.'}</p></div>
       ) : (
         <div className="card tbl-wrap">
-          <table className="jc-table">
+          <table className="jc-table fit-card">
+            {/* percentage widths so all columns fit the card at any width (no
+                1024px min-width / h-scroll); Detail flexes into the remainder */}
             <colgroup>
-              <col style={{ width: 46 }} /><col style={{ width: 84 }} />
-              <col style={{ width: 112 }} /><col style={{ width: 88 }} /><col style={{ width: 86 }} /><col style={{ width: 150 }} />
-              <col style={{ width: 92 }} /><col style={{ width: 100 }} /><col style={{ width: 80 }} />
-              <col style={{ width: 80 }} /><col />{canWrite && <col style={{ width: 98 }} />}
+              <col style={{ width: '4%' }} /><col style={{ width: '7%' }} />
+              <col style={{ width: '11%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '13%' }} />
+              <col style={{ width: '8%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} /><col />{canWrite && <col style={{ width: '8%' }} />}
             </colgroup>
             <thead><tr><th>{tab === 'open' ? 'Pending' : 'Turnaround'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
               <th>Issued by</th>
@@ -3659,8 +3671,7 @@ const NAV = LIVE ? [
   ['/log', 'Log book'],
   ['/failures', 'Failures'],
   ['/job-cards', 'Job cards'],
-  ['/letters', 'Letters'],
-  ['/printables', 'Printables'],
+  ['/printables', 'More'],
   ['/guide', 'Guide'],
 ] : [
   ['/', 'Assets'],
@@ -4148,7 +4159,7 @@ export default function App() {
               const href = fl ? `#/line/${encodeURIComponent(fl)}/failures` : '#/failures'
               return <a key={path} href={href} className={lineFailMatch ? 'active' : ''}>{label}</a>
             }
-            if (path === '/printables') return <PrintablesNav key={path} active={routePath === '/printables'} />
+            if (path === '/printables') return <PrintablesNav key={path} active={routePath === '/printables' || routePath === '/letters'} />
             return <a key={path} href={`#${path}`} className={routePath === path ? 'active' : ''}>{label}</a>
           })}
           {!LIVE && <ShowcaseDropdown />}
