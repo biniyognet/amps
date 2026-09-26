@@ -27,10 +27,11 @@ class AssetScheduleSummary(BaseModel):
     next_frequency: str | None
     next_due: date | None
     days_left: int | None
-    state: str              # ok | due_soon | overdue | long_overdue
+    state: str              # ok | due_soon | grace | overdue | long_overdue
     never_done: bool = False  # routine-overdue but never once maintained
     overdue_count: int      # routine (short-cycle) overdue only
     long_overdue_count: int = 0   # 5-Yearly overdue / never started
+    grace_count: int = 0          # lapsed ≤30d on a Monthly+ cycle — records awaited
     last_done: date | None = None   # most recent maintenance across all cycles
     cycles: dict[str, str] = {}     # per-cycle state, e.g. {Monthly: overdue, Yearly: ok}
 

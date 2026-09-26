@@ -95,3 +95,30 @@ def test_coverage_flags_all_general_pattern():
     assert uncovered == 22
     _, _, sunday_uncovered, _ = per_day[6]
     assert sunday_uncovered == ["M", "E", "N", "G"]  # Sunday fully dark
+
+
+def test_recent_lapse_on_monthly_is_records_awaited_grace():
+    # agency records reach the depot up to a month late: a Monthly+ cycle that
+    # lapsed ≤30 days ago is 'grace' (neutral), not overdue; day 31 is overdue
+    today = date(2026, 9, 26)
+    due_30_ago = today - timedelta(days=30 + 91)   # Quarterly due exactly 30d ago
+    due_31_ago = today - timedelta(days=31 + 91)
+    assert build_schedule({"Quarterly"}, {"Quarterly": due_30_ago}, today)[0]["state"] == "grace"
+    assert build_schedule({"Quarterly"}, {"Quarterly": due_31_ago}, today)[0]["state"] == "overdue"
+
+
+def test_weekly_gets_no_grace():
+    today = date(2026, 9, 26)
+    rows = build_schedule({"Weekly"}, {"Weekly": today - timedelta(days=8)}, today)
+    assert rows[0]["state"] == "overdue"
+
+
+def test_summarize_grace_is_neither_overdue_nor_ok():
+    today = date(2026, 9, 26)
+    s = summarize_schedule(build_schedule({"Monthly"}, {"Monthly": today - timedelta(days=40)}, today))
+    assert s["state"] == "grace" and s["grace_count"] == 1 and s["overdue_count"] == 0
+    # a genuinely lapsed cycle still dominates
+    s = summarize_schedule(build_schedule({"Monthly", "Quarterly"},
+                                          {"Monthly": today - timedelta(days=40),
+                                           "Quarterly": today - timedelta(days=200)}, today))
+    assert s["state"] == "overdue"

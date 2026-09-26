@@ -615,7 +615,7 @@ class ScheduleRow(BaseModel):
     via: str | None           # the longer cycle that fulfilled this one, if any
     next_due: date | None
     days_left: int | None
-    state: str                # ok | due_soon | overdue | never
+    state: str                # ok | due_soon | grace | overdue | never
 
 
 class ScheduleSummary(BaseModel):

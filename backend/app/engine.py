@@ -55,6 +55,13 @@ SCHEDULE_FREQ = {
     "Weekly": 7, "Monthly": 30, "Quarterly": 91, "Half-Yearly": 182, "Yearly": 365, "5-Yearly": 1825,
 }
 DUE_SOON_DAYS = 30   # a next-due within this window is "due soon", not yet overdue
+# Records-awaited grace: maintenance done by outside agencies reaches the depot
+# (and gets checked for compliance) up to a month after the work. A Monthly-or-
+# longer cycle that lapsed within GRACE_DAYS is shown as 'grace' ("records
+# awaited") — not overdue; compliance counts it like due-soon (Arup/PS 09-26).
+# Weekly stays strict (30 days would hide four missed weeklies).
+GRACE_DAYS = 30
+GRACE_MIN_CYCLE = SCHEDULE_FREQ["Monthly"]
 
 
 def build_schedule(freqs, done, today=None):
@@ -84,7 +91,10 @@ def build_schedule(freqs, done, today=None):
             continue
         due = done[src] + timedelta(days=days)
         left = (due - today).days
-        state = "overdue" if left < 0 else "due_soon" if left <= DUE_SOON_DAYS else "ok"
+        if left < 0:
+            state = "grace" if days >= GRACE_MIN_CYCLE and -left <= GRACE_DAYS else "overdue"
+        else:
+            state = "due_soon" if left <= DUE_SOON_DAYS else "ok"
         rows.append({"frequency": f, "last_done": done[src], "via": src if src != f else None,
                      "next_due": due, "days_left": left, "state": state})
     return rows
@@ -110,10 +120,12 @@ def summarize_schedule(rows):
     overdue = [r for r in outstanding if not _is_long(r)]       # routine overdue (the headline)
     long_overdue = [r for r in outstanding if _is_long(r)]      # 5-Yearly overdue / never started
     due_soon = [r for r in rows if r["state"] == "due_soon"]
+    grace = [r for r in rows if r["state"] == "grace"]
     dated = [r for r in rows if r["next_due"] is not None]
     nxt = min(dated, key=lambda r: r["next_due"]) if dated else None
-    # routine overdue dominates; then due-soon; then long-cycle backlog; then ok
-    state = ("overdue" if overdue else "due_soon" if due_soon
+    # routine overdue dominates; then records-awaited; then due-soon; then
+    # long-cycle backlog; then ok
+    state = ("overdue" if overdue else "grace" if grace else "due_soon" if due_soon
              else "long_overdue" if long_overdue else "ok")
     # "never done": the asset is routine-overdue AND no routine cycle was ever
     # performed — a fresh asset with no maintenance history at all, distinct from
@@ -133,6 +145,7 @@ def summarize_schedule(rows):
         "never_done": never_done,
         "overdue_count": len(overdue),
         "long_overdue_count": len(long_overdue),
+        "grace_count": len(grace),
     }
 
 

@@ -151,7 +151,7 @@ const StageChip = ({ stage }) => (
 
 /* ---------- dashboard (live) ---------- */
 
-const SEV_RANK = { overdue: 0, never: 0.5, due_soon: 1, long_overdue: 2, ok: 3 }
+const SEV_RANK = { overdue: 0, never: 0.5, grace: 0.8, due_soon: 1, long_overdue: 2, ok: 3 }
 
 /* filters that survive tab switches — parked in localStorage under a namespaced
    key so leaving a page and coming back keeps the view you set up. */
@@ -291,6 +291,7 @@ function LiveDashboard({ go, initialLine = null }) {
   const overdue = overdueAll.filter((a) => dispState(a) !== 'never')    // lapsed only (Overdue = overdue − never-done)
   const notScheduled = base.filter((a) => !sched[assetKey(a)])          // no PM plan at all — out of scope
   const dueSoon = base.filter((a) => stateOf(a) === 'due_soon')
+  const grace = base.filter((a) => stateOf(a) === 'grace')   // lapsed ≤30d, agency records awaited
   const longOverdue = base.filter((a) => stateOf(a) === 'long_overdue')  // 5-Yearly overdue / never started
   const faulty = base.filter((a) => attnOf(a) > 0)   // open OR acknowledged
   // one asset matches a bucket key; several selected chips OR together
@@ -346,8 +347,8 @@ function LiveDashboard({ go, initialLine = null }) {
   const toggleIn = (set) => (v) => set((prev) => { const a = asArr(prev); return a.includes(v) ? a.filter((x) => x !== v) : [...a, v] })
   // PM-state column filter shares the ribbon's `filters` buckets, so the header
   // funnel and the ribbon chips stay in sync.
-  const PM_OPTS = ['overdue', 'cyc:Monthly', 'cyc:Quarterly', 'cyc:Half-Yearly', 'cyc:Yearly', 'never', 'due_soon', 'long_overdue', 'ok', 'not_scheduled']
-  const PM_LBL = { overdue: 'Overdue (any cycle)', 'cyc:Monthly': 'Monthly overdue', 'cyc:Quarterly': 'Quarterly overdue', 'cyc:Half-Yearly': 'Half-Yearly overdue', 'cyc:Yearly': 'Yearly overdue', never: 'Awaiting 1st service', due_soon: 'Due soon', long_overdue: '5-Yearly', ok: 'On schedule', not_scheduled: 'Unscheduled' }
+  const PM_OPTS = ['overdue', 'cyc:Monthly', 'cyc:Quarterly', 'cyc:Half-Yearly', 'cyc:Yearly', 'never', 'grace', 'due_soon', 'long_overdue', 'ok', 'not_scheduled']
+  const PM_LBL = { overdue: 'Overdue (any cycle)', 'cyc:Monthly': 'Monthly overdue', 'cyc:Quarterly': 'Quarterly overdue', 'cyc:Half-Yearly': 'Half-Yearly overdue', 'cyc:Yearly': 'Yearly overdue', never: 'Awaiting 1st service', grace: 'Records awaited', due_soon: 'Due soon', long_overdue: '5-Yearly', ok: 'On schedule', not_scheduled: 'Unscheduled' }
   const colFilters = {
     code: { text: fCode, setText: setFCode },
     name: { text: fName, setText: setFName },
@@ -473,9 +474,10 @@ function LiveDashboard({ go, initialLine = null }) {
               {[['all', `All ${base.length}`], ['faulty', `Faulty ${faulty.length}`],
                 ['overdue', `Overdue ${overdue.length}`],
                 ['never', <>Awaiting 1st service <span className="cnt-never">{neverDone.length}</span></>],
+                ['grace', `Records awaited ${grace.length}`],
                 ['due_soon', `Due soon ${dueSoon.length}`], ['long_overdue', `5-Yearly ${longOverdue.length}`],
                 ['not_scheduled', `Unscheduled ${notScheduled.length}`]]
-                .filter(([k]) => (k !== 'faulty' || faulty.length) && (k !== 'long_overdue' || longOverdue.length) && (k !== 'not_scheduled' || notScheduled.length) && (k !== 'never' || neverDone.length))
+                .filter(([k]) => (k !== 'faulty' || faulty.length) && (k !== 'grace' || grace.length) && (k !== 'long_overdue' || longOverdue.length) && (k !== 'not_scheduled' || notScheduled.length) && (k !== 'never' || neverDone.length))
                 .map(([k, lbl]) => {
                   const active = k === 'all' ? filters.length === 0 : filters.includes(k)
                   const toggle = () => k === 'all' ? setFilter([])
@@ -483,7 +485,7 @@ function LiveDashboard({ go, initialLine = null }) {
                   return (
                 <button key={k} type="button" aria-pressed={active}
                         className={`btn preset ${k === 'never' ? 'preset-never ' : ''}${active ? 'active' : ''}${(k === 'overdue' && overdue.length) || (k === 'faulty' && faulty.length) ? ' has-od' : ''}`}
-                        title={FILTER_TIP(k, { base: base.length, faulty: faulty.length, overdue: overdue.length, never: neverDone.length, dueSoon: dueSoon.length, longOverdue: longOverdue.length, notScheduled: notScheduled.length })}
+                        title={FILTER_TIP(k, { base: base.length, faulty: faulty.length, overdue: overdue.length, never: neverDone.length, grace: grace.length, dueSoon: dueSoon.length, longOverdue: longOverdue.length, notScheduled: notScheduled.length })}
                         onClick={toggle}>{lbl}</button>
                 )})}
               {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
@@ -982,7 +984,7 @@ function AssetLogSections({ log, staff, code, canWrite }) {
    (a Yearly service fulfils the Quarterly under it). Applicability comes from the
    asset's plan when set, else it's inferred from what the log already holds. */
 const SCHED_FREQS = ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly']
-const SCHED_LABEL = { overdue: 'Overdue', due_soon: 'Due soon', long_overdue: '5-Yearly due', ok: 'On schedule', never: 'Never done' }
+const SCHED_LABEL = { overdue: 'Overdue', grace: 'Records awaited', due_soon: 'Due soon', long_overdue: '5-Yearly due', ok: 'On schedule', never: 'Never done' }
 // short labels for the print caption when filter chips are active
 const FILTER_LABEL = { faulty: 'faulty', overdue: 'overdue (lapsed)', never: 'awaiting 1st service', due_soon: 'due soon', long_overdue: '5-Yearly', not_scheduled: 'unscheduled' }
 
@@ -1065,7 +1067,7 @@ function ColFilter({ open, onToggle, onClose, values, toggle, clear, opts, fmt, 
 // coloured by that cycle's state; a cycle not in the asset's plan is a dim dash.
 const CYC_ABBR = [['Monthly', 'M'], ['Quarterly', 'Q'], ['Half-Yearly', 'HY'], ['Yearly', 'Y'], ['5-Yearly', '5Y']]
 const cycStateClass = (st) => st === 'overdue' ? 'pmc-od' : st === 'never' ? 'pmc-never'
-  : st === 'due_soon' ? 'pmc-due' : st === 'ok' ? 'pmc-ok' : st === 'long_overdue' ? 'pmc-long' : 'pmc-none'
+  : st === 'grace' ? 'pmc-grace' : st === 'due_soon' ? 'pmc-due' : st === 'ok' ? 'pmc-ok' : st === 'long_overdue' ? 'pmc-long' : 'pmc-none'
 const PmMatrix = ({ cycles = {} }) => (
   <span className="pm-matrix">
     {CYC_ABBR.filter(([f]) => f in cycles).map(([f, ab]) => (
@@ -1077,6 +1079,7 @@ const PmMatrix = ({ cycles = {} }) => (
 const SCHED_TIP = {
   overdue: 'A routine (short-cycle) maintenance is past due — the asset was serviced before but has since lapsed.',
   never: 'Routine maintenance is due and this asset has never once been maintained on any cycle (no history at all).',
+  grace: 'Maintenance fell due within the last 30 days — the agency record is awaited for compliance check. Counted as compliant (like due soon) until the month is up.',
   due_soon: 'A routine maintenance falls due within the next few days.',
   long_overdue: 'A 5-Yearly (long-cycle) overhaul is due or was never started — tracked apart from the routine backlog.',
   ok: 'All maintenance cycles are up to date.',
@@ -1087,6 +1090,7 @@ const FILTER_TIP = (k, c) => k === 'all' ? `All ${c.base} assets in view`
   : k === 'overdue' ? `${c.overdue} asset(s) overdue after lapsing — serviced before but now past due (excludes never-done)`
   : k === 'never' ? `${c.never} asset(s) awaiting their first scheduled service — have a plan but no PM done yet (onboarding backlog, not a lapse)`
   : k === 'not_scheduled' ? `${c.notScheduled} asset(s) with no maintenance schedule at all — outside the PM scope`
+  : k === 'grace' ? `${c.grace} asset(s) past due by ≤30 days — agency records awaited (counted as compliant)`
   : k === 'due_soon' ? `${c.dueSoon} asset(s) due for maintenance within the next few days`
   : k === 'long_overdue' ? `${c.longOverdue} asset(s) with a 5-Yearly overhaul due or never started`
   : undefined
@@ -3076,7 +3080,7 @@ function LineDashboard({ go, initialLine = null }) {
   // it does not swamp the number the PCEE acts on. Un-scheduled assets (no plan,
   // no logged maintenance) are their own bucket.
   const total = assets.length
-  const bucket = { ok: 0, due_soon: 0, overdue: 0, long_overdue: 0, none: 0 }
+  const bucket = { ok: 0, due_soon: 0, grace: 0, overdue: 0, long_overdue: 0, none: 0 }
   assets.forEach((a) => { bucket[stateOf(a) || 'none'] += 1 })
   // Separate the routine-overdue bucket into "never serviced" (has a plan but no
   // first PM yet — a scheduling backlog, common on a young system) and genuinely
@@ -3091,7 +3095,9 @@ function LineDashboard({ go, initialLine = null }) {
   // "compliant" = not lapsed: an asset on schedule (ok) OR approaching its next
   // due date (due_soon) is still within its maintenance window. Only genuinely
   // overdue (lapsed) routine PM counts against compliance.
-  const compliant = bucket.ok + bucket.due_soon
+  // records-awaited (lapsed ≤30d on a Monthly+ cycle, agency record not yet
+  // checked) counts as compliant like due-soon until the month is up
+  const compliant = bucket.ok + bucket.due_soon + bucket.grace
   const compliance = inCycle > 0 ? Math.round((compliant / inCycle) * 100) : (scheduled ? 100 : 0)
   // routine overdue broken up by the overdue cycle (Monthly / Quarterly / …)
   // and by asset class — so the PCEE sees WHERE the backlog is concentrated
@@ -3137,6 +3143,7 @@ function LineDashboard({ go, initialLine = null }) {
   const segs = [
     ['ok', 'On schedule', bucket.ok, 'seg-ok'],
     ['due_soon', 'Due soon', bucket.due_soon, 'seg-due'],
+    ['grace', 'Records awaited', bucket.grace, 'seg-grace'],
     ['overdue', 'Overdue', lapsed, 'seg-od'],
     ['never', 'Awaiting 1st service', neverN, 'seg-never'],
     ['long_overdue', '5-Yearly due', bucket.long_overdue, 'seg-long'],
@@ -3165,7 +3172,7 @@ function LineDashboard({ go, initialLine = null }) {
       [],
       ['Metric', 'Count'],
       ['Total assets', total], ['On schedule', bucket.ok], ['Due soon', bucket.due_soon],
-      ['Overdue (lapsed)', lapsed], ['Awaiting 1st service', neverN],
+      ['Records awaited (≤30d, compliant)', bucket.grace], ['Overdue (lapsed)', lapsed], ['Awaiting 1st service', neverN],
       ['5-Yearly overhaul', bucket.long_overdue], ['Unscheduled', bucket.none],
       ['Open failures', openF], ['Exceeded codal life', exceeded],
       ['PM compliance %', compliance],
@@ -3216,7 +3223,7 @@ function LineDashboard({ go, initialLine = null }) {
           <span className={`h-pct ${complClass}`}>{compliance}%</span>
           <div className="h-txt">
             <span className="h-pk">PM compliance</span>
-            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule</span>
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule{bucket.grace > 0 && <> · <b>{bucket.grace.toLocaleString()}</b> records awaited</>}</span>
           </div>
         </div>
         <div className="h-meter" role="img" aria-label="PM compliance breakdown">
@@ -3798,21 +3805,22 @@ function useNetworkGlance() {
     const ln = a.line || '—'
     // per-line mini-breakdown for the landing dashboards: on-schedule, due-soon,
     // lapsed-overdue, awaiting-1st (never) — mirrors the LineDashboard buckets.
-    const p = (perLine[ln] ||= { assets: 0, ok: 0, dueSoon: 0, overdue: 0, never: 0, exceeded: 0 })
+    const p = (perLine[ln] ||= { assets: 0, ok: 0, dueSoon: 0, grace: 0, overdue: 0, never: 0, exceeded: 0 })
     p.assets += 1
     const s = sched[assetKey(a)]
     const st = s?.state
     if (s?.never_done) p.never += 1
     else if (st === 'overdue') p.overdue += 1
+    else if (st === 'grace') p.grace += 1       // records awaited — counts as compliant
     else if (st === 'due_soon') p.dueSoon += 1
     else if (st === 'ok') p.ok += 1
     if (codalExceeded(a)) p.exceeded += 1
   }
   // compliance over in-cycle assets (serviced or lapsed), excluding never/unscheduled
   for (const p of Object.values(perLine)) {
-    const inCycle = p.ok + p.dueSoon + p.overdue
+    const inCycle = p.ok + p.dueSoon + p.grace + p.overdue
     p.inCycle = inCycle
-    p.compliance = inCycle > 0 ? Math.round(((p.ok + p.dueSoon) / inCycle) * 100) : null
+    p.compliance = inCycle > 0 ? Math.round(((p.ok + p.dueSoon + p.grace) / inCycle) * 100) : null
   }
   const openByLine = (fail && fail.by_line_open) || {}
   const net = {
@@ -3859,12 +3867,12 @@ function Landing() {
               const ready = failReady && !loading
               // mini compliance bar segments (only non-zero) — same colours as
               // the LineDashboard hood: on-schedule / due-soon / overdue / awaiting
-              const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
+              const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['grace', p.grace || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
                 .filter(([, n]) => n > 0)
               const segTot = segs.reduce((s, [, n]) => s + n, 0) || 1
               // a line can be onboarded (assets present) yet carry no PM schedule
               // yet — no plans, no logs. That's "schedule pending", NOT all-clear.
-              const scheduled = (p.ok || 0) + (p.dueSoon || 0) + (p.overdue || 0) + (p.never || 0)
+              const scheduled = (p.ok || 0) + (p.dueSoon || 0) + (p.grace || 0) + (p.overdue || 0) + (p.never || 0)
               const pending = ready && (p.assets || l.assets) > 0 && scheduled === 0
               const clear = ready && scheduled > 0 && !open && !p.overdue && !p.exceeded
               return (
@@ -3886,7 +3894,7 @@ function Landing() {
                   <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations</span>
                   {ready && segTot > 1 && (
                     <span className="lt-bar" aria-hidden="true">
-                      {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
+                      {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'grace' ? 'grace' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
                     </span>
                   )}
                   {pending && (
@@ -3897,6 +3905,7 @@ function Landing() {
                       {ready ? (pending ? <span className="lt-stat dim">schedule pending</span> : <>
                         <span className="lt-stat od"><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
                         <span className="lt-stat"><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
+                        {p.grace ? <span className="lt-stat"><b>{p.grace.toLocaleString()}</b> records awaited</span> : null}
                         {open ? <span className="lt-stat al"><b>{open}</b> open</span> : null}
                         {clear && <span className="land-hchip ok">All clear</span>}
                       </>) : <span className="lt-stat dim">loading…</span>}

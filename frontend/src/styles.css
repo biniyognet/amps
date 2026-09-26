@@ -2188,3 +2188,11 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
 .modal-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .modal-err { color: var(--critical); font-size: 12.5px; margin: 2px 0 10px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+/* records awaited — lapsed ≤30d on a Monthly+ cycle, agency record pending check.
+   Counted compliant; teal-grey hatch so it reads apart from on-time green / due amber */
+.chip.d-grace { background: #eef4f4; border-color: #c9dcdc; color: #3d6b6b; }
+.chip.d-grace .dot { background: #5f9a9a; }
+.pmc.pmc-grace { background: #eef4f4; color: #3d6b6b; border-color: #c9dcdc; }
+.cc-seg.seg-grace, .cc-dot.seg-grace, .h-seg.seg-grace, .lt-seg.seg-grace {
+  background: repeating-linear-gradient(45deg, #7fb0b0 0 4px, #a9cccc 4px 8px); }
+.h-col.seg-grace .h-cn { color: #3d6b6b; }
