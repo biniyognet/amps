@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Arup Biswas and AMPS contributors (binidev)
 // AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ASSETS, PM_SCHEDULES, JOB_CARDS, SPECS, PROCUREMENTS, PROC_STAGES,
@@ -2520,9 +2520,9 @@ function AboutPage() {
 
 /* Printables lives under a nav dropdown (QR tags / Checksheets), so the page
    itself just renders the chosen surface — no in-page tab bar. */
-function Printables({ initial = 'qr' }) {
+function Printables({ initial = 'qr', fmtId = '' }) {
   const tab = initial === 'checksheets' ? 'checksheets' : 'qr'
-  return tab === 'qr' ? <TagSheet /> : <ChecksheetFormats />
+  return tab === 'qr' ? <TagSheet /> : <ChecksheetFormats initialId={fmtId} />
 }
 
 /* the Printables nav item: a dropdown submenu instead of a page-level tab bar */
@@ -2564,15 +2564,19 @@ function PrintablesNav({ active }) {
    scan/upload it back against the log entry. */
 const CS_STATUS_LABEL = { draft: 'Draft', pending: 'Pending approval', published: 'Published', archived: 'Archived' }
 // the standard maintenance cycles a checksheet groups its activities under
-const CS_CYCLES = ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly']
+const CS_CYCLES = ['Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly', 'As Required']
+// short forms for the picker's cycle strip
+const CS_CYCLE_ABBR = { Daily: 'D', Weekly: 'W', Monthly: 'M', Quarterly: 'Q', 'Half-Yearly': 'H', Yearly: 'Y', '5-Yearly': '5Y', 'As Required': 'AR' }
 
 function normFmt(f) {
   // API format → the shape the printable/editor use; tolerate the bundled fallback
-  const items = (f.items || []).map((it) => typeof it === 'string' ? { activity: it, prescribed: '', freqs: [] } : { freqs: [], prescribed: '', ...it })
-  return { frequencies: [], ...f, items }
+  const items = (f.items || []).map((it) => typeof it === 'string' ? { activity: it, prescribed: '', freqs: [], section: '' } : { freqs: [], prescribed: '', section: '', ...it })
+  return { frequencies: [], slots: [], ...f, grp: f.grp || f.group, items }
 }
+// the asset-register system a format serves — the library groups and filters by it
+const csSystem = (f) => f.system || (f.grp ? `${f.grp} · other` : 'Unassigned')
 
-function ChecksheetFormats() {
+function ChecksheetFormats({ initialId = '' }) {
   const { me, canWrite } = useMe()
   const isApprover = me && (me.role === 'incharge' || me.role === 'admin')
   const [formats, setFormats] = useState(null)
@@ -2585,6 +2589,7 @@ function ChecksheetFormats() {
   useEffect(() => { load() }, [])
   if (formats === null) return <p className="dim">Loading checksheet formats…</p>
   const published = formats.filter((f) => f.status === 'published' || !f.status)
+  const pending = formats.filter((f) => f.status === 'pending').length
 
   return (
     <div>
@@ -2592,151 +2597,408 @@ function ChecksheetFormats() {
         <div className="asset-filter no-print" role="tablist" aria-label="Checksheet mode" style={{ marginBottom: 12 }}>
           <button type="button" className={`btn preset ${mode === 'print' ? 'active' : ''}`} onClick={() => setMode('print')}>Print blanks</button>
           <button type="button" className={`btn preset ${mode === 'manage' ? 'active' : ''}`} onClick={() => setMode('manage')}>
-            Manage formats{formats.some((f) => f.status === 'pending') ? ` · ${formats.filter((f) => f.status === 'pending').length} pending` : ''}
+            Manage formats{pending ? ` · ${pending} pending` : ''}
           </button>
         </div>
       )}
       {err && <div className="card offline-note no-print">{err}</div>}
       {editing ? (
-        <ChecksheetEditor initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} setErr={setErr} />
+        <ChecksheetEditor initial={editing} formats={formats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} setErr={setErr} />
       ) : mode === 'manage' && canWrite ? (
         <ChecksheetManage formats={formats} isApprover={isApprover} onEdit={setEditing} reload={load} setErr={setErr} />
       ) : (
-        <ChecksheetPrint published={published} />
+        <ChecksheetPrint published={published} initialId={initialId} />
       )}
     </div>
   )
 }
 
-/* the print-ready blank picker + A4 sheet */
-function ChecksheetPrint({ published }) {
-  const [sel, setSel] = useState(published[0]?.id ?? published[0]?.key ?? '')
-  const [copies, setCopies] = useState(1)
-  const [printFreq, setPrintFreq] = useState('')   // '' = all (grouped); else one frequency
-  const fmt = published.find((f) => (f.id ?? f.key) === sel) || published[0]
-  useEffect(() => { setPrintFreq('') }, [sel])     // reset the frequency when the format changes
-  if (!fmt) return <div className="card"><p className="dim" style={{ margin: 0 }}>No published checksheet formats yet.</p></div>
-  const sheets = Array.from({ length: Math.min(Math.max(copies, 1), 20) }, (_, i) => i)
+/* the library filter bar: search · system chips · cycle. Shared by print & manage. */
+function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, children }) {
+  const systems = Object.entries(formats.reduce((m, f) => { const s = csSystem(f); m[s] = (m[s] || 0) + 1; return m }, {}))
+    .sort(([a], [b]) => a.localeCompare(b))
+  const cycles = [...new Set(formats.flatMap((f) => f.slots?.length ? [f.frequency || 'Log sheet'] : f.frequencies || []))]
+    .sort((a, b) => cycleRank(a) - cycleRank(b))
   return (
-    <div className="cs-formats">
-      <aside className="cs-picker no-print card">
-        <div className="cs-picker-h">Formats <span className="dim">· {published.length}</span></div>
-        <ul>
-          {published.map((f) => (
-            <li key={f.id ?? f.key}>
-              <button type="button" className={(f.id ?? f.key) === sel ? 'active' : ''} onClick={() => setSel(f.id ?? f.key)}>
-                <span className="cs-pick-label">{f.label}</span>
-                <span className="cs-pick-n">{f.items.length}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        {(fmt.frequencies?.length > 0) && (
-          <label className="cs-copies cs-freq-print">Frequency
-            <select value={printFreq} onChange={(e) => setPrintFreq(e.target.value)}>
-              <option value="">All (grouped)</option>
-              {fmt.frequencies.map((c) => <option key={c} value={c}>Up to {c}</option>)}
-            </select>
-          </label>
+    <div className="cs-filters no-print">
+      <div className="asset-toolbar">
+        <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
+               placeholder="Search — format, equipment, activity…" aria-label="Search checksheet formats" />
+        {cycles.length > 1 && (
+          <select value={cyc} onChange={(e) => setCyc(e.target.value)} aria-label="Filter by cycle">
+            <option value="">All cycles</option>
+            {cycles.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         )}
-        <div className="cs-picker-actions">
-          <label className="cs-copies">Copies
-            <input type="number" min="1" max="20" value={copies} onChange={(e) => setCopies(Number(e.target.value) || 1)} />
-          </label>
-          <button className="btn" type="button" onClick={() => window.print()}>Print</button>
+        {(q || sys || cyc) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSys(''); setCyc('') }}>Clear</button>}
+        <span className="asset-count">{shown} of {formats.length}</span>
+        {children}
+      </div>
+      {systems.length > 1 && (
+        <div className="asset-filter cs-sys-chips" role="tablist" aria-label="Filter by system">
+          <button type="button" className={`btn preset ${!sys ? 'active' : ''}`} onClick={() => setSys('')}>All systems</button>
+          {systems.map(([s, n]) => (
+            <button key={s} type="button" className={`btn preset ${sys === s ? 'active' : ''}`} onClick={() => setSys(sys === s ? '' : s)}>
+              {s} <span className="cs-chip-n">{n}</span>
+            </button>
+          ))}
         </div>
-        <p className="dim cs-hint">Print a blank, fill it by hand during maintenance, then upload the scan against the log entry.</p>
-      </aside>
-      <div className="cs-print-area">
-        {sheets.map((i) => <ChecksheetSheet key={i} fmt={fmt} printFreq={printFreq} />)}
+      )}
+    </div>
+  )
+}
+
+function csMatches(f, { q, sys, cyc }) {
+  if (sys && csSystem(f) !== sys) return false
+  if (cyc && !(f.frequencies || []).includes(cyc) && !(f.slots?.length && (f.frequency || 'Log sheet') === cyc)) return false
+  const ql = q.trim().toLowerCase()
+  return !ql || [f.label, f.title, f.grp, f.system, f.asset_code, f.asset_class, ...f.items.map((i) => `${i.section || ''} ${i.activity}`)]
+    .some((v) => (v || '').toLowerCase().includes(ql))
+}
+
+/* the print-ready blank picker + A4 sheet */
+function ChecksheetPrint({ published, initialId }) {
+  const [q, setQ] = useState('')
+  const [sys, setSys] = usePersistedState('cs.system', '')
+  const [cyc, setCyc] = useState('')
+  const [sel, setSel] = useState(() => {
+    const hit = published.find((f) => String(f.id ?? f.key) === String(initialId))
+    return hit ? (hit.id ?? hit.key) : ''
+  })
+  // a scanned QR (…&f=<id>) re-selects even when the page is already open
+  useEffect(() => {
+    const hit = initialId && published.find((f) => String(f.id ?? f.key) === String(initialId))
+    if (hit) setSel(hit.id ?? hit.key)
+  }, [initialId])
+  const [copies, setCopies] = useState(1)
+  const [printFreq, setPrintFreq] = useState('')   // '' = all (grouped); else up to one cycle
+  const [layout, setLayout] = usePersistedState('cs.layout2', 'standard')   // standard (= the issued DOCX) | grouped
+  const shown = published.filter((f) => csMatches(f, { q, sys, cyc }))
+  const fmt = shown.find((f) => (f.id ?? f.key) === sel) || shown[0]
+  useEffect(() => { setPrintFreq('') }, [fmt?.id ?? fmt?.key])   // reset the cycle when the format changes
+  const bySys = shown.reduce((m, f) => { (m[csSystem(f)] = m[csSystem(f)] || []).push(f); return m }, {})
+  const sheets = Array.from({ length: Math.min(Math.max(copies, 1), 20) }, (_, i) => i)
+  const isLog = fmt?.slots?.length > 0
+  return (
+    <div>
+      <CsFilterBar formats={published} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={shown.length} />
+      <div className="cs-formats">
+        <aside className="cs-picker no-print card">
+          {shown.length === 0 ? <p className="dim" style={{ margin: 4 }}>No format matches.</p> : (
+            <div className="cs-pick-scroll">
+              {Object.keys(bySys).sort().map((s) => (
+                <section key={s}>
+                  <div className="cs-pick-sys">{s}<span>{bySys[s].length}</span></div>
+                  <ul>
+                    {bySys[s].sort((a, b) => a.label.localeCompare(b.label)).map((f) => {
+                      const k = f.id ?? f.key
+                      const strip = f.slots?.length ? `log · ${f.slots.length} cols` : (f.frequencies || []).slice().sort((a, b) => cycleRank(a) - cycleRank(b)).map((c) => CS_CYCLE_ABBR[c] || c).join(' · ')
+                      return (
+                        <li key={k}>
+                          <button type="button" className={fmt && k === (fmt.id ?? fmt.key) ? 'active' : ''} onClick={() => setSel(k)}>
+                            <span className="cs-pick-label">{f.label.replace(/^ECS · /, '')}<small>{strip}</small></span>
+                            <span className="cs-pick-n">{f.items.length}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+          <p className="dim cs-hint">Print a blank, fill it by hand during maintenance, then upload the scan against the log entry.</p>
+        </aside>
+        <div className="cs-print-area">
+          {fmt ? (
+            <>
+              <div className="cs-sheetbar card no-print">
+                <div className="cs-sheetbar-t">
+                  <b>{fmt.label}</b>
+                  <span className="dim">{csSystem(fmt)}{fmt.asset_code ? ` · ${fmt.asset_code}` : ''} · {fmt.items.length} {isLog ? 'readings' : 'activities'}{fmt.version ? ` · v${fmt.version}` : ''}</span>
+                </div>
+                <div className="cs-sheetbar-ctl">
+                  {!isLog && fmt.frequencies?.length > 0 && (
+                    <>
+                      <label>Layout
+                        <select value={layout} onChange={(e) => setLayout(e.target.value)}>
+                          <option value="standard">Standard sheet</option>
+                          <option value="grouped">Grouped by cycle</option>
+                        </select>
+                      </label>
+                      <label>Cycle
+                        <select value={printFreq} onChange={(e) => setPrintFreq(e.target.value)}>
+                          <option value="">All cycles</option>
+                          {fmt.frequencies.slice().sort((a, b) => cycleRank(a) - cycleRank(b)).map((c) => <option key={c} value={c}>{cycleRank(c) >= 90 ? c : `Up to ${c}`}</option>)}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                  <label>Copies<input type="number" min="1" max="20" value={copies} onChange={(e) => setCopies(Number(e.target.value) || 1)} /></label>
+                  <button className="btn" type="button" onClick={() => window.print()}>Print</button>
+                </div>
+              </div>
+              {sheets.map((i) => <ChecksheetSheet key={i} fmt={fmt} printFreq={printFreq} layout={layout} />)}
+            </>
+          ) : <div className="card"><p className="dim" style={{ margin: 0 }}>{published.length ? 'Pick a format.' : 'No published checksheet formats yet.'}</p></div>}
+        </div>
       </div>
     </div>
   )
 }
 
+/* section heading rows, inserted wherever an item's section changes */
+function csRows(items, render, span) {
+  const out = []
+  let prev = null
+  items.forEach((it, j) => {
+    const s = it.section || ''
+    if (s && s !== prev) out.push(<tr key={`s${j}`} className="cs-sec"><td colSpan={span}>{s}</td></tr>)
+    prev = s
+    out.push(render(it, j))
+  })
+  return out
+}
+
 /* a plain activity table (S.N · activity · prescribed · actual reading) */
 function CsFlatTable({ items }) {
+  const presc = items.some((it) => it.prescribed)
   return (
     <table className="cs-table">
       <thead><tr>
         <th className="cs-sn">#</th><th>Activity / check point</th>
-        <th className="cs-presc">Standard value</th>
+        {presc && <th className="cs-presc">Standard value</th>}
         <th className="cs-done">Observation</th>
       </tr></thead>
       <tbody>
-        {items.map((it, j) => (
+        {csRows(items, (it, j) => (
           <tr key={j}><td className="cs-sn">{j + 1}</td><td>{it.activity}</td>
-            <td className="cs-presc">{it.prescribed || ''}</td><td className="cs-done"></td></tr>
+            {presc && <td className="cs-presc">{it.prescribed || ''}</td>}<td className="cs-done"></td></tr>
+        ), presc ? 4 : 3)}
+      </tbody>
+    </table>
+  )
+}
+
+/* ── the STANDARD sheet — the same design as the issued Word file (ECS_Checksheets_*.docx):
+   one line "Org · TITLE", equipment + legend, Station / Equipment ID / Date / Shift, one table
+   (S/N · Activity · one ● column per cycle · Remarks), shaded section rows, and a compact
+   two-box sign-off (Staff / External firm · Supervisor (MRLY)). Long sheets (> 60 rows) go
+   two-up on the page so every sheet prints on ONE A4 page; the font then shrinks only as
+   far as that page needs (8.5pt → 6pt). */
+const CS_HEAD = { 'Half-Yearly': 'Half-Yearly', 'As Required': 'As Req.', '1000 operations': '1000 ops', '10000 operations': '10000 ops' }
+const CS_SPLIT_ROWS = 60
+const CS_PAGE_H_MM = 297 - 2 * 12.7        // A4 minus Word "Narrow" margins — keep in step with @page cs-std
+const csTitleCase = (s) => s.toLowerCase().replace(/(^|[\s(,/-])(\w)/g, (m, a, b) => a + b.toUpperCase())
+
+function csStdRows(items) {
+  const rows = []
+  let prev = null
+  items.forEach((it, j) => {
+    const s = it.section || ''
+    if (s && s !== prev) rows.push({ sec: s })
+    prev = s
+    rows.push({ sn: j + 1, it })
+  })
+  return rows
+}
+
+/* break near the middle, preferably just before a section heading; a continued
+   section repeats its heading "(contd.)" at the top of the right half */
+function csSplitRows(rows) {
+  const half = Math.ceil(rows.length / 2)
+  const cands = rows.map((r, i) => (r.sec && Math.abs(i - half) <= 6 ? i : -1)).filter((i) => i >= 0)
+  const cut = cands.length ? cands.reduce((a, b) => (Math.abs(b - half) < Math.abs(a - half) ? b : a)) : half
+  const L = rows.slice(0, cut)
+  let R = rows.slice(cut)
+  if (R.length && !R[0].sec) {
+    const prev = [...L].reverse().find((r) => r.sec)
+    if (prev) R = [{ sec: `${prev.sec} (contd.)` }, ...R]
+  }
+  return [L, R]
+}
+
+function CsStdTable({ rows, cols, slots }) {
+  const isLog = slots.length > 0
+  const heads = isLog ? slots : cols
+  const span = heads.length + (isLog ? 2 : 3)
+  const cw = isLog && heads.length > 5 ? '13.5mm' : '15mm'
+  return (
+    <table className="cs-std-table">
+      <colgroup>
+        <col style={{ width: '10mm' }} /><col />
+        {heads.map((h) => <col key={h} style={{ width: cw }} />)}
+        {!isLog && <col style={{ width: heads.length >= 5 ? '24mm' : '30mm' }} />}
+      </colgroup>
+      <thead><tr>
+        <th>S/N</th><th>{isLog ? 'Parameter' : 'Activity'}</th>
+        {heads.map((h) => <th key={h} className="c">{isLog ? h : (CS_HEAD[h] || h)}</th>)}
+        {!isLog && <th>Remarks</th>}
+      </tr></thead>
+      <tbody>
+        {rows.map((r, i) => r.sec
+          ? <tr key={i} className="cs-std-sec"><td colSpan={span}>{r.sec}</td></tr>
+          : (
+            <tr key={i}>
+              <td className="c">{r.sn}</td><td>{r.it.activity}</td>
+              {heads.map((h) => <td key={h} className="c cs-std-dot">{!isLog && (r.it.freqs || []).includes(h) ? '●' : ''}</td>)}
+              {!isLog && <td></td>}
+            </tr>
+          ))}
+      </tbody>
+    </table>
+  )
+}
+
+function CsStdSplitTable({ rows, cols, slots }) {
+  const isLog = slots.length > 0
+  const heads = isLog ? slots : cols
+  const g = heads.length + 2
+  const [L, R] = csSplitRows(rows)
+  const half = (side, n) => {
+    const r = side[n]
+    if (!r) return Array.from({ length: g }, (_, k) => <td key={k} className="cs-std-empty"></td>)
+    if (r.sec) return [<td key="s" colSpan={g} className="cs-std-sec-td">{r.sec}</td>]
+    return [
+      <td key="n" className="c">{r.sn}</td>, <td key="a">{r.it.activity}</td>,
+      ...heads.map((h) => <td key={h} className="c cs-std-dot">{!isLog && (r.it.freqs || []).includes(h) ? '●' : ''}</td>),
+    ]
+  }
+  const cols1 = [<col key="n" style={{ width: '7.5mm' }} />, <col key="a" />, ...heads.map((h) => <col key={h} style={{ width: '7.5mm' }} />)]
+  const hdr = [<th key="n">S/N</th>, <th key="a">{isLog ? 'Parameter' : 'Activity'}</th>,
+    ...heads.map((h) => <th key={h} className="c" title={h}>{isLog ? h.replace(/^Week /, 'Wk') : (CS_CYCLE_ABBR[h] || h)}</th>)]
+  return (
+    <table className="cs-std-table cs-std-split">
+      <colgroup>{cols1}<col style={{ width: '2mm' }} />{cols1.map((c) => ({ ...c, key: `r${c.key}` }))}</colgroup>
+      <thead><tr>{hdr}<th className="cs-std-gap"></th>{hdr.map((h) => ({ ...h, key: `r${h.key}` }))}</tr></thead>
+      <tbody>
+        {Array.from({ length: Math.max(L.length, R.length) }, (_, n) => (
+          <tr key={n}>{half(L, n)}<td className="cs-std-gap"></td>{half(R, n).map((c) => ({ ...c, key: `r${c.key}` }))}</tr>
         ))}
       </tbody>
     </table>
   )
 }
 
-/* one AMPS-branded A4 blank: metro logo, QR to the format, then the activities
-   GROUPED into frequency sections (Monthly / Quarterly / … ), or a single
-   frequency's list. Prescribed-value + actual-reading columns; signatures. */
-const CYCLE_RANK = { Monthly: 1, Quarterly: 2, 'Half-Yearly': 3, Yearly: 4, '5-Yearly': 5 }
-const cycleRank = (c) => CYCLE_RANK[c] ?? 99
+const CYCLE_RANK = { Daily: -1, Weekly: 0, Monthly: 1, Quarterly: 2, 'Half-Yearly': 3, Yearly: 4, '5-Yearly': 5, 'As Required': 90 }
+const cycleRank = (c) => CYCLE_RANK[c] ?? (/operation/i.test(c) ? 91 + String(c).length / 100 : 99)
 
-function ChecksheetSheet({ fmt, printFreq = '' }) {
+function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
   const qrVal = `${location.origin}/#/printables?t=checksheets&f=${fmt.id ?? ''}`
   const cols = (fmt.frequencies || []).slice().sort((a, b) => cycleRank(a) - cycleRank(b))
-  const hasFreq = cols.length > 0
+  const slots = fmt.slots || []
+  const isLog = slots.length > 0
   // Cycles are CUMULATIVE: a Yearly service also performs the Monthly/Quarterly
   // checks. So picking a cycle prints every cycle up to and including it (its
-  // lower cycles never drop out) — there is no "Yearly only".
+  // lower cycles never drop out) — there is no "Yearly only". Event-driven
+  // columns (As Required, per N operations) are not cumulative: picking one
+  // prints just that column.
   const selRank = printFreq ? cycleRank(printFreq) : Infinity
-  const sections = cols.filter((c) => cycleRank(c) <= selRank)
-  const grouped = hasFreq
-  // Dynamic compression: size the sheet to its own content so a small checksheet
-  // stays large/readable and a big one shrinks just enough to fit one page. Rows
-  // shown = the activities that will print + one heading per section.
-  const shownItems = grouped
-    ? sections.reduce((n, c) => n + fmt.items.filter((it) => (it.freqs || []).includes(c)).length, 0)
-    : (printFreq ? fmt.items.filter((it) => (it.freqs || []).includes(printFreq)).length : fmt.items.length)
-  const rowLoad = shownItems + (grouped ? sections.length : 0)
-  const lvl = rowLoad <= 12 ? 'lg' : rowLoad <= 20 ? 'md' : rowLoad <= 30 ? 'sm' : 'xs'
+  const sections = !printFreq ? cols : cycleRank(printFreq) >= 90 ? [printFreq] : cols.filter((c) => cycleRank(c) <= selRank)
+  const mode = isLog ? 'log' : !cols.length ? 'flat' : layout === 'grouped' ? 'grouped' : 'standard'
+  const items = mode === 'standard' && printFreq ? fmt.items.filter((it) => (it.freqs || []).some((c) => sections.includes(c))) : fmt.items
+  const rows = csStdRows(items)
+  const split = (mode === 'standard' || mode === 'log') && rows.length > CS_SPLIT_ROWS
+  const fullTitle = fmt.title || fmt.label
+  const m = fullTitle.match(/^(METRO RAILWAY[^—]*?)\s*—\s*(.*)$/i)
+  const org = csTitleCase(m ? m[1] : ORG).replace(/\s*,\s*/g, ', ')
+  const title = (m ? m[2] : fullTitle).toUpperCase()
+  const shown = mode === 'standard' ? sections : cols
+  const legend = mode === 'standard'
+    ? ` · ● = activity due in that cycle${split ? ` (${shown.map((c) => `${CS_CYCLE_ABBR[c] || c} = ${c}`).join(', ')})` : ''}`
+    : ''
+  // one FULL page per sheet (measured, not guessed): 1) the biggest font that fits (≤ 10.5pt),
+  // 2) leftover height spread into taller rows (≤ ~4 mm a side — room to write), 3) whatever is
+  // still left becomes the remarks box, so the sign-off always sits at the foot of the A4 page
+  const pageRef = useRef(null)
+  useLayoutEffect(() => {
+    const el = pageRef.current
+    if (!el) return
+    const fit = () => {
+      const limit = (CS_PAGE_H_MM * 96) / 25.4 - 6
+      const set = (k, v) => el.style.setProperty(k, v)
+      const box = el.querySelector('.cs-std-rbox')
+      const line = el.querySelector('.cs-std-remarks')
+      set('--cs-padv', '0px')
+      if (box) { box.style.display = 'none'; box.style.height = '' }
+      if (line) line.style.display = ''
+      let fs = 10.5
+      set('--cs-fs', `${fs}pt`)
+      while (el.offsetHeight > limit && fs > 6) {
+        fs -= 0.5
+        set('--cs-fs', `${fs}pt`)
+      }
+      const rows = el.querySelectorAll('tbody > tr').length || 1
+      let pad = Math.min(15, Math.max(0, (limit - el.offsetHeight) / rows / 2))
+      while (pad > 0) {
+        set('--cs-padv', `${pad.toFixed(2)}px`)
+        if (el.offsetHeight <= limit) break
+        pad = pad < 0.3 ? 0 : pad * 0.85
+        if (!pad) set('--cs-padv', '0px')
+      }
+      if (box && limit - el.offsetHeight > 24) {
+        if (line) line.style.display = 'none'
+        const rest = limit - el.offsetHeight
+        box.style.height = `${rest - 10}px`             // 10px = the box's own top margin + border
+        box.style.display = ''
+        const over = el.offsetHeight - limit
+        if (over > 0) box.style.height = `${Math.max(0, rest - 10 - over)}px`
+      }
+    }
+    fit()
+    // re-fit once fonts settle, and right before printing (the printed page is what must fill)
+    document.fonts?.ready?.then(fit)
+    window.addEventListener('beforeprint', fit)
+    return () => window.removeEventListener('beforeprint', fit)
+  }, [fmt, printFreq, layout])
   return (
-    <article className={`cs-sheet cs-lvl-${lvl}`}>
-      <header className="cs-sheet-head">
-        <img className="cs-logo" src="/metro-logo.svg" alt="" aria-hidden="true" />
-        <div className="cs-head-mid">
-          <b>{ORG}</b>
-          <span className="cs-head-sub">AMPS · Maintenance Checksheet{fmt.version ? ` · v${fmt.version}` : ''}</span>
-          <span className="cs-title">{fmt.title || fmt.label}</span>
-        </div>
-        <QR value={qrVal} size={62} />
-      </header>
-      <div className="cs-meta">
-        <span>Location: <u>&nbsp;</u></span>
-        <span>Asset name / ID: <u>&nbsp;</u></span>
-        <span>Sheet no: <u>&nbsp;</u></span>
-        <span>Date: <u>&nbsp;</u></span>
-        {printFreq ? <span>For: <b>up to {printFreq}</b></span> : (fmt.frequency ? <span>Frequency: <b>{fmt.frequency}</b></span> : null)}
-      </div>
-
-      {grouped ? (
-        // activities grouped under each frequency heading (cumulative sections)
-        sections.map((c) => {
-          const gi = fmt.items.filter((it) => (it.freqs || []).includes(c))
-          if (!gi.length) return null
-          return (
-            <div className="cs-group" key={c}>
-              <div className="cs-group-h">{c}<span className="dim"> · {gi.length} {gi.length === 1 ? 'activity' : 'activities'}</span></div>
-              <CsFlatTable items={gi} />
+    <article className="cs-sheet cs-std">
+      <div className="cs-std-page" ref={pageRef}>
+        <header className="cs-std-head">
+          <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />
+          <div>
+            <div className="cs-std-title"><span className="cs-std-org">{org}</span> · {title}</div>
+            <div className="cs-std-sub">
+              Equipment: {fmt.asset_code || csSystem(fmt)}{legend}
+              {printFreq ? <> · For: <b>{cycleRank(printFreq) >= 90 ? printFreq : `up to ${printFreq}`}</b></> : null}
+              {fmt.version ? ` · v${fmt.version}` : ''}
             </div>
-          )
-        })
-      ) : (
-        <CsFlatTable items={fmt.items} />
-      )}
+          </div>
+          <QR value={qrVal} size={44} />
+        </header>
+        <div className="cs-std-meta">
+          <span>Station: <u /></span><span>Equipment ID: <u /></span>
+          <span>{isLog && fmt.frequency === 'Weekly' ? 'Month' : 'Date'}: <u className="s" /></span><span>Shift: <u className="xs" /></span>
+        </div>
 
-      <div className="cs-remarks"><span>Maintenance remarks:</span><div className="cs-remark-box"></div></div>
-      <footer className="cs-sign">
-        <div>Staff (name &amp; signature):<br /><span className="cs-sign-line"></span></div>
-        <div>Supervisor (name &amp; signature):<br /><span className="cs-sign-line"></span></div>
-      </footer>
+        {mode === 'grouped' ? (
+          sections.map((c) => {
+            const gi = fmt.items.filter((it) => (it.freqs || []).includes(c))
+            if (!gi.length) return null
+            return (
+              <div className="cs-group" key={c}>
+                <div className="cs-group-h">{c}<span className="dim"> · {gi.length} {gi.length === 1 ? 'activity' : 'activities'}</span></div>
+                <CsFlatTable items={gi} />
+              </div>
+            )
+          })
+        ) : mode === 'flat' ? <CsFlatTable items={fmt.items} />
+          : split ? <CsStdSplitTable rows={rows} cols={sections} slots={slots} />
+          : <CsStdTable rows={rows} cols={sections} slots={slots} />}
+
+        {(split || mode === 'grouped' || mode === 'flat' || isLog) && (
+          <div className="cs-std-remarks">{isLog ? 'Remarks / abnormalities:' : 'Remarks / defects observed:'}<span /></div>
+        )}
+        <div className="cs-std-rbox" style={{ display: 'none' }}>Remarks / defects observed:</div>
+        <footer className="cs-std-sign">
+          {['Done by — Staff / External firm', 'Checked by — Supervisor (MRLY)'].map((who) => (
+            <div key={who}>
+              <b>{who}</b>
+              <div className="cs-std-sign-l"><span>Name: <u /></span><span>Sign: <u className="s" /></span><span>Date: <u className="xs" /></span></div>
+            </div>
+          ))}
+        </footer>
+      </div>
     </article>
   )
 }
@@ -2761,55 +3023,43 @@ function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr }) {
   const reject = (id) => { const reason = window.prompt('Reason for rejection (sent back to the author):'); if (reason && reason.trim()) act(id, 'reject', { reason: reason.trim() }) }
   const [q, setQ] = useState('')
   const [fStatus, setFStatus] = useState('')
-  const [fGroup, setFGroup] = useState('')
+  const [sys, setSys] = usePersistedState('cs.system', '')
+  const [cyc, setCyc] = useState('')
   const order = { pending: 0, draft: 1, published: 2, archived: 3 }
-  const groups = [...new Set(formats.map((f) => f.grp).filter(Boolean))].sort()
   const counts = formats.reduce((m, f) => { m[f.status] = (m[f.status] || 0) + 1; return m }, {})
-  const ql = q.trim().toLowerCase()
   const rows = [...formats]
     .filter((f) => !fStatus || f.status === fStatus)
-    .filter((f) => !fGroup || f.grp === fGroup)
-    .filter((f) => !ql || [f.label, f.title, f.grp, f.asset_code, f.asset_class, ...f.items.map((i) => i.activity)].some((v) => (v || '').toLowerCase().includes(ql)))
-    .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.label.localeCompare(b.label))
+    .filter((f) => csMatches(f, { q, sys, cyc }))
+    .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || csSystem(a).localeCompare(csSystem(b)) || a.label.localeCompare(b.label))
   const STAT_TABS = [['', `All ${formats.length}`], ['pending', `Pending ${counts.pending || 0}`], ['draft', `Draft ${counts.draft || 0}`], ['published', `Published ${counts.published || 0}`]]
   return (
     <div>
-      <div className="asset-toolbar no-print">
-        <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-               placeholder="Search formats — name, group, activity…" aria-label="Search checksheet formats" />
+      <CsFilterBar formats={formats} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={rows.length}>
         <div className="asset-filter" role="tablist" aria-label="Status filter">
           {STAT_TABS.filter(([k]) => k !== 'pending' || counts.pending).map(([k, lbl]) => (
             <button key={k} type="button" className={`btn preset ${fStatus === k ? 'active' : ''}${k === 'pending' && counts.pending ? ' has-od' : ''}`}
                     onClick={() => setFStatus(k)}>{lbl}</button>
           ))}
         </div>
-        {groups.length > 1 && (
-          <select value={fGroup} onChange={(e) => setFGroup(e.target.value)} aria-label="Filter by group">
-            <option value="">All groups</option>
-            {groups.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-        )}
-        {(q || fStatus || fGroup) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFStatus(''); setFGroup('') }}>Clear</button>}
-        <span className="asset-count">{rows.length} shown</span>
         <div className="asset-actions">
           <button type="button" className="icon-btn" title="New checksheet format" aria-label="New format"
-                  onClick={() => onEdit({ label: '', title: '', grp: 'HT', frequencies: [], items: [{ activity: '', prescribed: '', freqs: [] }] })}>
+                  onClick={() => onEdit({ label: '', title: '', grp: sys.startsWith('LT · ECS') ? 'ECS' : 'HT', system: sys || '', frequencies: [], slots: [], items: [{ activity: '', prescribed: '', freqs: [], section: '' }] })}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
           </button>
         </div>
-      </div>
+      </CsFilterBar>
       <div className="card tbl-wrap">
         <table className="cs-manage-tbl">
-          <thead><tr><th>Format</th><th>Asset / class</th><th>Group</th><th>Cycles</th><th>Ver</th><th>Items</th><th>Status</th><th>By</th><th aria-label="Actions"></th></tr></thead>
+          <thead><tr><th>Format</th><th>System</th><th>Equipment / class</th><th>Cycles</th><th>Ver</th><th>Items</th><th>Status</th><th>By</th><th aria-label="Actions"></th></tr></thead>
           <tbody>
             {rows.length === 0 ? (
               <tr><td colSpan={9} className="dim" style={{ textAlign: 'center', padding: 20 }}>No formats match.</td></tr>
             ) : rows.map((f) => (
               <tr key={f.id}>
                 <td><b>{f.label}</b>{f.reject_reason && f.status === 'draft' ? <div className="cs-reject">✗ {f.reject_reason}</div> : null}</td>
+                <td className="dim">{csSystem(f)}</td>
                 <td className="dim">{f.asset_code || f.asset_class || '—'}</td>
-                <td className="dim">{f.grp}</td>
-                <td className="dim">{f.frequencies?.length ? f.frequencies.join(' · ') : '—'}</td>
+                <td className="dim">{f.slots?.length ? `Log · ${f.slots.join(' · ')}` : f.frequencies?.length ? f.frequencies.slice().sort((a, b) => cycleRank(a) - cycleRank(b)).map((c) => CS_CYCLE_ABBR[c] || c).join(' · ') : '—'}</td>
                 <td className="dim">v{f.version}</td>
                 <td className="dim">{f.items.length}</td>
                 <td><span className={`cs-badge cs-b-${f.status}`}>{CS_STATUS_LABEL[f.status] || f.status}</span></td>
@@ -2855,20 +3105,24 @@ function ChecksheetHistory({ fmt, onClose }) {
 
 /* create / edit a format: title, group, applicability, and the ordered item list
    each with its activity + prescribed (acceptance-limit) value */
-function ChecksheetEditor({ initial, onClose, onSaved, setErr }) {
+function ChecksheetEditor({ initial, formats = [], onClose, onSaved, setErr }) {
   const [label, setLabel] = useState(initial.label || '')
   const [title, setTitle] = useState(initial.title || '')
   const [grp, setGrp] = useState(initial.grp || 'HT')
+  const [system, setSystem] = useState(initial.system || '')
+  const [slotsTxt, setSlotsTxt] = useState((initial.slots || []).join(', '))
+  const knownSystems = [...new Set(formats.map((f) => f.system).filter(Boolean))].sort()
   const [freq, setFreq] = useState(initial.frequency || '')
   const [assetCode, setAssetCode] = useState(initial.asset_code || '')
   const [cls, setCls] = useState(initial.asset_class || '')
   const [cols, setCols] = useState(initial.frequencies || [])   // frequency-matrix columns
   const [newCol, setNewCol] = useState('')
-  const [items, setItems] = useState(initial.items?.length ? initial.items.map((i) => ({ freqs: [], prescribed: '', ...i })) : [{ activity: '', prescribed: '', freqs: [] }])
+  const [items, setItems] = useState(initial.items?.length ? initial.items.map((i) => ({ freqs: [], prescribed: '', section: '', ...i })) : [{ activity: '', prescribed: '', freqs: [], section: '' }])
   const [busy, setBusy] = useState(false)
   const editingPublished = initial.status === 'published' || initial.status === 'archived'
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => j === i ? { ...it, [k]: v } : it))
-  const addItem = () => setItems((xs) => [...xs, { activity: '', prescribed: '', freqs: [] }])
+  // a new row inherits the last row's section so a block of checks is typed once
+  const addItem = () => setItems((xs) => [...xs, { activity: '', prescribed: '', freqs: [], section: xs[xs.length - 1]?.section || '' }])
   const rmItem = (i) => setItems((xs) => xs.filter((_, j) => j !== i))
   const move = (i, d) => setItems((xs) => { const n = [...xs]; const j = i + d; if (j < 0 || j >= n.length) return xs;[n[i], n[j]] = [n[j], n[i]]; return n })
   const addCol = () => { const c = newCol.trim(); if (c && !cols.includes(c)) setCols([...cols, c]); setNewCol('') }
@@ -2879,7 +3133,8 @@ function ChecksheetEditor({ initial, onClose, onSaved, setErr }) {
     if (!label.trim() || !clean.length) { setErr('A format needs a name and at least one activity.'); return }
     setBusy(true); setErr('')
     try {
-      const body = { label: label.trim(), title: title.trim(), grp: grp.trim() || 'HT', frequency: freq.trim() || null, asset_code: assetCode.trim() || null, asset_class: cls.trim() || null, frequencies: cols, items: clean }
+      const slots = slotsTxt.split(',').map((x) => x.trim()).filter(Boolean)
+      const body = { label: label.trim(), title: title.trim(), grp: grp.trim() || 'HT', system: system.trim() || null, frequency: freq.trim() || null, asset_code: assetCode.trim() || null, asset_class: cls.trim() || null, frequencies: cols, slots, items: clean.map((it) => ({ ...it, section: (it.section || '').trim() })) }
       const base = import.meta.env.VITE_AMPS_API ?? ''
       // new (no id) → POST; existing → PUT (a published one forks a new draft)
       const r = initial.id
@@ -2899,6 +3154,12 @@ function ChecksheetEditor({ initial, onClose, onSaved, setErr }) {
       <div className="fg-fields cs-editor-meta">
         <label className="fg-span-2">Format name<input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. 33KV VCB" /></label>
         <label>Group<input value={grp} onChange={(e) => setGrp(e.target.value)} placeholder="HT / LT / ECS" /></label>
+        <label className="fg-span-2">System <span className="ef-opt">(asset-register system — the library filters by it)</span>
+          <input value={system} onChange={(e) => setSystem(e.target.value)} list="cs-systems" placeholder="e.g. LT · ECS (AC)" />
+          <datalist id="cs-systems">{knownSystems.map((x) => <option key={x} value={x} />)}</datalist>
+        </label>
+        <label className="fg-span-2">Log columns <span className="ef-opt">(opt — a readings log instead of cycles, comma-separated)</span>
+          <input value={slotsTxt} onChange={(e) => setSlotsTxt(e.target.value)} placeholder="e.g. 8:00 AM, 12:00 PM, 4:00 PM  ·  Week 1, Week 2, Week 3, Week 4" /></label>
         <label>Frequency <span className="ef-opt">(opt)</span><input value={freq} onChange={(e) => setFreq(e.target.value)} placeholder="e.g. Yearly" /></label>
         <label className="fg-span-2">Printed title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="METRO RAILWAY, KOLKATA — 33KV VCB MAINTENANCE" /></label>
         <label>Asset / equipment <span className="ef-opt">(opt)</span><input value={assetCode} onChange={(e) => setAssetCode(e.target.value)} placeholder="e.g. Third Rail, BET, VCB" /></label>
@@ -2919,14 +3180,15 @@ function ChecksheetEditor({ initial, onClose, onSaved, setErr }) {
           <button type="button" className="mini-btn" onClick={addCol}>＋</button>
         </div>
       </div>
-      <div className="cs-items-hd" style={{ gridTemplateColumns: `30px 1fr 1fr ${cols.length ? `repeat(${cols.length}, 34px) ` : ''}96px` }}>
-        <span>#</span><span>Maintenance activity</span><span>Prescribed / acceptance limit</span>
+      <div className="cs-items-hd" style={{ gridTemplateColumns: `30px 150px 1fr 1fr ${cols.length ? `repeat(${cols.length}, 34px) ` : ''}96px` }}>
+        <span>#</span><span>Section</span><span>Maintenance activity</span><span>Prescribed / acceptance limit</span>
         {cols.map((c) => <span key={c} className="cs-freq-h">{c}</span>)}
         <span></span>
       </div>
       {items.map((it, i) => (
-        <div className="cs-item-row" key={i} style={{ gridTemplateColumns: `30px 1fr 1fr ${cols.length ? `repeat(${cols.length}, 34px) ` : ''}96px` }}>
+        <div className="cs-item-row" key={i} style={{ gridTemplateColumns: `30px 150px 1fr 1fr ${cols.length ? `repeat(${cols.length}, 34px) ` : ''}96px` }}>
           <span className="cs-item-n">{i + 1}</span>
+          <input className="cs-item-sec" value={it.section || ''} onChange={(e) => setItem(i, 'section', e.target.value)} placeholder="section (opt)" list="cs-sections" />
           <input value={it.activity} onChange={(e) => setItem(i, 'activity', e.target.value)} placeholder="activity to check" />
           <input value={it.prescribed} onChange={(e) => setItem(i, 'prescribed', e.target.value)} placeholder="e.g. ≥ 100 MΩ / firm / clean" />
           {cols.map((c) => (
@@ -2940,6 +3202,7 @@ function ChecksheetEditor({ initial, onClose, onSaved, setErr }) {
           </span>
         </div>
       ))}
+      <datalist id="cs-sections">{[...new Set(items.map((x) => x.section).filter(Boolean))].map((x) => <option key={x} value={x} />)}</datalist>
       <div className="cs-editor-actions">
         <button type="button" className="btn ghost sm" onClick={addItem}>＋ Add activity</button>
         <button type="button" className="btn" disabled={busy} onClick={save}>{busy ? 'Saving…' : initial.id ? 'Save' : 'Create draft'}</button>
@@ -4199,7 +4462,7 @@ export default function App() {
         : routePath === '/letters' ? (LIVE ? <CorrespondenceView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
         : routePath === '/spares' ? (LIVE ? <NotYet /> : <Spares />)
         : routePath === '/procurement' ? (LIVE ? <NotYet /> : <Procurement />)
-        : routePath === '/printables' ? <Printables initial={routeQuery.get('t') || 'qr'} />
+        : routePath === '/printables' ? <Printables initial={routeQuery.get('t') || 'qr'} fmtId={routeQuery.get('f') || ''} />
         : routePath === '/tags' ? <Printables initial="qr" />
         : routePath === '/guide' ? <DocsView />
         : routePath === '/about' ? <AboutPage />

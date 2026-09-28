@@ -30,16 +30,19 @@ class ChecksheetItem(BaseModel):
     activity: str = Field(min_length=1)
     prescribed: str = ""          # prescribed value / acceptance limit (optional)
     freqs: list[str] = []         # frequency columns this activity is DUE at (subset of the format's)
+    section: str = ""             # heading it sits under on the printed sheet ("Compressor · Motor")
 
 
 class FormatIn(BaseModel):
     label: str = Field(min_length=1)
     title: str = ""
     grp: str = "HT"
+    system: str | None = None     # asset-register system it serves, e.g. "LT · ECS (AC)"
     asset_code: str | None = None
     asset_class: str | None = None
     frequency: str | None = None
     frequencies: list[str] = []   # cycle groups, e.g. ["Monthly","Yearly"]
+    slots: list[str] = []         # log-sheet columns (e.g. 8:00 AM … / Week 1-4): prints a readings grid
     items: list[ChecksheetItem] = []
 
 
@@ -47,12 +50,14 @@ class FormatOut(BaseModel):
     id: int
     slug: str
     grp: str
+    system: str | None
     label: str
     title: str
     asset_code: str | None
     asset_class: str | None
     frequency: str | None
     frequencies: list[str]
+    slots: list[str]
     items: list[ChecksheetItem]
     version: int
     status: str
@@ -73,12 +78,20 @@ def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:80] or "format"
 
 
-def _freqs(f: ChecksheetFormat) -> list[str]:
+def _jlist(raw: str | None) -> list[str]:
     try:
-        raw = json.loads(getattr(f, "frequencies_json", None) or "[]")
+        vals = json.loads(raw or "[]")
     except ValueError:
-        raw = []
-    return [str(x).strip() for x in raw if str(x).strip()]
+        vals = []
+    return [str(x).strip() for x in vals if str(x).strip()]
+
+
+def _freqs(f: ChecksheetFormat) -> list[str]:
+    return _jlist(getattr(f, "frequencies_json", None))
+
+
+def _slots(f: ChecksheetFormat) -> list[str]:
+    return _jlist(getattr(f, "slots_json", None))
 
 
 def _items(f: ChecksheetFormat) -> list[ChecksheetItem]:
@@ -95,23 +108,25 @@ def _items(f: ChecksheetFormat) -> list[ChecksheetItem]:
             fr = [str(x).strip() for x in (it.get("freqs") or []) if str(x).strip()]
             out.append(ChecksheetItem(activity=str(it.get("activity", "")).strip(),
                                       prescribed=str(it.get("prescribed", "")).strip(),
-                                      freqs=[c for c in fr if not cols or c in cols]))
+                                      freqs=[c for c in fr if not cols or c in cols],
+                                      section=str(it.get("section") or "").strip()))
     return [i for i in out if i.activity]
 
 
 def _to_out(f: ChecksheetFormat) -> FormatOut:
     return FormatOut(
-        id=f.id, slug=f.slug, grp=f.grp, label=f.label, title=f.title,
+        id=f.id, slug=f.slug, grp=f.grp, system=f.system, label=f.label, title=f.title,
         asset_code=f.asset_code, asset_class=f.asset_class, frequency=f.frequency, frequencies=_freqs(f),
+        slots=_slots(f),
         items=_items(f), version=f.version, status=f.status.value, supersedes_id=f.supersedes_id,
         reject_reason=f.reject_reason, created_by=f.created_by, created_at=f.created_at,
         updated_at=f.updated_at, approved_by=f.approved_by, approved_at=f.approved_at)
 
 
-def _dump_freqs(freqs: list[str]) -> str:
+def _dump_freqs(freqs: list[str], width: int = 20) -> str:
     seen, out = set(), []
     for c in freqs:
-        c = str(c).strip()[:20]
+        c = str(c).strip()[:width]
         if c and c not in seen:
             seen.add(c); out.append(c)
     return json.dumps(out, ensure_ascii=False)
@@ -120,7 +135,8 @@ def _dump_freqs(freqs: list[str]) -> str:
 def _dump_items(items: list[ChecksheetItem], cols: list[str]) -> str:
     colset = set(cols)
     return json.dumps([{"activity": i.activity.strip(), "prescribed": i.prescribed.strip(),
-                        "freqs": [c for c in i.freqs if c in colset]}
+                        "freqs": [c for c in i.freqs if c in colset],
+                        **({"section": i.section.strip()[:120]} if i.section.strip() else {})}
                        for i in items if i.activity.strip()], ensure_ascii=False)
 
 
@@ -131,7 +147,7 @@ def _is_approver(user) -> bool:
 # ---- read ------------------------------------------------------------------
 
 @router.get("/formats", response_model=list[FormatOut])
-def list_formats(status: str | None = None, db: Session = Depends(get_db),
+def list_formats(status: str | None = None, system: str | None = None, db: Session = Depends(get_db),
                  user=Depends(optional_user)):
     """Formats. Anonymous/viewer see only PUBLISHED (the printable library);
     a signed-in writer/approver sees drafts & pending too so they can work the
@@ -143,6 +159,8 @@ def list_formats(status: str | None = None, db: Session = Depends(get_db),
     if getattr(user, "line_id", None) is not None:
         q = q.where((ChecksheetFormat.line_id == user.line_id) | (ChecksheetFormat.line_id.is_(None)))
     signed_in = getattr(user, "id", None) is not None and getattr(user, "role", None) != UserRole.VIEWER
+    if system:
+        q = q.where(ChecksheetFormat.system == system)
     if status:
         q = q.where(ChecksheetFormat.status == ChecksheetStatus(status))
     elif not signed_in:
@@ -192,6 +210,7 @@ def create_format(body: FormatIn, db: Session = Depends(get_db), user=Depends(cu
     cols = [str(c).strip() for c in body.frequencies if str(c).strip()]
     f = ChecksheetFormat(
         slug=_slugify(body.label), grp=(body.grp or "HT").strip()[:40],
+        system=(body.system or "").strip()[:80] or None, slots_json=_dump_freqs(body.slots, 40),
         label=body.label.strip()[:120], title=body.title.strip()[:240] or body.label.strip()[:240],
         asset_code=(body.asset_code or None), asset_class=(body.asset_class or None),
         frequency=(body.frequency or None),
@@ -218,6 +237,8 @@ def edit_format(fid: int, body: FormatIn, db: Session = Depends(get_db), user=De
         f.label = body.label.strip()[:120]
         f.title = body.title.strip()[:240] or f.label
         f.grp = (body.grp or f.grp).strip()[:40]
+        f.system = (body.system or "").strip()[:80] or None
+        f.slots_json = _dump_freqs(body.slots, 40)
         f.asset_code = body.asset_code or None
         f.asset_class = body.asset_class or None
         f.frequency = body.frequency or None
@@ -235,6 +256,7 @@ def edit_format(fid: int, body: FormatIn, db: Session = Depends(get_db), user=De
         select(ChecksheetFormat).where(ChecksheetFormat.slug == f.slug)).all())
     nf = ChecksheetFormat(
         slug=f.slug, grp=(body.grp or f.grp).strip()[:40], label=body.label.strip()[:120],
+        system=(body.system or "").strip()[:80] or None, slots_json=_dump_freqs(body.slots, 40),
         title=body.title.strip()[:240] or body.label.strip()[:240],
         asset_code=body.asset_code or None, asset_class=body.asset_class or None,
         frequency=body.frequency or None,

@@ -411,6 +411,9 @@ class ChecksheetFormat(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(String(80), index=True)   # stable across versions
     grp: Mapped[str] = mapped_column(String(40), default="HT")  # HT / LT / ECS …
+    # the asset-register system it serves ("HT · 33kV", "LT · ECS (AC)") — the
+    # Printables library filters and groups by it
+    system: Mapped[str | None] = mapped_column(String(80))
     label: Mapped[str] = mapped_column(String(120))
     title: Mapped[str] = mapped_column(String(240))
     # what the format applies to. `asset_code` names the specific equipment/asset
@@ -422,7 +425,10 @@ class ChecksheetFormat(Base):
     # frequency-matrix columns (e.g. ["M1","M3","M6","Y1"]); each item marks which
     # of these it is DUE at (white in the printed grid) vs not-required (grey).
     frequencies_json: Mapped[str] = mapped_column(Text, default="[]")
-    items_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of {activity,prescribed,freqs}
+    items_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of {activity,prescribed,freqs,section?}
+    # log-sheet columns for a readings sheet (a daily chiller log's 8:00 AM … 8:00 PM,
+    # a weekly sheet's Week 1-4); empty = the usual frequency-matrix checksheet
+    slots_json: Mapped[str] = mapped_column(Text, default="[]")
     version: Mapped[int] = mapped_column(default=1)
     status: Mapped[ChecksheetStatus] = mapped_column(default=ChecksheetStatus.DRAFT)
     supersedes_id: Mapped[int | None]      # the published format this replaces

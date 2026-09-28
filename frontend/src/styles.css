@@ -647,7 +647,25 @@ td .chip.d-none { color: var(--ink-3); }
 .cs-formats { display: grid; grid-template-columns: 250px 1fr; gap: 16px; align-items: start; }
 .cs-picker { padding: 12px; position: sticky; top: 12px; }
 .cs-picker-h { font-weight: 700; margin-bottom: 8px; }
-.cs-picker ul { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+.cs-picker ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.cs-pick-scroll { max-height: 64vh; overflow-y: auto; margin: -2px -4px 0; padding: 0 4px; }
+.cs-pick-sys { display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1;
+  background: var(--surface, #fff); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-3); padding: 8px 9px 4px; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
+.cs-pick-sys span { font-weight: 600; letter-spacing: 0; }
+.cs-pick-label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cs-pick-label small { font-size: 10.5px; font-weight: 500; color: var(--ink-3); letter-spacing: .03em; }
+.cs-filters { margin-bottom: 10px; }
+.cs-sys-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.cs-chip-n { font-size: 10.5px; opacity: .65; margin-left: 2px; }
+.cs-sheetbar { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap;
+  padding: 10px 14px; position: sticky; top: 8px; z-index: 2; max-width: 800px; box-sizing: border-box; }
+.cs-sheetbar-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-sheetbar-t .dim { font-size: 12px; }
+.cs-sheetbar-ctl { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.cs-sheetbar-ctl label { display: flex; flex-direction: column; font-size: 11px; color: var(--ink-2); gap: 3px; }
+.cs-sheetbar-ctl select, .cs-sheetbar-ctl input { font: inherit; font-size: 12px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px; }
+.cs-sheetbar-ctl input { width: 56px; }
 .cs-picker li button { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
   text-align: left; border: 1px solid transparent; background: none; padding: 7px 9px; border-radius: 8px;
   cursor: pointer; font-size: 13px; color: var(--ink); }
@@ -693,11 +711,53 @@ td .chip.d-none { color: var(--ink-3); }
 .cs-group-h { font-size: 12px; font-weight: 700; background: #eef4f8; border: 1px solid #bbb; border-bottom: none;
   padding: 4px 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .cs-group .cs-table { margin-top: 0; }
+/* section heading rows inside a table ("Compressor · Motor", "B · Motor") */
+.cs-table tr.cs-sec td { background: #f6f8fa; font-weight: 700; font-size: .92em; letter-spacing: .01em;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* readings log: evenly split blank columns */
+.cs-table.cs-log .cs-slot { width: 9%; text-align: center; font-size: 9.5px; }
 .cs-remarks { margin-top: 10px; font-size: 12px; }
 .cs-remark-box { height: var(--cs-rbox, 48px); border: 1px solid #bbb; border-radius: 4px; margin-top: 4px; }
 .cs-sign { display: flex; justify-content: space-between; gap: 24px; margin-top: 14px; font-size: 12px; }
 .cs-sign > div { flex: 1; }
 .cs-sign-line { display: block; height: 30px; border-bottom: 1px solid #999; margin-top: 4px; }
+/* STANDARD sheet = the issued Word file's design. .cs-std-page is exactly the printable
+   A4 width (210 − 2×12.7 mm) on screen too, so the fit loop measures what will print. */
+.cs-sheet.cs-std { max-width: none; overflow-x: auto; padding: 14px; }
+.cs-std-page { width: 184.6mm; margin: 0 auto; font-family: Arial, 'Liberation Sans', Helvetica, sans-serif;
+  font-size: var(--cs-fs, 8.5pt); line-height: 1.18; color: #111; }
+.cs-std-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3pt; }
+.cs-std-head > div { flex: 1; text-align: center; }
+.cs-std-logo { width: 13mm; height: 13mm; flex: none; object-fit: contain; }
+.cs-std-head svg, .cs-std-head canvas { width: 13mm !important; height: 13mm !important; flex: none; }
+.cs-std-title { font-size: 10pt; font-weight: 700; }
+.cs-std-org { color: #0f335c; }
+.cs-std-sub { font-size: 7pt; margin-top: 2pt; }
+.cs-std-meta { display: flex; gap: 14pt; font-size: 8pt; margin: 3pt 0 4pt; }
+.cs-std-meta u, .cs-std-sign-l u, .cs-std-remarks span { display: inline-block; flex: 1; min-width: 32mm; border-bottom: 1px solid #555; text-decoration: none; height: 1em; }
+.cs-std-meta u.s, .cs-std-sign-l u.s { min-width: 22mm; }
+.cs-std-meta u.xs, .cs-std-sign-l u.xs { min-width: 13mm; }
+.cs-std-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--cs-fs, 8.5pt); }
+.cs-std-table th, .cs-std-table td { border: 1px solid #000; padding: .3mm 1mm; vertical-align: middle; text-align: left; overflow-wrap: anywhere; }
+.cs-std-table td { padding-top: calc(.3mm + var(--cs-padv, 0px)); padding-bottom: calc(.3mm + var(--cs-padv, 0px)); }
+.cs-std-page .cs-table td { padding-top: calc(2px + var(--cs-padv, 0px)); padding-bottom: calc(2px + var(--cs-padv, 0px)); }
+.cs-std-rbox { border: 1px solid #000; margin-top: 6pt; padding: 2pt 4pt; font-size: 7.5pt; font-weight: 700; box-sizing: border-box; overflow: hidden; }
+.cs-std-table th { background: #dce6f2; font-weight: 700; text-align: center; color: #111; text-transform: none; letter-spacing: normal; font-size: min(var(--cs-fs, 8.5pt), 8.5pt); white-space: normal; overflow-wrap: normal; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cs-std-table .c { text-align: center; }
+.cs-std-table .cs-std-dot { color: #1f7a33; }
+.cs-std-table tr.cs-std-sec td, .cs-std-table td.cs-std-sec-td { background: #efefef; font-weight: 700;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cs-std-table tr { break-inside: avoid; }
+.cs-std-split .cs-std-gap { border-top: none; border-bottom: none; background: #fff; padding: 0; }
+.cs-std-split td.cs-std-empty { border: none; }
+.cs-std-remarks { display: flex; gap: 4pt; font-size: 7.5pt; margin-top: 6pt; }
+.cs-std-sign { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #000; margin-top: 8pt; font-size: 7.5pt; break-inside: avoid; }
+.cs-std-sign > div { padding: 2pt 4pt 3pt; }
+.cs-std-sign > div + div { border-left: 1px solid #000; }
+.cs-std-sign-l { display: flex; gap: 6pt; margin-top: 12pt; }
+.cs-std-sign-l span { display: flex; flex: 1; gap: 2pt; white-space: nowrap; }
+.cs-std-sign-l span:nth-child(n+2) { flex: 0 1 auto; }
+.cs-std .cs-group-h { font-size: var(--cs-fs, 8.5pt); }
 @media screen and (max-width: 640px) { .cs-formats { grid-template-columns: 1fr; } .cs-picker { position: static; } }
 
 /* governance: badges, manage table, editor, audit modal */
@@ -718,7 +778,8 @@ td .chip.d-none { color: var(--ink-3); }
 .cs-items-hd, .cs-item-row { display: grid; grid-template-columns: 30px 1fr 1fr 96px; gap: 8px; align-items: center; }
 .cs-items-hd { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ink-3); padding: 0 2px 4px; }
 .cs-item-row { margin-bottom: 6px; }
-.cs-item-row input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; }
+.cs-item-row input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; box-sizing: border-box; }
+.cs-item-row .cs-item-sec { font-size: 12px; color: var(--ink-2); background: #fafbfc; }
 .cs-item-n { text-align: center; color: var(--ink-3); font-size: 12px; }
 .cs-item-acts { display: flex; gap: 3px; }
 .cs-freq-manage { margin: 4px 0 12px; }
@@ -742,7 +803,8 @@ td .chip.d-none { color: var(--ink-3); }
 
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
-  .cs-picker, .page-head, .asset-filter, .cs-manage-head { display: none !important; }
+  @page cs-std { size: A4 portrait; margin: 12.7mm; }
+  .cs-picker, .page-head, .asset-filter, .cs-manage-head, .cs-sheetbar, .cs-filters { display: none !important; }
   .cs-formats { display: block; }
   /* each sheet fills one full A4 page — flex column with the signatures anchored
      to the bottom, so there is no blank space below the content. Font/padding
@@ -751,6 +813,10 @@ td .chip.d-none { color: var(--ink-3); }
   .cs-sheet { border: none; border-radius: 0; padding: 0; max-width: none;
     min-height: 273mm; break-after: page; }
   .cs-sheet:last-child { break-after: auto; }
+  /* the standard sheet sits on its own named page: Word "Narrow" margins, natural height
+     (no min-height — the fit loop already keeps it inside one page) */
+  .cs-sheet.cs-std { page: cs-std; min-height: 0; overflow: visible; padding: 0; }
+  .cs-std-page { margin: 0; }
   .cs-table tr { break-inside: avoid; }
   .cs-group { margin-bottom: var(--cs-gap, 8px); break-inside: avoid; }
   .cs-remarks { margin-top: var(--cs-gap, 8px); }
