@@ -53,6 +53,9 @@ class LogEntryIn(BaseModel):
     attended_by: str | None = None      # the crew that actually did the work
     consumables: str | None = None      # spares/materials consumed (free text)
     action_taken: str | None = None     # the work done / remarks (old-sheet column)
+    # where the work was, as free text — for entries with no register asset
+    # (asset-linked entries show the asset's location unless this is given)
+    station: str | None = None
     # a filled structured checksheet: {template, name, results:[{label,status,reading}]}
     checksheet: dict | None = None
     asset_code: str | None = None
@@ -139,6 +142,9 @@ class EntryRef(BaseModel):
     via_job_card: bool = False
     checksheet: dict | None = None
     type: str | None = None       # the response kind (acknowledgement/job_card/rectification)
+    # a rectification's closing remark — "Closed" or "Under observation"
+    # (the job-card sheet's Remarks column; "Pending" is simply an open job card)
+    subtype: str | None = None
     retracted: bool = False       # a withdrawn response, kept for the audit trail
     attachments: "list[AttachmentRef]" = []   # scans/photos on this response (e.g. a job card)
 
@@ -293,7 +299,7 @@ def _ref(x: LogEntry | None, attach: dict | None = None) -> "EntryRef | None":
                     station=x.station or (x.asset.location.name if x.asset and x.asset.location else None),
                     action_taken=x.action_taken, via_job_card=bool(x.via_job_card),
                     checksheet=_load_checksheet(x.checksheet),
-                    type=x.type.value, retracted=bool(x.retracted),
+                    type=x.type.value, subtype=x.subtype, retracted=bool(x.retracted),
                     attachments=(attach or {}).get(x.id, []))
 
 
@@ -370,6 +376,7 @@ def _auto_failure_in(resp: LogEntryIn) -> LogEntryIn:
     return LogEntryIn(
         log_date=resp.log_date, time=resp.time, shift=resp.shift, type="failure",
         asset_code=resp.asset_code, system=resp.system, category=resp.category,
+        station=resp.station,
         fault_type=(resp.fault_type or "").strip() or None,
         attended_by=resp.attended_by,
         text=resp.text,
@@ -428,8 +435,21 @@ def _add_one(db: Session, entry: LogEntryIn, user):
     # neither ever floats free of a failure (invisible to the failure/job-card
     # boards). A rectification with no open failure thus files failure + fix together.
     link_failure = auto_failure = None
+    # An EDIT is a new entry correcting the old one. It must carry over what the
+    # edit form does not resend — the station, the work done, the job-card flag —
+    # and above all stay tied to the SAME failure: re-running the auto-link on an
+    # edited job card would raise a duplicate failure or hop to another one.
+    prev = db.get(LogEntry, entry.corrects_id) if entry.corrects_id is not None else None
+    if prev is not None:
+        keep = {k: getattr(prev, k) for k in ("station", "action_taken", "subtype")
+                if getattr(entry, k, None) in (None, "") and getattr(prev, k)}
+        entry = entry.model_copy(update=keep)
+        if prev.rectifies_id is not None and entry.rectifies_id is None:
+            link_failure = db.get(LogEntry, prev.rectifies_id)
     create_in = entry
-    if etype in _AUTO_FAILURE_KINDS and entry.asset_code:
+    if link_failure is not None:
+        create_in = entry.model_copy(update={"rectifies_id": None, "rectification": None})
+    elif etype in _AUTO_FAILURE_KINDS and entry.asset_code:
         asset = visible_asset(db, entry.asset_code, user)
         if entry.rectifies_id is not None:
             link_failure = db.get(LogEntry, entry.rectifies_id)
@@ -444,6 +464,8 @@ def _add_one(db: Session, entry: LogEntryIn, user):
         create_in = entry.model_copy(update={"rectifies_id": None, "rectification": None})
 
     obj = _create_entry(db, create_in, user)
+    if prev is not None and prev.via_job_card is not None:
+        obj.via_job_card = prev.via_job_card
     if link_failure is not None:
         obj.rectifies_id = link_failure.id
         db.flush()
@@ -547,6 +569,7 @@ def _create_entry(db: Session, entry: LogEntryIn, user, rectifies: LogEntry | No
         consumables=((entry.consumables or "").strip() or None),
         action_taken=((entry.action_taken or "").strip()[:2000] or None),
         checksheet=_dump_checksheet(entry.checksheet),
+        station=((entry.station or "").strip()[:160] or None),
         asset=asset, corrects_id=entry.corrects_id,
         line_id=user.line_id,  # NULL = department-wide entry (HQ/admin)
     )
@@ -712,6 +735,8 @@ class RectificationIn(BaseModel):
     consumables: str | None = None
     via_job_card: bool = False   # the fix was carried out by the agency under a job card
     checksheet: dict | None = None  # a structured checksheet for the fix / job card
+    # closing remark (job-card sheet "Remarks"): Closed | Under observation
+    remarks: str | None = None
 
 
 class ResolutionIn(BaseModel):
@@ -737,6 +762,16 @@ _RESP_PREFIX = {
 
 def _scope_ok(user, e: LogEntry) -> bool:
     return user.line_id is None or e.line_id in (user.line_id, None)
+
+
+_REMARKS = {"closed": "Closed", "under observation": "Under observation",
+            "under obsevation": "Under observation"}   # the sheet's own spelling
+
+
+def _remark(v: str | None) -> str | None:
+    """Normalise a closing remark; a fix with none given is simply Closed."""
+    v = (v or "").strip()
+    return _REMARKS.get(v.lower(), v[:40]) if v else "Closed"
 
 
 def _at_of(fail: LogEntry, r: "RectificationIn") -> datetime:
@@ -803,6 +838,8 @@ def set_resolution(failure_id: int, body: ResolutionIn,
             resp.consumables = (r.consumables or None) if is_rect else None
             resp.via_job_card = bool(r.via_job_card) if is_rect else None
             resp.checksheet = _dump_checksheet(r.checksheet)
+            if is_rect:
+                resp.subtype = _remark(r.remarks)
             resp.retracted = None   # editing an active response keeps it active
             for extra in existing[1:]:
                 extra.retracted = True   # older duplicates: retract, don't delete
@@ -815,6 +852,8 @@ def set_resolution(failure_id: int, body: ResolutionIn,
                 consumables=(r.consumables or None) if is_rect else None,
                 via_job_card=bool(r.via_job_card) if is_rect else None,
                 checksheet=_dump_checksheet(r.checksheet),
+                subtype=_remark(r.remarks) if is_rect else None,
+                station=fail.station,
                 rectifies_id=fail.id, asset_id=fail.asset_id, line_id=fail.line_id))
 
     # The three response logs are INDEPENDENT and coexist as history, with STATE

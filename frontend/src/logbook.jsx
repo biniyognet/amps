@@ -369,6 +369,8 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
   const [assetCode, setAssetCode] = useState(entry.asset_code || '')
   const [system, setSystem] = useState(entry.system || '')
   const [category, setCategory] = useState(entry.category || '')
+  // where the work was — the asset's station, or free text for unlinked entries
+  const [station, setStation] = useState(entry.station || '')
   const [team, setTeam] = useState(entry.attended_by || '')
   const [consumables, setConsumables] = useState(entry.consumables || '')
   const [tim, setTim] = useState(hhmm(entry.at))
@@ -399,6 +401,8 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
   const [rFault, setRFault] = useState(pSrc?.fault_type || entry.fault_type || '')
   const [rTeam, setRTeam] = useState(pSrc?.attended_by || '')
   const [rConsum, setRConsum] = useState(pSrc?.consumables || '')
+  // closing remark — the job-card sheet's Remarks column (Closed / Under observation)
+  const [rRemark, setRRemark] = useState(entry.resolved_by?.subtype || 'Closed')
   // a rectification may be carried out by us or by the agency under a job card
   const [rViaJobCard, setRViaJobCard] = useState(!!entry.resolved_by?.via_job_card || !!entry.job_card_by)
   // the progress response (job card / rectification) may carry a checksheet
@@ -426,6 +430,22 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
   const classesFor = system
     ? [...new Set(assets.filter((a) => a.system === system).map((a) => a.asset_class).filter(Boolean))].sort()
     : [...new Set(assets.map((a) => a.asset_class).filter(Boolean))].sort()
+  // the same System › Station › Asset cascade as a new entry: stations under the
+  // system, and the asset list shrunk to system + station (+ class). A stored
+  // station may carry a detail ("Sealdah · Concourse") — match on its first part.
+  const stationKey = station.split(' · ')[0].trim()
+  const stationsFor = [...new Set(assets.filter((a) => !system || a.system === system)
+    .map((a) => a.location).filter(Boolean))].sort()
+  const editAssets = assets.filter((a) => (!system || a.system === system)
+    && (!stationKey || a.location === stationKey) && (!category || a.asset_class === category))
+  const pickAsset = (v) => {
+    setAssetCode(v)
+    const hit = assets.find((a) => a.code === v)
+    if (!hit) return
+    if (hit.system) setSystem(hit.system)
+    if (hit.asset_class) setCategory(hit.asset_class)
+    if (hit.location) setStation(hit.location)
+  }
 
   // the progress axis needs its own detail (job card scope, or the fix)
   const progressActive = progress === 'job_card' || progress === 'rectified'
@@ -446,6 +466,10 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
     if (isFail && progressActive && !rText.trim()) {
       setErr(`This ${KIND_LABEL[progress]} needs a note — what was done or requested.`); return
     }
+    // closing a job card = the sheet's last three columns: recovery date, time, remarks
+    if (isFail && isResolved && jobIssued && !rectLocked && (!rDate || !rTime)) {
+      setErr('Closing a job card needs the recovery date and time.'); return
+    }
     if (isFail && acknowledged && !aText.trim()) {
       setErr('The acknowledgement needs a note — what was raised / requested.'); return
     }
@@ -459,7 +483,7 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
           log_date: eDate || entry.log_date, shift: eShift || entry.shift, type: entry.type,
           subtype: entry.subtype || null,
           system: system || null, category: category || null,
-          asset_code: assetCode.trim() || null,
+          asset_code: assetCode.trim() || null, station: station.trim() || null,
           time: tim || null, text: text.trim(), attended_by: team.trim() || null,
           consumables: isFail ? null : (consumables.trim() || null),
           checksheet: isFail ? null : (csEdit || null),  // preserve/edit the entry's checksheet
@@ -481,6 +505,7 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
             fault_type: rFault.trim() || null, attended_by: rTeam.trim() || null,
             consumables: isResolved ? (rConsum.trim() || null) : null,
             via_job_card: isResolved ? rViaJobCard : false,
+            remarks: isResolved ? rRemark : null,
             checksheet: rCs || null,
           } : null,
         }
@@ -554,14 +579,19 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
                 {classesFor.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
+            <label>Station
+              <input value={station} list="edit-stations" placeholder="Station…"
+                     onChange={(e) => setStation(e.target.value)} />
+              <datalist id="edit-stations">
+                {stationsFor.map((s) => <option key={s} value={s} />)}
+              </datalist>
+            </label>
             <label>Equipment (Asset ID)
-              <input value={assetCode} list="register-codes" placeholder="scan/type code — links the asset"
-                     onChange={(e) => {
-                       const v = e.target.value; setAssetCode(v)
-                       const hit = assets.find((a) => a.code === v)
-                       if (hit?.system) setSystem(hit.system)
-                       if (hit?.asset_class) setCategory(hit.asset_class)
-                     }} />
+              <input value={assetCode} list="edit-codes" placeholder="scan/type code — links the asset"
+                     onChange={(e) => pickAsset(e.target.value)} />
+              <datalist id="edit-codes">
+                {editAssets.map((a) => <option key={a.code} value={a.code}>{`${a.code} — ${a.name} · ${a.location}`}</option>)}
+              </datalist>
             </label>
           </div>
         </section>
@@ -660,12 +690,20 @@ function EditEntryForm({ entry, assets, systems, classSystem, initialResp = null
                 </div>
               )}
               {progressActive && <>
-                <label>{isResolved ? 'Rectified on' : 'Job card dated'}
+                <label>{isResolved ? (jobIssued ? 'Recovery date' : 'Rectified on') : 'Job card dated'}
                   <input type="date" value={rDate} min={entry.log_date} readOnly={rectLocked} onChange={(e) => setRDate(e.target.value)} />
                 </label>
-                <label>At
+                <label>{isResolved && jobIssued ? 'Recovery time' : 'At'}
                   <TimeInput value={rTime} onChange={rectLocked ? () => {} : setRTime} label="At" />
                 </label>
+                {isResolved && (
+                  <label>Remarks
+                    <select value={rRemark} disabled={rectLocked} onChange={(e) => setRRemark(e.target.value)}>
+                      <option value="Closed">Closed</option>
+                      <option value="Under observation">Under observation</option>
+                    </select>
+                  </label>
+                )}
                 <label>{isResolved ? 'Team' : 'Issued to'}
                   <input value={rTeam} readOnly={rectLocked} onChange={(e) => setRTeam(e.target.value)}
                          placeholder={isResolved ? 'crew / agency that fixed it' : 'agency / dept the card went to'} />
@@ -864,6 +902,7 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
       system: (r.system || '').trim() || null,
       action_taken: (r.action || '').trim() || null, attended_by: (r.team || '').trim() || null,
       asset_code: (r.asset || '').trim() || null, shift: 'G',
+      station: (r.station || '').trim() || null,
     }
   }
   const submit = async () => {
@@ -1004,7 +1043,7 @@ export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, o
     return { log_date: r.date || defaultDate, type: 'job_card', asset_code: (r.asset || '').trim() || null,
       text: detail.length >= 3 ? detail : (fault || 'Job card issued'), fault_type: fault.slice(0, 120) || null,
       attended_by: (r.agency || '').trim() || null, entered_by: (r.issuedby || '').trim(),
-      system: (r.system || '').trim() || null, shift: 'G' }
+      system: (r.system || '').trim() || null, station: (r.station || '').trim() || null, shift: 'G' }
   }
   const submit = async () => {
     const live = rows.filter((r) => (r.asset || '').trim() && ((r.fault || '').trim() || (r.detail || '').trim()))
