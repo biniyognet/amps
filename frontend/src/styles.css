@@ -2226,6 +2226,7 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
   border: 1px solid var(--border); white-space: nowrap; }
 .corr-mode.letter { background: #eef4fb; color: #245b8f; border-color: #cfe0f0; }
 .corr-mode.email { background: #fff2e6; color: #a4560f; border-color: #f4d6b8; }
+.corr-mode.mom { background: #eef7ee; color: #2d6a34; border-color: #cde6cf; }
 
 /* ---- Coordinator Guide (Docs) ---- */
 .docs { max-width: 900px; margin: 0 auto; }

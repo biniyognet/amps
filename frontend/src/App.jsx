@@ -2544,7 +2544,7 @@ function PrintablesNav({ active }) {
       {open && (
         <div className="showcase-menu" role="menu">
           <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
-            <span className="sc-name">Letters</span><span className="sc-sub">official correspondence — letters & emails on record</span>
+            <span className="sc-name">Letters</span><span className="sc-sub">official correspondence — letters, emails & MOM on record</span>
           </a>
           <a className="sc-item" role="menuitem" href="#/printables?t=qr" onClick={() => go('qr')}>
             <span className="sc-name">QR asset tags</span><span className="sc-sub">printable QR labels for every asset</span>
@@ -3790,13 +3790,13 @@ function JobCardsView({ line = '' }) {
   )
 }
 
-/* ---------- correspondence (letters & emails) ---------- */
+/* ---------- correspondence (letters, emails & minutes of meeting) ---------- */
 function CorrespondenceView({ line = '' }) {
   const { me } = useMe()
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
   const [q, setQ] = useState('')
-  const [mode, setMode] = useState('all')   // all | letter | email
+  const [mode, setMode] = useState('all')   // all | letter | email | mom
   useEffect(() => {
     const lq = line ? `?line=${encodeURIComponent(line)}` : ''
     getJSON(`/api/correspondence${lq}`).then((r) => setRows(r || [])).catch((e) => setError(String(e)))
@@ -3806,9 +3806,10 @@ function CorrespondenceView({ line = '' }) {
   const line_ = me?.line || ''
   const letters = rows.filter((r) => r.mode === 'letter')
   const emails = rows.filter((r) => r.mode === 'email')
+  const moms = rows.filter((r) => r.mode === 'mom')
   const linked = rows.filter((r) => r.related_assets && !['-', '___', ''].includes((r.related_assets || '').trim()))
   const ql = q.trim().toLowerCase()
-  const MODES = [['all', 'All', rows], ['letter', 'Letters', letters], ['email', 'Emails', emails]]
+  const MODES = [['all', 'All', rows], ['letter', 'Letters', letters], ['email', 'Emails', emails], ['mom', 'MOM', moms]]
   const shown = rows.filter((r) => (mode === 'all' || r.mode === mode)
     && (!ql || [r.ref_no, r.subject, r.related_assets, r.brief, r.sender, r.recipient].some((v) => (v || '').toLowerCase().includes(ql))))
   const fmt = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -3816,11 +3817,12 @@ function CorrespondenceView({ line = '' }) {
   return (
     <>
       <div className="page-head"><h1>Correspondence {line_ && <span className="dim">· {line_}</span>}</h1></div>
-      <p className="dim" style={{ marginTop: -6 }}>Official letters and emails, with the scanned document and the asset(s) each concerns.</p>
+      <p className="dim" style={{ marginTop: -6 }}>Official letters, emails and minutes of meeting, with the scanned document and the asset(s) each concerns.</p>
       <div className="kpis dash-kpis" style={{ marginBottom: 14 }}>
         <div className="tile"><div className="v">{rows.length}</div><div className="k">Total</div><div className="note">on record</div></div>
         <div className="tile"><div className="v">{letters.length}</div><div className="k">Letters</div></div>
         <div className="tile"><div className="v">{emails.length}</div><div className="k">Emails</div></div>
+        <div className="tile"><div className="v">{moms.length}</div><div className="k">MOM</div><div className="note">minutes of meeting</div></div>
         <div className="tile ok"><div className="v">{linked.length}</div><div className="k">Asset-linked</div><div className="note">names equipment</div></div>
       </div>
       <div className="asset-toolbar">
@@ -3851,7 +3853,7 @@ function CorrespondenceView({ line = '' }) {
               {shown.map((r) => (
                 <tr key={r.id}>
                   <td className="dim" data-l="Date">{fmt(r.date)}</td>
-                  <td data-l="Mode"><span className={`corr-mode ${r.mode}`}>{r.mode === 'email' ? 'Email' : 'Letter'}</span></td>
+                  <td data-l="Mode"><span className={`corr-mode ${r.mode}`}>{r.mode === 'email' ? 'Email' : r.mode === 'mom' ? 'MOM' : 'Letter'}</span></td>
                   <td className="wrap-cell" data-l="Ref no."><span className="code">{oneLine(r.ref_no, 40) || '—'}</span></td>
                   <td className="wrap-cell" data-l="Subject" title={r.brief || ''}>{oneLine(r.subject, 120) || '—'}</td>
                   <td className="wrap-cell dim" data-l="Related assets">{oneLine(r.related_assets, 60) || '—'}</td>

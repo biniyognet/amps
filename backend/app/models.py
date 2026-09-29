@@ -451,13 +451,14 @@ class Correspondence(Base):
     letter from an email; `ref_no` is the letter/reference number.
     """
     __tablename__ = "correspondence"
-    __table_args__ = (UniqueConstraint("line_id", "seq", name="uq_corr_line_seq"),)
+    # minutes of meeting keep their own SL series beside the letters/emails one
+    __table_args__ = (UniqueConstraint("line_id", "mode", "seq", name="uq_corr_line_mode_seq"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     line_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))  # the line's register
     seq: Mapped[int | None]                      # SL in the source sheet (stable key per line)
     corr_date: Mapped[date | None]               # the letter/email date
-    mode: Mapped[str] = mapped_column(String(16), default="letter")  # letter | email
+    mode: Mapped[str] = mapped_column(String(16), default="letter")  # letter | email | mom
     ref_no: Mapped[str | None] = mapped_column(String(200))          # letter / reference number
     subject: Mapped[str | None] = mapped_column(Text)
     related_assets: Mapped[str | None] = mapped_column(Text)         # asset(s) it concerns (free text)

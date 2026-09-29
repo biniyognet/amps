@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Arup Biswas
 # AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
-"""Correspondence trail — official letters and emails per line.
+"""Correspondence trail — official letters, emails and minutes of meeting per line.
 
 A read-mostly register imported from each line's coordination sheet: one row
 per letter/email, with the scanned document link, an OCR/summary, and the
@@ -71,7 +71,7 @@ def _out(c: Correspondence, line_name: str | None) -> CorrOut:
 def list_correspondence(line: str | None = None, mode: str | None = None,
                         db: Session = Depends(get_db), user=Depends(optional_user)):
     """Letters/emails, newest first. Scoped to the caller's line; `line` filters
-    further (and is how HQ/admin picks one). `mode` = letter | email."""
+    further (and is how HQ/admin picks one). `mode` = letter | email | mom."""
     q = select(Correspondence)
     if user.line_id is not None:
         q = q.where(Correspondence.line_id == user.line_id)
@@ -110,28 +110,30 @@ class ImportIn(BaseModel):
 @router.post("/import")
 def import_correspondence(body: ImportIn, db: Session = Depends(get_db),
                           user=Depends(current_writer)):
-    """Idempotent bulk import. Keyed on (line, seq): a row with a known SL is
-    updated in place, a new SL is inserted, so re-running the sheet is safe.
-    Rows without an SL are appended (no natural key to match on)."""
+    """Idempotent bulk import. Keyed on (line, register, seq): a row with a known
+    SL is updated in place, a new SL is inserted, so re-running the sheet is safe.
+    Letters and emails share one SL series (one tracker tab); minutes of meeting
+    (mode "mom") have their own. Rows without an SL are appended."""
     site = _resolve_line(db, body.line)
     if not site:
         raise HTTPException(404, f"unknown line '{body.line}'")
     if user.line_id is not None and user.line_id != site.id:
         raise HTTPException(403, "you can only import into your own line")
-    existing = {c.seq: c for c in db.scalars(
+    reg = lambda m: "mom" if m == "mom" else "corr"
+    existing = {(reg(c.mode), c.seq): c for c in db.scalars(
         select(Correspondence).where(Correspondence.line_id == site.id,
                                      Correspondence.seq.isnot(None))).all()}
     created = updated = 0
     for r in body.rows:
         mode = (r.mode or "letter").strip().lower()
-        if mode not in ("letter", "email"):
+        if mode not in ("letter", "email", "mom"):
             mode = "letter"
         fields = dict(corr_date=_parse_date(r.date), mode=mode, ref_no=r.ref_no,
                       subject=r.subject, related_assets=r.related_assets, brief=r.brief,
                       sender=r.sender, recipient=r.recipient, copy_to=r.copy_to,
                       link=r.link, ocr=r.ocr, drafting_date=_parse_date(r.drafting_date),
                       drafting_by=r.drafting_by)
-        row = existing.get(r.seq) if r.seq is not None else None
+        row = existing.get((reg(mode), r.seq)) if r.seq is not None else None
         if row:
             for k, v in fields.items():
                 setattr(row, k, v)
