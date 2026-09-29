@@ -512,7 +512,7 @@ def update_asset(code: str, patch: AssetUpdate, db: Session = Depends(get_db),
     an asset out of it. Append-only history survives a code change because the
     logbook links by id, not code — but printed QR tags carry the code, so a
     code change is flagged for reprinting."""
-    a = visible_asset(db, code, user)  # 404s outside the caller's scope
+    a = visible_asset(db, _code(code), user)  # 404s outside the caller's scope
     my_line = db.get(Location, user.line_id).name if user.line_id is not None else None
 
     changes: list[str] = []

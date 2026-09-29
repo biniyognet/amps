@@ -461,7 +461,7 @@ function LiveDashboard({ go, initialLine = null }) {
             <AssetForm mode="create"
                        initial={effLine ? { line: effLine, criticality: 'B', status: 'in_service' } : null}
                        onCancel={() => setNewOpen(false)}
-                       onDone={(code) => { setNewOpen(false); location.hash = `/asset/${code}` }} />
+                       onDone={(code) => { setNewOpen(false); location.hash = `/asset/${encodeURIComponent(code)}` }} />
           </div>
         )}
         </>
@@ -543,7 +543,7 @@ function LiveDashboard({ go, initialLine = null }) {
               <AssetForm mode="create"
                          initial={effLine ? { line: effLine, criticality: 'B', status: 'in_service' } : null}
                          onCancel={() => setNewOpen(false)}
-                         onDone={(code) => { setNewOpen(false); location.hash = `/asset/${code}` }} />
+                         onDone={(code) => { setNewOpen(false); location.hash = `/asset/${encodeURIComponent(code)}` }} />
             </div>
           )}
           {(impBusy || impResult) && (
@@ -600,13 +600,13 @@ function LiveDashboard({ go, initialLine = null }) {
                     // with several, no single target is right — go to the asset's
                     // failure list, where each failure is actioned individually.
                     const single = nOut === 1 && fid
-                    const ackHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=acknowledgement` : `#/asset/${a.code}`
-                    const rectHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=rectification` : `#/asset/${a.code}`
+                    const ackHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=acknowledgement` : `#/asset/${encodeURIComponent(a.code)}`
+                    const rectHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=rectification` : `#/asset/${encodeURIComponent(a.code)}`
                     return (
                       <tr key={a.code} tabIndex={0}
                           className={nOpen ? 'row-faulty' : nAck ? 'row-ack' : nJob ? 'row-job' : ''}
-                          onClick={() => go(`/asset/${a.code}`)}
-                          onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${a.code}`)}>
+                          onClick={() => go(`/asset/${encodeURIComponent(a.code)}`)}
+                          onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${encodeURIComponent(a.code)}`)}>
                         <td className="sl-col">{rowOffset + i + 1}</td>
                         <td className="code" data-l="Code">{a.code}</td>
                         <td data-l="Asset">{a.name}
@@ -715,8 +715,8 @@ function Dashboard({ go }) {
             {ASSETS.map((a) => {
               const pm = nextPM(a.code)
               return (
-                <tr key={a.code} tabIndex={0} onClick={() => go(`/asset/${a.code}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${a.code}`)}>
+                <tr key={a.code} tabIndex={0} onClick={() => go(`/asset/${encodeURIComponent(a.code)}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${encodeURIComponent(a.code)}`)}>
                   <td className="code" data-l="Code">{a.code}</td>
                   <td data-l="Asset">{a.name}</td>
                   <td className="dim" data-l="Class">{a.cls}</td>
@@ -1255,7 +1255,7 @@ function AssetForm({ initial, mode, onDone, onCancel }) {
       const payload = { ...f }
       Object.keys(payload).forEach((k) => { if (payload[k] === '') payload[k] = null })
       const url = mode === 'edit'
-        ? `/api/assets/${encodeURIComponent(start.code)}`
+        ? `/api/assets/${encPath(start.code)}`
         : '/api/assets'
       const res = await fetch(url, {
         method: mode === 'edit' ? 'PATCH' : 'POST',
@@ -1441,7 +1441,7 @@ function LiveAssetDetail({ code }) {
                          onCancel={() => setEditing(false)}
                          onDone={(newCode) => {
                            setEditing(false)
-                           if (newCode !== a.code) location.hash = `/asset/${newCode}`
+                           if (newCode !== a.code) location.hash = `/asset/${encodeURIComponent(newCode)}`
                            else reload()
                          }} />
             </div>
@@ -1623,7 +1623,7 @@ function Planner() {
         <div className="plan-carry">
           <span className="plan-carry-t">⚠ Carried forward — overdue</span>
           {carried.map((p) => (
-            <a key={p.asset + p.task} href={`#/asset/${p.asset}`} className="plan-carry-item">
+            <a key={p.asset + p.task} href={`#/asset/${encodeURIComponent(p.asset)}`} className="plan-carry-item">
               <b className="code">{p.asset}</b> {p.task} <span className="pc-days">{p.over}d</span>
             </a>
           ))}
@@ -1650,7 +1650,7 @@ function Planner() {
                 {items.map((p, j) => {
                   const overdue = p.due < now && !(p.due.toDateString() === now.toDateString())
                   return (
-                    <a key={j} href={`#/asset/${p.asset}`} className={`cal-item${overdue ? ' late' : ''}`}
+                    <a key={j} href={`#/asset/${encodeURIComponent(p.asset)}`} className={`cal-item${overdue ? ' late' : ''}`}
                        title={`${p.asset} — ${p.task} (${p.frequency})`}>
                       <i className="cal-freq">{FREQ_BADGE[p.frequency]}</i> <b>{p.asset}</b> <span className="cal-task">{p.task}</span>
                     </a>
@@ -1791,8 +1791,8 @@ function Failures() {
           <thead><tr><th>ID</th><th>Asset</th><th>Occurred</th><th>Restored</th><th>Downtime</th><th>State</th><th>Cause → remedy</th></tr></thead>
           <tbody>
             {FAILURES.map((f) => (
-              <tr key={f.id} tabIndex={0} onClick={() => { location.hash = `/asset/${f.asset}` }}
-                  onKeyDown={(e) => e.key === 'Enter' && (location.hash = `/asset/${f.asset}`)}>
+              <tr key={f.id} tabIndex={0} onClick={() => { location.hash = `/asset/${encodeURIComponent(f.asset)}` }}
+                  onKeyDown={(e) => e.key === 'Enter' && (location.hash = `/asset/${encodeURIComponent(f.asset)}`)}>
                 <td className="code" data-l="ID">{f.id}</td>
                 <td className="code" data-l="Asset">{f.asset}</td>
                 <td className="dim dt" data-l="Occurred">{fmtDate(f.started)} {fmtTime(f.started)}</td>
@@ -2019,8 +2019,8 @@ function LiveFailures({ line = '' }) {
           <tbody>
             {shown.map((f) => (
               <tr key={f.id} tabIndex={0}
-                  onClick={() => f.asset_code && (location.hash = `/asset/${f.asset_code}`)}
-                  onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${f.asset_code}`)}>
+                  onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
+                  onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
                 <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
                 <td className="dim" data-l="Class">{f.category || '—'}</td>
                 <td className="dim dt" data-l="Occurred">{f.log_date}</td>
@@ -2186,7 +2186,7 @@ function JobCard({ jcId }) {
   return (
     <>
       <div className="sheet-bar">
-        <a className="crumb" style={{ margin: 0 }} href={`#/asset/${asset.code}`}>← {asset.code}</a>
+        <a className="crumb" style={{ margin: 0 }} href={`#/asset/${encodeURIComponent(asset.code)}`}>← {asset.code}</a>
         <button className="btn" onClick={() => window.print()}>Print job card</button>
         <p>{done ? 'Completed — returned with technician acknowledgement.' : 'Issued copy — hand over to the executing department / agency.'}</p>
       </div>
@@ -2305,7 +2305,7 @@ function Checksheet({ kind, a1, a2 }) {
   return (
     <>
       <div className="sheet-bar">
-        <a className="crumb" style={{ margin: 0 }} href={`#/asset/${asset.code}`}>← {asset.code}</a>
+        <a className="crumb" style={{ margin: 0 }} href={`#/asset/${encodeURIComponent(asset.code)}`}>← {asset.code}</a>
         <button className="btn" onClick={() => window.print()}>Print checksheet</button>
         <p>{filled ? 'Completed record — as verified on the job card.' : 'Blank sheet — print, fill in the field, and file against the job card.'}</p>
       </div>
@@ -3746,8 +3746,8 @@ function JobCardsView({ line = '' }) {
             <tbody>
               {shown.map(({ f, jc, rb, status, age }) => (
                 <tr key={f.id} tabIndex={0}
-                    onClick={() => f.asset_code && (location.hash = `/asset/${f.asset_code}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${f.asset_code}`)}>
+                    onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
                   <td data-l="Age"><span className={`jc-age${status === 'open' && age >= 30 ? ' hot' : status === 'open' && age >= 14 ? ' warm' : ''}`}>{age}d</span></td>
                   <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`}>{STL[status][1]}</span></td>
                   <td className="code" data-l="Asset">{f.asset_code || '—'}</td>

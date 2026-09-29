@@ -1831,7 +1831,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                               <span className="dot" />{en.type}{en.subtype ? ` · ${en.subtype}` : ''}
                             </span>
                             {en.asset_code
-                              ? <a className="code" href={`#/asset/${en.asset_code}`}>{en.asset_code}</a>
+                              ? <a className="code" href={`#/asset/${encodeURIComponent(en.asset_code)}`}>{en.asset_code}</a>
                               : en.type === 'failure' && <span className="chip d-overdue"><span className="dot" />unlinked</span>}
                             {en.type === 'failure' && (en.ended_at
                               ? <span className="chip w-done"><span className="dot" />resolved{en.down_hours != null ? ` · ${en.down_hours}h` : ''}</span>
