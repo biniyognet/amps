@@ -2991,7 +2991,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
         )}
         <div className="cs-std-rbox" style={{ display: 'none' }}>Remarks / defects observed:</div>
         <footer className="cs-std-sign">
-          {['Done by — Staff / External firm', 'Checked by — Supervisor (MRLY)'].map((who) => (
+          {['Done by — Staff / External firm', 'Checked by — (MRLY)'].map((who) => (
             <div key={who}>
               <b>{who}</b>
               <div className="cs-std-sign-l"><span>Name: <u /></span><span>Sign: <u className="s" /></span><span>Date: <u className="xs" /></span></div>
