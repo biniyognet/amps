@@ -1108,9 +1108,27 @@ function useAssetSchedule(code) {
   return { schedule, reloadSchedule: () => setNonce((n) => n + 1) }
 }
 
+// '2026-09-13' → '13 Sep' (year only when it isn't this year)
+const schedDay = (d) => {
+  const t = new Date(`${d}T00:00:00`)
+  return t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(t.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) })
+}
+// one plain-words line per cycle: why it is in this state
+const schedWhy = (r) => {
+  if (r.state === 'never') return 'no record yet — log it, or set last-done in “Edit details”'
+  const due = new Date(`${r.next_due}T00:00:00`).toLocaleDateString('en-GB', { month: 'long' })
+  const n = Math.abs(r.days_left)
+  if (r.state === 'grace') return `${due} record awaited · due ${schedDay(r.next_due)}, ${n}d ago`
+  if (r.state === 'overdue' || r.state === 'long_overdue') return `lapsed ${n}d · was due ${schedDay(r.next_due)}`
+  return `next ${schedDay(r.next_due)} · in ${r.days_left}d`
+}
+
 function MaintenanceSchedule({ schedule }) {
   const rows = schedule?.rows || []
   const s = schedule?.summary
+  // split the header count: a lapse is not the same as a cycle never recorded
+  const cnt = (st) => rows.filter((r) => r.state === st).length
+  const lapsed = cnt('overdue') + cnt('long_overdue'), never = cnt('never'), grace = cnt('grace')
   return (
     <div className="sect">
       <h3>
@@ -1120,33 +1138,27 @@ function MaintenanceSchedule({ schedule }) {
         )}
         {s && (
           <span className="sched-sum">
-            {s.overdue_count > 0
-              ? <span className="ss-red">⚠ {s.overdue_count} overdue</span>
-              : s.next_due
-                ? <>next: <b>{s.next_frequency}</b> in {s.days_left}d · <span className="dt">{s.next_due}</span></>
-                : null}
+            {lapsed > 0 && <span className="ss-red">⚠ {lapsed} overdue</span>}
+            {grace > 0 && <span className="ss-grace">{grace} record{grace > 1 ? 's' : ''} awaited</span>}
+            {never > 0 && <span className="ss-never">{never} not yet recorded</span>}
+            {!lapsed && !grace && !never && s.next_due && <>next: <b>{s.next_frequency}</b> in {s.days_left}d · <span className="dt">{s.next_due}</span></>}
           </span>
         )}
       </h3>
       {rows.length === 0 ? (
         <p className="dim">No maintenance plan or recurring history yet — set a plan in “Edit details”, or log a Monthly / Quarterly / Half-Yearly / Yearly / 5-Yearly entry.</p>
       ) : (
-        <div className="tbl-wrap">
-          <table className="sched-tbl">
-            <thead><tr><th>Frequency</th><th>Last done</th><th>Next due</th><th>Days left</th><th>State</th></tr></thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.frequency}>
-                  <td data-l="Frequency"><b>{r.frequency}</b></td>
-                  <td className="dim dt" data-l="Last done">{r.last_done || '—'}{r.via && <span className="sched-via"> · via {r.via}</span>}</td>
-                  <td className="dt" data-l="Next due">{r.next_due || '—'}</td>
-                  <td data-l="Days left">{r.days_left == null ? '—' : r.days_left < 0 ? `${-r.days_left}d ago` : `in ${r.days_left}d`}</td>
-                  <td data-l="State"><span className={schedChip(r.state)} title={SCHED_TIP[r.state]}><span className="dot" />{SCHED_LABEL[r.state]}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="sched-list">
+          {rows.map((r) => (
+            <li key={r.frequency} className={`sl-row sl-${r.state}`} title={SCHED_TIP[r.state]}>
+              <span className={`pmc ${cycStateClass(r.state)}`}>{(CYC_ABBR.find(([f]) => f === r.frequency) || [])[1] || r.frequency[0]}</span>
+              <b className="sl-freq">{r.frequency}</b>
+              <span className={`sl-last dt${r.last_done ? '' : ' sl-empty'}`}>{r.last_done ? <>done {schedDay(r.last_done)}{r.via && <i className="sched-via"> via {r.via}</i>}</> : '—'}</span>
+              <span className="sl-why">{schedWhy(r)}</span>
+              <span className={schedChip(r.state)}><span className="dot" />{SCHED_LABEL[r.state]}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
