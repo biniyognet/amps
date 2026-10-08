@@ -489,7 +489,7 @@ function LiveDashboard({ go, initialLine = null }) {
               {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
               {/* criticality A/B/C sit in the same ribbon, after the PM-state chips */}
               <span className="crit-sep" aria-hidden="true" />
-              {[['A', 'Vital — 33 kV AIS, transformers, rectifiers, HSCB, MDB, DG, emergency DB'],
+              {[['A', 'Vital — 33 kV AIS, 11 kV switchgear, transformers, rectifiers, HSCB, MDB, DG, emergency DB'],
                 ['B', 'Important'], ['C', 'Tolerable']].map(([k, tip]) => {
                 const active = fCrit.includes(k)
                 return (
@@ -3436,6 +3436,29 @@ function LineDashboard({ go, initialLine = null }) {
     ['none', 'Unscheduled', bucket.none, 'seg-none'],
   ].filter(([, , n]) => n > 0)
 
+  // the same status bar per criticality A/B/C — compliance and segments are
+  // computed exactly as the headline, just over that grade's assets
+  const critRows = [['A', 'Vital'], ['B', 'Important'], ['C', 'Tolerable']].map(([k, label]) => {
+    const list = assets.filter((a) => a.criticality === k)
+    const b = { ok: 0, due_soon: 0, grace: 0, overdue: 0, long_overdue: 0, none: 0 }
+    list.forEach((a) => { b[stateOf(a) || 'none'] += 1 })
+    const nv = list.filter((a) => pm(a)?.never_done).length
+    const lp = b.overdue - nv
+    const sch = list.length - b.none
+    const inC = sch - nv
+    const ok = b.ok + b.due_soon + b.grace
+    const pct = inC > 0 ? Math.round((ok / inC) * 100) : (sch ? 100 : 0)
+    const s = [
+      ['ok', 'On schedule', b.ok, 'seg-ok'], ['due_soon', 'Due soon', b.due_soon, 'seg-due'],
+      ['grace', 'Records awaited', b.grace, 'seg-grace'], ['overdue', 'Overdue', lp, 'seg-od'],
+      ['never', 'Awaiting 1st service', nv, 'seg-never'], ['long_overdue', '5-Yearly due', b.long_overdue, 'seg-long'],
+      ['none', 'Unscheduled', b.none, 'seg-none'],
+    ].filter(([, , n]) => n > 0)
+    return { k, label, n: list.length, pct, cls: pct >= 90 ? 'good' : pct >= 70 ? 'warn' : 'bad', segs: s }
+  }).filter((r) => r.n > 0)
+  // a click opens the register already narrowed to that grade (its persisted chip)
+  const openCrit = (k) => { try { localStorage.setItem('amps.filter.reg.crit', JSON.stringify([k])) } catch { /* private mode */ } }
+
   const tile = (v, k, cls, to, sub) => (
     <a className={`bento-stat${cls ? ' ' + cls : ''}`} href={to} role="button">
       <div className="v">{v}</div><div className="k">{k}</div>{sub && <div className="n">{sub}</div>}
@@ -3522,6 +3545,28 @@ function LineDashboard({ go, initialLine = null }) {
           ))}
         </div>
       </section>
+      {critRows.length > 0 && (
+        <section className="crit-strips" aria-label="PM status by criticality">
+          {critRows.map((r) => (
+            <div key={r.k} className="cs-row">
+              <a className="cs-head" href={regHref} onClick={() => openCrit(r.k)} title={`Open the register filtered to criticality ${r.k}`}>
+                <span className={`cs-badge cr-${r.k}`}>{r.k}</span>
+                <span className="cs-txt"><span className="cs-lbl">{r.label}</span><span className="cs-n">{r.n.toLocaleString()} assets</span></span>
+                <span className={`cs-pct ${r.cls}`}>{r.pct}%</span>
+              </a>
+              <div className="h-meter cs-meter" role="img" aria-label={`Criticality ${r.k} PM breakdown`}>
+                {r.segs.map(([k, label, n, cls]) => (
+                  <a key={k} className={`h-col ${cls}`} href={regHref} onClick={() => openCrit(r.k)} style={{ flex: `${n} 1 0` }} title={`${r.k} · ${label}: ${n.toLocaleString()}`}>
+                    <span className={`h-seg cc-seg ${cls}`} />
+                    <span className="h-cn">{n.toLocaleString()}</span>
+                    <span className="h-cl">{label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
       </div>
 
       <div className="dash-grid3">
