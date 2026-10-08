@@ -187,6 +187,8 @@ function LiveDashboard({ go, initialLine = null }) {
   const [fName, setFName] = usePersistedState('reg.name', '')     // Asset: contains-text filter
   const fSystem = asArr(fSystemR), fClass = asArr(fClassR), fLocation = asArr(fLocationR), fStatus = asArr(fStatusR), fLocDet = asArr(fLocDetR)
   const [fDepot, setFDepot] = usePersistedState('reg.depot', '')
+  const [fCritR, setFCrit] = usePersistedState('reg.crit', [])   // criticality quick chips A/B/C
+  const fCrit = asArr(fCritR)
   const [sortKey, setSortKey] = usePersistedState('reg.sortKey', null)  // null = register order
   const [sortDir, setSortDir] = usePersistedState('reg.sortDir', 'asc')
   const [page, setPage] = useState(0)   // register pages 150 rows/page for speed
@@ -255,7 +257,7 @@ function LiveDashboard({ go, initialLine = null }) {
   // lists narrow to that depot. A dropdown never constrains itself, and always
   // keeps its own current value so a selection stays visible.
   // multi-select array fields + the single depot field
-  const FILTER_FIELDS = [['sys', fSystem], ['cls', fClass], ['location', fLocation], ['status', fStatus], ['locationDetail', fLocDet]]
+  const FILTER_FIELDS = [['sys', fSystem], ['cls', fClass], ['location', fLocation], ['status', fStatus], ['locationDetail', fLocDet], ['criticality', fCrit]]
   const passesExcept = (a, exceptKey) => FILTER_FIELDS.every(
     ([k, v]) => k === exceptKey || v.length === 0 || v.includes(a[k]))
     && (exceptKey === 'depot' || !fDepot || !lineDepots.includes(fDepot) || a.depot === fDepot)
@@ -286,6 +288,11 @@ function LiveDashboard({ go, initialLine = null }) {
   // only apply a depot filter that actually belongs to the current line — a
   // depot picked on another line (persisted) must not blank this line's register
   if (fDepot && lineDepots.includes(fDepot)) base = base.filter((a) => a.depot === fDepot)
+  // criticality chips count the view BEFORE their own filter, so A/B/C always
+  // show what picking them would give
+  const critN = { A: 0, B: 0, C: 0 }
+  base.forEach((a) => { if (a.criticality in critN) critN[a.criticality] += 1 })
+  if (fCrit.length) base = base.filter((a) => fCrit.includes(a.criticality))
   const overdueAll = base.filter((a) => stateOf(a) === 'overdue')
   const neverDone = overdueAll.filter((a) => dispState(a) === 'never')  // never once maintained
   const overdue = overdueAll.filter((a) => dispState(a) !== 'never')    // lapsed only (Overdue = overdue − never-done)
@@ -328,7 +335,7 @@ function LiveDashboard({ go, initialLine = null }) {
   // SL (serial) numbering — absolute position in the filtered set, so a printout
   // of a paged view still numbers continuously
   const rowOffset = printAll ? 0 : pageSafe * REG_PAGE
-  useEffect(() => { setPage(0) }, [filters.join(','), q, fSystem, fClass, fLocation, fStatus, fLocDet.join(','), fCode, fName, sortKey, sortDir]) // eslint-disable-line
+  useEffect(() => { setPage(0) }, [filters.join(','), q, fSystem, fClass, fLocation, fStatus, fLocDet.join(','), fCrit.join(','), fCode, fName, sortKey, sortDir]) // eslint-disable-line
 
   const toggleSort = (k) => {
     if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -490,6 +497,19 @@ function LiveDashboard({ go, initialLine = null }) {
                 )})}
               {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
             </div>
+            <div className="asset-filter crit-filter" role="group" aria-label="Criticality filter">
+              {[['A', 'Vital — 33 kV AIS, transformers, rectifiers, HSCB, MDB, DG, emergency DB'],
+                ['B', 'Important'], ['C', 'Tolerable']].map(([k, tip]) => {
+                const active = fCrit.includes(k)
+                return (
+                  <button key={k} type="button" aria-pressed={active} title={`Criticality ${k} · ${tip}`}
+                          className={`btn preset crit-chip cr-${k}${active ? ' active' : ''}`}
+                          onClick={() => setFCrit(active ? fCrit.filter((x) => x !== k) : [...fCrit, k])}>
+                    <span className="dot" />{k} {critN[k]}
+                  </button>
+                )
+              })}
+            </div>
             {/* Class · Location · System · Status filters now live in the table
                 column headers (▾). Only depot stays here — it has no column. */}
             {depotsList.length > 0 && !me?.depot && (
@@ -498,9 +518,9 @@ function LiveDashboard({ go, initialLine = null }) {
                 {depotsList.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
-            {(fSystem.length || fClass.length || fLocation.length || fStatus.length || fLocDet.length || fCode || fName || fDepot || q || filters.length || sortKey) && (
+            {(fSystem.length || fClass.length || fLocation.length || fStatus.length || fLocDet.length || fCrit.length || fCode || fName || fDepot || q || filters.length || sortKey) && (
               <button type="button" className="btn ghost sm" onClick={() => {
-                setFSystem([]); setFClass([]); setFLocation([]); setFStatus([]); setFLocDet([]); setFCode(''); setFName(''); setFDepot(''); setQ(''); setFilter([]); setSortKey(null)
+                setFSystem([]); setFClass([]); setFLocation([]); setFStatus([]); setFLocDet([]); setFCrit([]); setFCode(''); setFName(''); setFDepot(''); setQ(''); setFilter([]); setSortKey(null)
               }}>Clear</button>
             )}
             <span className="asset-count">{shown.length} shown</span>
@@ -535,7 +555,7 @@ function LiveDashboard({ go, initialLine = null }) {
           {/* a caption that appears only on the printout: what's being shown */}
           <div className="print-caption">
             AMPS · {effLine || 'All lines'} — {filters.length === 0 ? 'all assets' : filters.map((k) => FILTER_LABEL[k] || k).join(' + ')}
-            {fSystem.length ? ` · ${fSystem.join('/')}` : ''}{fClass.length ? ` · ${fClass.join('/')}` : ''}{fLocation.length ? ` · ${fLocation.join('/')}` : ''}{fStatus.length ? ` · ${fStatus.map((s) => STATUS_LABEL[s] || s).join('/')}` : ''}
+            {fSystem.length ? ` · ${fSystem.join('/')}` : ''}{fClass.length ? ` · ${fClass.join('/')}` : ''}{fLocation.length ? ` · ${fLocation.join('/')}` : ''}{fStatus.length ? ` · ${fStatus.map((s) => STATUS_LABEL[s] || s).join('/')}` : ''}{fCrit.length ? ` · Criticality ${fCrit.join('/')}` : ''}
             {q ? ` · “${q}”` : ''} · {shown.length} assets · {new Date().toISOString().slice(0, 10)}
           </div>
           {newOpen && canWrite && (

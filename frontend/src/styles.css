@@ -2282,3 +2282,14 @@ html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
 .cc-seg.seg-grace, .cc-dot.seg-grace, .h-seg.seg-grace, .lt-seg.seg-grace {
   background: repeating-linear-gradient(45deg, #7fb0b0 0 4px, #a9cccc 4px 8px); }
 .h-col.seg-grace .h-cn { color: #3d6b6b; }
+
+/* criticality quick chips on the register ribbon — same A/B/C hues as the PM-list chips */
+.crit-filter { gap: 4px; flex: 0 0 auto; }
+.crit-filter .crit-chip { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.crit-filter .crit-chip .dot { width: 7px; height: 7px; border-radius: 99px; display: inline-block; }
+.crit-filter .crit-chip.cr-A .dot { background: var(--critical); }
+.crit-filter .crit-chip.cr-B .dot { background: #d99a2b; }
+.crit-filter .crit-chip.cr-C .dot { background: #3f7fc4; }
+.crit-filter .crit-chip.cr-A.active { background: #fdf1f1; border-color: #f2c9c9; color: #a32e2e; }
+.crit-filter .crit-chip.cr-B.active { background: #fef6ec; border-color: #f6e0c2; color: #92600f; }
+.crit-filter .crit-chip.cr-C.active { background: #f0f6fd; border-color: #d3e3f6; color: #2b5c99; }

@@ -16,7 +16,7 @@ def _code(code: str) -> str:
     once, we decode the remaining layer here. Idempotent for ordinary codes."""
     return unquote(code)
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -161,7 +161,7 @@ def _get_or_create_location(db: Session, name: str, line: str | None = None) -> 
     return obj
 
 
-def visible_asset(db: Session, code: str, user) -> Asset:
+def visible_asset(db: Session, code: str, user, asset_id: int | None = None) -> Asset:
     """The asset with this code inside the user's scope — else 404. Codes repeat
     across lines, so a scoped user resolves to THEIR line's asset; an unscoped
     admin gets the first match (rare — admins rarely fetch by bare code).
@@ -169,7 +169,11 @@ def visible_asset(db: Session, code: str, user) -> Asset:
     Codes carry spaces/parens and some imported ones have stray leading/trailing
     or doubled whitespace or case drift, so an exact match can miss what the eye
     reads as the same code. Fall back to a whitespace-collapsed, case-insensitive
-    compare before giving up."""
+    compare before giving up.
+
+    `asset_id` pins the exact row when a code repeats across stations (an
+    unscoped admin would otherwise get the first match); it must still carry
+    this code and sit inside the caller's scope."""
     from sqlalchemy import func
 
     def _scoped(q):
@@ -180,6 +184,11 @@ def visible_asset(db: Session, code: str, user) -> Asset:
             q = q.where(Asset.depot == user.depot)
         return q
 
+    if asset_id is not None:
+        obj = db.scalars(_scoped(select(Asset).where(Asset.id == asset_id))).first()
+        if not obj or " ".join(obj.code.split()).lower() != " ".join(code.split()).lower():
+            raise HTTPException(404, "asset not found")
+        return obj
     obj = db.scalars(_scoped(select(Asset).where(Asset.code == code))).first()
     if not obj:
         # tolerant match: trim + case-insensitive (covers stray edge whitespace)
@@ -503,7 +512,7 @@ def _line_of(a: Asset) -> str | None:
 
 @router.patch("/{code}", response_model=AssetOut)
 def update_asset(code: str, patch: AssetUpdate, db: Session = Depends(get_db),
-                 user=Depends(current_writer)):
+                 user=Depends(current_writer), asset_id: int | None = Query(None, alias="id")):
     """Edit an asset's technical details, one attributable change at a time.
 
     Every field that actually changes is written to the audit trail as
@@ -512,7 +521,7 @@ def update_asset(code: str, patch: AssetUpdate, db: Session = Depends(get_db),
     an asset out of it. Append-only history survives a code change because the
     logbook links by id, not code — but printed QR tags carry the code, so a
     code change is flagged for reprinting."""
-    a = visible_asset(db, _code(code), user)  # 404s outside the caller's scope
+    a = visible_asset(db, _code(code), user, asset_id)  # 404s outside the caller's scope
     my_line = db.get(Location, user.line_id).name if user.line_id is not None else None
 
     changes: list[str] = []
