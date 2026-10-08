@@ -432,15 +432,6 @@ function LiveDashboard({ go, initialLine = null }) {
   if (error) return <div className="card offline-note">Backend unreachable — {error}. Check the server and reload.</div>
   return (
     <>
-      {!initialLine && lines.length > 1 && (
-        <div className="preset-bar" role="tablist" aria-label="Line">
-          {lines.map((l) => (
-            <button key={l} type="button" className={`btn preset ${effLine === l ? 'active' : ''}`} onClick={() => setLine(l)}>
-              <span className="dot" style={{ background: lineColor(l), display: 'inline-block', width: 8, height: 8, borderRadius: 99, marginRight: 6 }} />{l}
-            </button>
-          ))}
-        </div>
-      )}
       {assets.length === 0 ? (
         <>
         <div className="card"><p className="dim" style={{ margin: 0 }}>
@@ -496,8 +487,8 @@ function LiveDashboard({ go, initialLine = null }) {
                         onClick={toggle}>{lbl}</button>
                 )})}
               {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
-            </div>
-            <div className="asset-filter crit-filter" role="group" aria-label="Criticality filter">
+              {/* criticality A/B/C sit in the same ribbon, after the PM-state chips */}
+              <span className="crit-sep" aria-hidden="true" />
               {[['A', 'Vital — 33 kV AIS, transformers, rectifiers, HSCB, MDB, DG, emergency DB'],
                 ['B', 'Important'], ['C', 'Tolerable']].map(([k, tip]) => {
                 const active = fCrit.includes(k)
