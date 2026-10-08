@@ -3490,7 +3490,7 @@ function LineDashboard({ go, initialLine = null }) {
     return (
       <div className="h-meter" role="img" aria-label={aria}>
         {rowSegs.map(([k, label, n, cls], i) => (
-          <a key={k} className={`h-col ${cls}${n / sum < 0.05 ? ' sm' : ''}`} href={regHref} onClick={onClick}
+          <a key={k} className={`h-col ${cls}${n / sum < 0.05 ? ' sm' : n / sum < 0.1 ? ' nar' : ''}`} href={regHref} onClick={onClick}
              style={{ flex: `${n} 1 0`, '--i': i }} title={`${tip}${label}: ${n.toLocaleString()}`}>
             <span className={`h-seg cc-seg ${cls}`} />
             <span className="h-cn">{n.toLocaleString()}</span>
@@ -4517,7 +4517,9 @@ export default function App() {
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
               : <a href="#/" className={!navLine ? 'active' : ''}>Lines</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>Guide</a>
-            <a href="#/login" className="btn login-btn">Sign in</a>
+            <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
+              <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+              <span className="li-txt">Sign in</span></a>
           </nav>
         </header>
         {routePath === '/guide' ? <DocsView />

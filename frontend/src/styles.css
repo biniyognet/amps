@@ -1844,6 +1844,7 @@ tbody tr:hover .edit-link { color: var(--accent); }
   border: 1.5px solid color-mix(in srgb, var(--accent) 60%, #e8e2d5);
   border-radius: 10px; font-weight: 650;
 }
+.nav .login-btn .li-ico { display: none; }
 .nav .login-btn:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent); color: var(--accent); }
 .nav .who {
   display: inline-flex; align-items: center; gap: 8px; font-size: 0.9em;
@@ -2371,8 +2372,31 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .crit-card .h-col { min-width: 40px; }
 }
 @media screen and (max-width: 600px) {
-  .h-col, .crit-card .h-col { min-width: 0; }
+  .h-col, .crit-card .h-col { min-width: 24px; }    /* room for a 3-digit count */
+  .h-col.sm { min-width: 0; }
   .h-col.sm .h-cn { visibility: hidden; }          /* slivers: number on hover/tap only */
+  .h-col.nar .h-cl { visibility: hidden; }
+  .h-meter .h-cn, .crit-card .h-cn { font-size: 12px; }
   .h-meter { overflow: hidden; }
+  /* top nav: one row under the brand — line pill + Guide + Sign in, tightened;
+     scrolls sideways (no page overflow) if a signed-in menu is longer */
+  .topbar { flex-wrap: wrap; row-gap: 6px; }
+  .nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: 0; width: 100%; gap: 2px; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav > * { flex: none; }
+  .nav a, .ln-btn { padding: 4px 8px; font-size: 13px; }
+  .ln-btn.ln-back { padding: 4px 5px; }
+  .line-nav { margin-right: 2px; }
+  /* Sign in → a round icon in the brand row's free corner, so the nav row stays one line */
+  .nav .login-btn { position: absolute; top: 15px; right: 0; width: 34px; height: 34px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 99px; }
+  .nav .login-btn .li-ico { display: block; }
+  .nav .login-btn .li-txt { display: none; }
+  .topbar:has(.login-btn) .brand { padding-right: 44px; }
+  .dash-title { flex: 1 1 auto; min-width: 0; }
+}
+@media screen and (max-width: 360px) {
+  .nav a, .ln-btn { padding: 4px 6px; font-size: 12.5px; }
+  .ln-btn.ln-back { padding: 4px 3px; }
 }
 @media print { .ring-arc, .h-seg, .viz rect { animation: none !important; } }
