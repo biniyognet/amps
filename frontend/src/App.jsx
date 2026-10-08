@@ -1691,19 +1691,42 @@ function Planner() {
 
 /* ---------- failures & recovery: analysis dashboard ---------- */
 
-function TrendChart({ data, compact }) {
+/* Ring gauge — a % as an arc that sweeps in once on mount (CSS, so a re-render
+   such as the dashboard clock tick never replays it). `na` = too few assets in
+   cycle for a % to mean anything: a muted ring and a dash instead of a number. */
+function Ring({ pct, cls, size = 56, stroke = 6, na = false, label }) {
+  const r = (size - stroke) / 2, c = 2 * Math.PI * r
+  const off = na ? c : c * (1 - Math.max(0, Math.min(100, pct)) / 100)
+  return (
+    <span className={`ring ring-${na ? 'na' : cls}`} style={{ width: size, height: size }} title={label}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
+        <circle className="ring-track" cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} />
+        <circle className="ring-arc" cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke}
+                strokeDasharray={c} strokeDashoffset={off} style={{ '--c': c, '--off': off }}
+                transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <span className="ring-v">{na ? '—' : `${pct}%`}</span>
+    </span>
+  )
+}
+
+function TrendChart({ data, compact, fit }) {
   // compact (single-row analytics) uses a taller aspect so the bars fill the
-  // card instead of hugging the top; the wide 2-col demo keeps the short aspect.
-  const W = 560, H = compact ? 320 : 170, PAD = { t: 18, r: 8, b: 24, l: 8 }
+  // card instead of hugging the top; the wide 2-col demo keeps the short aspect;
+  // fit (dashboard card) is wide-and-short so the chart fills the card's width.
+  const W = 560, H = fit ? 250 : compact ? 320 : 170, PAD = { t: 18, r: 8, b: 24, l: 8 }
   const max = Math.max(...data.map((m) => m.count), 1)
   const iw = W - PAD.l - PAD.r
   const ih = H - PAD.t - PAD.b
-  const bw = Math.min(34, (iw / data.length) * 0.5)
+  const bw = Math.min(fit ? 46 : 34, (iw / data.length) * 0.5)
   const x = (i) => PAD.l + (iw / data.length) * (i + 0.5)
   const y = (v) => PAD.t + ih * (1 - v / max)
+  // ~4 round gridlines (one per unit drew 96 lines at a 96-failure month)
+  const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500].find((s) => max / s <= 4) || Math.ceil(max / 4)
+  const ticks = [...Array(Math.floor(max / step) + 1)].map((_, i) => i * step)
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="viz" role="img" aria-label="Failures per month">
-      {[...Array(max + 1)].map((_, g) => (
+      {ticks.map((g) => (
         <line key={g} x1={PAD.l} x2={W - PAD.r} y1={y(g)} y2={y(g)} className="viz-grid" />
       ))}
       {data.map((m, i) => (
@@ -3344,7 +3367,7 @@ function LineDashboard({ go, initialLine = null }) {
   useEffect(() => {
     const lq = initialLine ? `&line=${encodeURIComponent(initialLine)}` : ''
     getJSON(`/api/logbook/failure-stats?days=180&months=6${lq}`).then(setStats).catch(() => {})
-    getJSON(`/api/logbook?limit=6${lq}`).then(setRecent).catch(() => {})
+    getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
   }, [initialLine])
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
   // Dock the hood beneath the sticky topbar like the register's toolbar: measure
@@ -3454,10 +3477,37 @@ function LineDashboard({ go, initialLine = null }) {
       ['never', 'Awaiting 1st service', nv, 'seg-never'], ['long_overdue', '5-Yearly due', b.long_overdue, 'seg-long'],
       ['none', 'Unscheduled', b.none, 'seg-none'],
     ].filter(([, , n]) => n > 0)
-    return { k, label, n: list.length, pct, cls: pct >= 90 ? 'good' : pct >= 70 ? 'warn' : 'bad', segs: s }
+    // under 10 assets in cycle a % is noise (C: 1 in cycle → "0%") — show a dash
+    return { k, label, n: list.length, pct, ok, inC, od: lp, na: inC < 10,
+      cls: pct >= 90 ? 'good' : pct >= 70 ? 'warn' : 'bad', segs: s }
   }).filter((r) => r.n > 0)
   // a click opens the register already narrowed to that grade (its persisted chip)
   const openCrit = (k) => { try { localStorage.setItem('amps.filter.reg.crit', JSON.stringify([k])) } catch { /* private mode */ } }
+  // one stacked meter (headline + A/B/C rows share it). A segment under 5% of
+  // its bar drops its caption (the tooltip keeps it) so neighbours never collide.
+  const meter = (rowSegs, aria, tip = '', onClick) => {
+    const sum = rowSegs.reduce((n, sg) => n + sg[2], 0) || 1
+    return (
+      <div className="h-meter" role="img" aria-label={aria}>
+        {rowSegs.map(([k, label, n, cls], i) => (
+          <a key={k} className={`h-col ${cls}${n / sum < 0.05 ? ' sm' : ''}`} href={regHref} onClick={onClick}
+             style={{ flex: `${n} 1 0`, '--i': i }} title={`${tip}${label}: ${n.toLocaleString()}`}>
+            <span className={`h-seg cc-seg ${cls}`} />
+            <span className="h-cn">{n.toLocaleString()}</span>
+            <span className="h-cl">{label}</span>
+          </a>
+        ))}
+      </div>
+    )
+  }
+  // recent logbook, condensed: identical entries (same type + text) collapse
+  // into one row with ×N — six "YEARLY MAINTENANCE DONE" read as one line
+  const recentGroups = []
+  recent.forEach((e) => {
+    const key = `${e.type}|${tidyLog(e.text)}`
+    const g = recentGroups.find((x) => x.key === key)
+    if (g) { g.n += 1; g.codes.add(e.asset_code) } else recentGroups.push({ key, e, n: 1, codes: new Set([e.asset_code]) })
+  })
 
   const tile = (v, k, cls, to, sub) => (
     <a className={`bento-stat${cls ? ' ' + cls : ''}`} href={to} role="button">
@@ -3486,6 +3536,9 @@ function LineDashboard({ go, initialLine = null }) {
       ['Open failures', openF], ['Exceeded codal life', exceeded],
       ['PM compliance %', compliance],
       [],
+      ['Criticality', 'Assets', 'In cycle', 'Within schedule', 'Overdue', 'PM compliance %'],
+      ...critRows.map((r) => [`${r.k} · ${r.label}`, r.n, r.inC, r.ok, r.od, r.na ? 'n/a' : r.pct]),
+      [],
       ['Overdue breakup', 'Count'],
       ...SCHED_FREQS.filter((f) => bkByFreq[f]).map((f) => [f, bkByFreq[f]]),
       ...(bkNever ? [['Awaiting 1st service (separate)', bkNever]] : []),
@@ -3503,8 +3556,13 @@ function LineDashboard({ go, initialLine = null }) {
     <>
       <div className="card dash-hood">
       <div className="dash-toolbar">
-        <h1 className="dash-title">{line} · Maintenance Overview</h1>
-        <span className="dash-crumb">Preventive-maintenance compliance & asset health</span>
+        <h1 className="dash-title" title="Preventive-maintenance compliance & asset health">{line} · Maintenance Overview</h1>
+        <span className="dash-kpis">
+          <a className="dk" href={regHref} title="Assets in service (spares and decommissioned not counted)"><b>{total.toLocaleString()}</b> assets</a>
+          <span className="dk" title={`${depots} depot${depots === 1 ? '' : 's'}`}><b>{stations}</b> stations</span>
+          <a className={`dk${openF ? ' dk-bad' : ''}`} href={failHref} title="Failures open, acknowledged or on a job card"><b>{openF}</b> open failures</a>
+          {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
+        </span>
         <span className="dash-clock" role="timer" aria-label="Current date and time">
           <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
           <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
@@ -3529,45 +3587,35 @@ function LineDashboard({ go, initialLine = null }) {
           legend IS the breakdown — no duplicate KPI row). */}
       <section className="hstrip">
         <div className="h-compl">
-          <span className={`h-pct ${complClass}`}>{compliance}%</span>
+          <Ring pct={compliance} cls={complClass} size={60} stroke={7} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
             <span className="h-pk">PM compliance</span>
-            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule{bucket.grace > 0 && <> · <b>{bucket.grace.toLocaleString()}</b> records awaited</>}</span>
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule</span>
+            {bucket.grace > 0 && <span className="h-cap"><b>{bucket.grace.toLocaleString()}</b> records awaited · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>}
           </div>
         </div>
-        <div className="h-meter" role="img" aria-label="PM compliance breakdown">
-          {segs.map(([k, label, n, cls]) => (
-            <a key={k} className={`h-col ${cls}`} href={regHref} style={{ flex: `${n} 1 0` }} title={`${label}: ${n.toLocaleString()}`}>
-              <span className={`h-seg cc-seg ${cls}`} />
-              <span className="h-cn">{n.toLocaleString()}</span>
-              <span className="h-cl">{label}</span>
-            </a>
-          ))}
-        </div>
+        {meter(segs, 'PM compliance breakdown')}
       </section>
+      </div>
+
       {critRows.length > 0 && (
-        <section className="crit-strips" aria-label="PM status by criticality">
+        <section className="card crit-card" aria-label="PM status by criticality">
           {critRows.map((r) => (
-            <div key={r.k} className="cs-row">
-              <a className="cs-head" href={regHref} onClick={() => openCrit(r.k)} title={`Open the register filtered to criticality ${r.k}`}>
-                <span className={`cs-badge cr-${r.k}`}>{r.k}</span>
-                <span className="cs-txt"><span className="cs-lbl">{r.label}</span><span className="cs-n">{r.n.toLocaleString()} assets</span></span>
-                <span className={`cs-pct ${r.cls}`}>{r.pct}%</span>
+            <div key={r.k} className={`crs-row cr-${r.k}`}>
+              <a className="crs-head" href={regHref} onClick={() => openCrit(r.k)} title={`Open the register filtered to criticality ${r.k}`}>
+                <span className={`crs-badge cr-${r.k}`}>{r.k}</span>
+                <span className="crs-txt">
+                  <span className="crs-lbl">{r.label}</span>
+                  <span className="crs-n">{r.n.toLocaleString()} assets{r.od > 0 && <> · <b className="od">{r.od.toLocaleString()} overdue</b></>}</span>
+                </span>
+                <Ring pct={r.pct} cls={r.cls} size={40} stroke={4.5} na={r.na}
+                      label={r.na ? `Only ${r.inC} in cycle — too few for a %` : `${r.ok.toLocaleString()} of ${r.inC.toLocaleString()} within schedule`} />
               </a>
-              <div className="h-meter cs-meter" role="img" aria-label={`Criticality ${r.k} PM breakdown`}>
-                {r.segs.map(([k, label, n, cls]) => (
-                  <a key={k} className={`h-col ${cls}`} href={regHref} onClick={() => openCrit(r.k)} style={{ flex: `${n} 1 0` }} title={`${r.k} · ${label}: ${n.toLocaleString()}`}>
-                    <span className={`h-seg cc-seg ${cls}`} />
-                    <span className="h-cn">{n.toLocaleString()}</span>
-                    <span className="h-cl">{label}</span>
-                  </a>
-                ))}
-              </div>
+              {meter(r.segs, `Criticality ${r.k} PM breakdown`, `${r.k} · `, () => openCrit(r.k))}
             </div>
           ))}
         </section>
       )}
-      </div>
 
       <div className="dash-grid3">
       {/* overdue breakup by cycle */}
@@ -3641,10 +3689,12 @@ function LineDashboard({ go, initialLine = null }) {
         <h2 className="viz-h">Recent logbook <span className="viz-note">latest entries</span></h2>
         {recent.length === 0 ? <p className="dim">No entries yet.</p> : (
           <div className="dash-recent">
-            {recent.map((e) => (
-              <a key={e.id} className="dr-row" href={e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}>
+            {recentGroups.slice(0, 7).map(({ key, e, n, codes }) => (
+              <a key={key} className="dr-row" href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
+                 title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
                 <span className={`chip ${e.type === 'failure' ? 'd-overdue' : ''}`}><span className="dot" />{e.type}</span>
-                <span className="dr-txt">{tidyLog(e.text).slice(0, 72)}</span>
+                <span className="dr-txt">{tidyLog(e.text).slice(0, 72)}{n === 1 && e.asset_code && <span className="dr-code">{e.asset_code}</span>}</span>
+                {n > 1 && <span className="dr-x">×{n}</span>}
                 <span className="dim dt dr-date">{e.log_date}</span>
               </a>
             ))}
@@ -3656,7 +3706,7 @@ function LineDashboard({ go, initialLine = null }) {
       {/* failures per month — last card */}
       <section className="card viz-card">
         <h2 className="viz-h">Failures / month <span className="viz-note">last 6</span></h2>
-        {trend.length ? <TrendChart data={trend} compact /> : <p className="dim">No failure data.</p>}
+        {trend.length ? <TrendChart data={trend} fit /> : <p className="dim">No failure data.</p>}
         <p className="viz-insight"><a className="crumb" href={failHref}>Open the failures dashboard →</a></p>
       </section>
       </div>
