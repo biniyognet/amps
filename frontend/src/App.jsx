@@ -762,6 +762,56 @@ const tidyLog = (t = '') => t
   .replace(/\s*·\s*\[historical import[^\]]*\]/i, '')
   .trim()
 
+/* A failure / job-card line is "<headline> · key: value · JC ref · to agency".
+   Tables used to print it raw, so the fault showed 2–3× (fault_type, headline,
+   "fault: <same>"). Split it once: headline + the tail as small facts, dropping
+   whatever repeats the headline. Display only — stored text is untouched. */
+const normTxt = (s) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+function parseLog(t = '', ft = '') {
+  const segs = tidyLog(t).split(/\s*·\s+/)   // some rows glue the dot to the word: "attend· asset: X"
+  let head = segs.shift() || ''
+  const meta = []
+  for (const s of segs) {
+    const kv = s.match(/^([a-z][a-z /&]{0,20}):\s*(.*)$/i)
+    if (kv) meta.push([kv[1].toLowerCase(), kv[2]])
+    else if (/^JC\b/.test(s)) meta.push(['jc', s])
+    else if (/^to\s/i.test(s)) meta.push(['to', s.slice(3)])
+    else meta.push(['', s])
+  }
+  const h = normTxt(head), f = normTxt(ft)
+  // fault_type is often the headline cut at ~120 chars — show it only when it adds something
+  const showFt = f && !h.startsWith(f.slice(0, 40)) && !h.includes(f) ? ft : ''
+  if (!head && ft) head = ft
+  return { head, ft: showFt, meta: meta.filter(([k, v]) => !(k === 'fault' && (normTxt(v) === h || normTxt(v) === f))) }
+}
+function LogText({ text, ft, skip = /^(asset|equipment|to)$/ }) {
+  const { head, ft: showFt, meta } = parseLog(text, ft)
+  const m = meta.filter(([k]) => !skip.test(k))
+  return (
+    <>
+      <div className="lt-head" title={head}>{showFt && <b>{showFt}</b>}{showFt && head && ' — '}{head}</div>
+      {m.length > 0 && <div className="lt-meta">{m.map(([k, v], i) => (
+        <span key={i} className={k === 'jc' ? 'lt-jc' : ''}>{k && k !== 'jc' && <i>{k}</i>}{v}</span>))}</div>}
+    </>
+  )
+}
+/* hours → the unit a person reads: 6.5 h · 17 d · 1.9 y */
+const fmtHrs = (h) => (h == null ? '—' : h < 48 ? `${Math.round(h * 10) / 10} h`
+  : h < 24 * 365 ? `${Math.round(h / 24)} d` : `${(h / 8760).toFixed(1)} y`)
+const ageCls = (d) => (d >= 90 ? ' hot' : d >= 30 ? ' warm' : '')
+/* long registers render a page at a time — 1,000+ rows froze the tab */
+const ROW_PAGE = 100
+function MoreRows({ shown, total, setLimit }) {
+  if (shown >= total) return null
+  return (
+    <div className="more-rows">
+      <span className="dim">Showing {shown} of {total}</span>
+      <button type="button" className="btn ghost sm" onClick={() => setLimit((l) => l + ROW_PAGE)}>Show {Math.min(ROW_PAGE, total - shown)} more</button>
+      <button type="button" className="btn ghost sm" onClick={() => setLimit(Infinity)}>Show all</button>
+    </div>
+  )
+}
+
 /* One entry row, shared by both history sections. The asset class is constant
    for this asset (it's in the facts grid), so it's not repeated on every row. */
 /* uploaded checksheet scans / photos / PDFs on a log entry — thumbnails/links */
@@ -1885,6 +1935,8 @@ function LiveFailures({ line = '' }) {
   const [state, setState] = usePersistedState('fail.state', 'open')   // tab: 'open' | 'resolved'
   const [period, setPeriod] = usePersistedState('fail.period', 0)
   const [showViz, setShowViz] = usePersistedState('fail.showViz', true)  // analytics charts, collapsible
+  const [limit, setLimit] = useState(ROW_PAGE)
+  useEffect(() => setLimit(ROW_PAGE), [state, q, cls, period, line])
   const toolbarRef = useRef(null)
   useEffect(() => {
     const setVars = () => { const tb = document.querySelector('.topbar'); if (tb) document.documentElement.style.setProperty('--topbar-h', `${tb.offsetHeight}px`) }
@@ -1924,7 +1976,9 @@ function LiveFailures({ line = '' }) {
   // three tabs by lifecycle: open (nothing done) · acknowledged (noted, not
   // fixed) · resolved (rectified). The row's `state` comes from the API.
   const ql = q.trim().toLowerCase()
-  const match = (r) => (!cls || (r.category || 'Unclassified') === cls)
+  // the period select scopes the list too, not only the tiles above it
+  const since = days >= 36500 ? '' : new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+  const match = (r) => (!since || r.log_date >= since) && (!cls || (r.category || 'Unclassified') === cls)
     && (!ql || [r.asset_code, r.text, r.fault_type, r.attended_by, r.category].some((v) => (v || '').toLowerCase().includes(ql)))
   const openRows = rows.filter((r) => r.state === 'open' && match(r))
   const ackRows = rows.filter((r) => r.state === 'acknowledged' && match(r))
@@ -1932,6 +1986,11 @@ function LiveFailures({ line = '' }) {
   const resolvedRows = rows.filter((r) => r.state === 'resolved' && match(r))
   const shown = state === 'open' ? openRows : state === 'acknowledged' ? ackRows
     : state === 'job_card' ? jobRows : resolvedRows
+  const ageD = (d) => Math.max(0, Math.round((Date.now() - new Date(`${d}T00:00:00`)) / 86400000))
+  // a mean over a few multi-month outages reads as "1,730 h"; the median is what a typical failure costs
+  const timed = rows.filter((r) => r.down_hours != null && (!since || r.log_date >= since)).map((r) => r.down_hours).sort((a, b) => a - b)
+  const median = timed.length ? (timed[(timed.length - 1) >> 1] + timed[timed.length >> 1]) / 2 : null
+  const printAll = () => { setLimit(Infinity); setTimeout(() => window.print(), 300) }
 
   const exportCsv = () => {
     const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
@@ -1980,7 +2039,7 @@ function LiveFailures({ line = '' }) {
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
             </button>
-            <button type="button" className="icon-btn" title="Print" aria-label="Print" onClick={() => window.print()}>
+            <button type="button" className="icon-btn" title="Print" aria-label="Print" onClick={printAll}>
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
             </button>
@@ -1993,10 +2052,15 @@ function LiveFailures({ line = '' }) {
           <div className="k">Failures — {periodLabel.toLowerCase()}</div></div>
         <div className={stats.open ? 'tile alert' : 'tile'}><div className="v">{stats.open}</div>
           <div className="k">Open breakdowns</div></div>
-        <div className="tile"><div className="v">{stats.measured ? `${stats.downtime_hours} h` : '—'}</div>
+        <div className="tile" title={stats.measured ? `${stats.downtime_hours} h in total` : ''}><div className="v">{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</div>
           <div className="k">Downtime{stats.measured ? ` · ${stats.measured} timed` : ' — none timed'}</div></div>
-        <div className="tile"><div className="v">{stats.mttr_hours != null ? `${stats.mttr_hours} h` : '—'}</div>
-          <div className="k">{stats.mttr_hours != null ? `MTTR · ${stats.measured} of ${stats.closed}` : 'MTTR — needs clock times'}</div></div>
+        {median != null && !anon ? (
+          <div className="tile" title={`mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><div className="v">{fmtHrs(median)}</div>
+            <div className="k">Typical restore · median{stats.mttr_hours != null ? ` (mean ${fmtHrs(stats.mttr_hours)})` : ''}</div></div>
+        ) : (
+          <div className="tile"><div className="v">{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</div>
+            <div className="k">{stats.mttr_hours != null ? `MTTR · ${stats.measured} of ${stats.closed}` : 'MTTR — needs clock times'}</div></div>
+        )}
         <div className={stats.unlinked ? 'tile warn' : 'tile'}><div className="v">{stats.unlinked}</div>
           <div className="k">Unlinked records</div></div>
       </div>
@@ -2061,9 +2125,9 @@ function LiveFailures({ line = '' }) {
             <col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '12%' }} />
             <col />{canWrite && <col style={{ width: '9%' }} />}
           </colgroup>
-          <thead><tr><th>Asset</th><th>Class</th><th>Occurred</th><th>Restored</th><th>Down</th><th>State</th><th>Team</th><th>Fault → what happened</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
+          <thead><tr><th>Asset</th><th>Class</th><th>Occurred</th><th>Restored</th><th>{state === 'resolved' ? 'Down' : 'Down / age'}</th><th>State</th><th>Team</th><th>Fault → what happened</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
           <tbody>
-            {shown.map((f) => (
+            {shown.slice(0, limit).map((f) => (
               <tr key={f.id} tabIndex={0}
                   onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
                   onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
@@ -2077,14 +2141,16 @@ function LiveFailures({ line = '' }) {
                       ? f.ended_at.slice(0, 10)
                       : f.ended_at.slice(0, 16).replace('T', ' '))
                   : '—'}</td>
-                <td className="dt" data-l="Down">{f.down_hours != null ? `${f.down_hours} h` : '—'}</td>
+                <td className="dt" data-l="Down">{f.down_hours != null
+                  ? <span title={`${f.down_hours} h`}>{fmtHrs(f.down_hours)}</span>
+                  : !f.ended_at && f.state !== 'resolved'
+                    ? <span className={`jc-age${ageCls(ageD(f.log_date))}`} title={`open for ${ageD(f.log_date)} days`}>{ageD(f.log_date)}d</span>
+                    : '—'}</td>
                 <td data-l="State">{!f.asset_code
                   ? <span className="chip"><span className="dot" />Unlinked</span>
                   : <span className={`chip ${FAIL_STATE_CHIP[f.state] || 'd-overdue'}`}><span className="dot" />{FAIL_STATE_LABEL[f.state] || 'open'}</span>}</td>
                 <td className="dim" data-l="Team">{f.attended_by || f.entered_by || '—'}</td>
-                <td className="wrap-cell" data-l="Fault">
-                  {f.fault_type && <b>{f.fault_type} </b>}{f.text}
-                </td>
+                <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} /></td>
                 {canWrite && (
                   <td className="td-edit" data-l="Edit">
                     <EditLink id={f.id} date={f.log_date}
@@ -2096,6 +2162,7 @@ function LiveFailures({ line = '' }) {
           </tbody>
         </table>
         {shown.length === 0 && <p className="dim" style={{ padding: '1rem' }}>Nothing matches this filter.</p>}
+        <MoreRows shown={Math.min(limit, shown.length)} total={shown.length} setLimit={setLimit} />
       </div>
       </>
       )}
@@ -3732,6 +3799,26 @@ function exportJobCards(cards) {
   a.click(); URL.revokeObjectURL(a.href)
 }
 
+/* scan / closure proof behind one compact toggle — an always-open uploader on
+   every row made the board ~1,200 rows × 200px tall */
+function JcScan({ jc, rb, canWrite }) {
+  const [open, setOpen] = useState(false)
+  const n = (jc.attachments?.length || 0) + (rb?.attachments?.length || 0)
+  if (!canWrite && !n) return null
+  return (
+    <div className="jc-scan" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className={`jc-clip${n ? ' has' : ''}`} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        📎 {n ? `${n} scan${n > 1 ? 's' : ''}` : 'Add scan'}</button>
+      {open && (canWrite
+        ? <AttachmentUpload entryId={jc.id} existing={jc.attachments || []} label="Job card scan — photo or PDF" />
+        : <AttachmentView items={jc.attachments} />)}
+      {open && rb?.attachments?.length > 0 && (
+        <div className="jc-scan-close"><span className="fg-lbl">Closure proof</span><AttachmentView items={rb.attachments} /></div>
+      )}
+    </div>
+  )
+}
+
 function JobCardsView({ line = '' }) {
   const { me, canWrite } = useMe()
   const [rows, setRows] = useState(null)
@@ -3743,6 +3830,8 @@ function JobCardsView({ line = '' }) {
   const [jcAdd, setJcAdd] = useState(null)     // null | 'single' | 'bulk'
   const [sort, setSort] = useState('recent')   // newest raised first — a just-raised card lands on top
   const [assets, setAssets] = useState([])
+  const [limit, setLimit] = useState(ROW_PAGE)
+  useEffect(() => setLimit(ROW_PAGE), [tab, q, fAgency, sort, line])
   const load = () => {
     const lq = line ? `&line=${encodeURIComponent(line)}` : ''
     getJSON(`/api/logbook?entry_type=failure&limit=5000${lq}`)
@@ -3784,7 +3873,12 @@ function JobCardsView({ line = '' }) {
   const doneCards = [...closed, ...penalty]
   const avgTurn = doneCards.length ? Math.round(doneCards.reduce((s, c) => s + c.age, 0) / doneCards.length) : null
   const line_ = me?.line || ''
-  const STL = { open: ['jc-open', 'Open'], closed: ['jc-closed', 'Closed by agency'], penalty: ['jc-penalty', 'Penalty — we fixed it'] }
+  const STL = { open: ['jc-open', 'Open'], closed: ['jc-closed', 'Closed'], penalty: ['jc-penalty', 'Penalty'] }
+  const STT = { open: 'Open — awaiting close-out', closed: 'Closed by agency', penalty: 'Penalty — we fixed it (agency default)' }
+  // open-card ageing buckets, the chase list at a glance
+  const BUCKETS = [['≤ 14 d', 0, 14, ''], ['15–30 d', 15, 30, ''], ['31–90 d', 31, 90, ' warm'], ['> 90 d', 91, Infinity, ' hot']]
+  const issuer = (v) => (v && v !== 'unknown' && !v.endsWith('-import') && v !== '' ? v : '')
+  const printAll = () => { setLimit(Infinity); setTimeout(() => window.print(), 300) }
   return (
     <>
       <div className="page-head"><h1>Job cards {line_ && <span className="dim">· {line_}</span>}</h1></div>
@@ -3809,7 +3903,7 @@ function JobCardsView({ line = '' }) {
         <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort job cards" title="Sort">
           {Object.entries(SORTS).map(([k, [lbl]]) => <option key={k} value={k}>{lbl}</option>)}
         </select>
-        {(q || fAgency.length) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]) }}>Clear</button>}
+        {(q || fAgency.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]) }}>Clear</button>}
         <span className="asset-count">{shown.length} shown</span>
         <div className="asset-actions">
           {canWrite && (
@@ -3828,11 +3922,20 @@ function JobCardsView({ line = '' }) {
                   onClick={() => exportJobCards(shown)}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
           </button>
-          <button type="button" className="icon-btn" title="Print these job cards" aria-label="Print job cards" onClick={() => window.print()}>
+          <button type="button" className="icon-btn" title="Print these job cards" aria-label="Print job cards" onClick={printAll}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
           </button>
         </div>
       </div>
+
+      {open.length > 0 && (tab === 'open' || tab === 'all') && (
+        <div className="jc-buckets" aria-label="Open job cards by age">
+          <span className="dim">Open by age</span>
+          {BUCKETS.map(([lbl, lo, hi, cls]) => (
+            <span key={lbl} className={`jc-age${cls}`}>{lbl} · {open.filter((c) => c.age >= lo && c.age <= hi).length}</span>
+          ))}
+        </div>
+      )}
 
       {canWrite && jcAdd && (
         <JobCardEntry assets={assets} systems={systems} defaultDate={new Date().toISOString().slice(0, 10)}
@@ -3847,61 +3950,59 @@ function JobCardsView({ line = '' }) {
             {/* percentage widths so all columns fit the card at any width (no
                 1024px min-width / h-scroll); Detail flexes into the remainder */}
             <colgroup>
-              <col style={{ width: '4%' }} /><col style={{ width: '7%' }} />
-              <col style={{ width: '11%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '13%' }} />
-              <col style={{ width: '8%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} />
-              <col style={{ width: '7%' }} /><col />{canWrite && <col style={{ width: '8%' }} />}
+              <col style={{ width: '5%' }} /><col style={{ width: '6%' }} />
+              <col style={{ width: '10%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col />
+              <col style={{ width: '9%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
+              {canWrite && <col style={{ width: '9%' }} />}
             </colgroup>
-            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Turnaround'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
-              <th>Issued by</th>
+            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
               <th className={fAgency.length ? 'th-filtered' : ''}>Issued to
                 <ColFilter open={openCol === 'ag'} onToggle={() => setOpenCol(openCol === 'ag' ? null : 'ag')}
                            onClose={() => setOpenCol(null)} values={fAgency}
                            toggle={(v) => setFAgency((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
                            clear={() => setFAgency([])} opts={agencies} allLabel="All agencies" />
               </th>
-              <th>Raised</th><th>Closed</th><th>Job card detail</th>{canWrite && <th aria-label="Action"></th>}</tr></thead>
+              <th>Raised</th><th>Job card</th>{canWrite && <th aria-label="Action"></th>}</tr></thead>
             <tbody>
-              {shown.map(({ f, jc, rb, status, age }) => (
+              {shown.slice(0, limit).map(({ f, jc, rb, status, age }) => {
+                const fp = parseLog(f.text, f.fault_type), jp = parseLog(jc.text)
+                const ref = (jp.meta.find(([k]) => k === 'jc') || fp.meta.find(([k]) => k === 'jc'))?.[1]
+                // the card text is normally the failure text again — show it only when it says something new
+                const jcNew = jp.head && normTxt(jp.head) !== normTxt(fp.head) ? jp.head : ''
+                const by = issuer(jc.entered_by)
+                return (
                 <tr key={f.id} tabIndex={0}
                     onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
                     onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
-                  <td data-l="Age"><span className={`jc-age${status === 'open' && age >= 30 ? ' hot' : status === 'open' && age >= 14 ? ' warm' : ''}`}>{age}d</span></td>
-                  <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`}>{STL[status][1]}</span></td>
+                  <td data-l={status === 'open' ? 'Pending' : 'Turnaround'}><span className={`jc-age${status === 'open' ? ageCls(age) : ''}`}
+                      title={status === 'open' ? `open for ${age} days` : `closed in ${age} days`}>{age}d</span></td>
+                  <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`} title={STT[status]}>{STL[status][1]}</span></td>
                   <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                  <td className="dim" data-l="Station">{f.station || jc.station || '—'}</td>
+                  <td className="dim nobreak" data-l="Station">{f.station || jc.station || '—'}</td>
                   <td className="dim" data-l="Location">{f.category || '—'}</td>
-                  <td className="wrap-cell" data-l="Fault">{f.fault_type ? <b>{f.fault_type}</b> : tidyLog(f.text)}</td>
-                  <td className="dim" data-l="Issued by">{jc.entered_by && jc.entered_by !== 'unknown' && !jc.entered_by.endsWith('-import') ? jc.entered_by : '—'}</td>
-                  <td className="dim" data-l="Issued to">{jc.attended_by || '—'}</td>
-                  <td className="dim dt" data-l="Raised">{jc.log_date}</td>
-                  <td className="dim dt" data-l="Closed">{rb ? rb.log_date : '—'}</td>
-                  <td className="wrap-cell" data-l="Detail">
-                    {tidyLog(jc.text)}
-                    <div className="jc-scan" onClick={(e) => e.stopPropagation()}>
-                      {canWrite
-                        ? <AttachmentUpload entryId={jc.id} existing={jc.attachments || []} label="Job card scan — photo or PDF" />
-                        : <AttachmentView items={jc.attachments} />}
-                    </div>
-                    {rb && (rb.attachments?.length > 0) && (
-                      <div className="jc-scan jc-scan-close" onClick={(e) => e.stopPropagation()}>
-                        <span className="fg-lbl">Closure proof</span>
-                        <AttachmentView items={rb.attachments} />
-                      </div>
-                    )}
+                  <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></td>
+                  <td className="dim" data-l="Issued to">{jc.attended_by || '—'}
+                    {by && by !== jc.attended_by && <div className="lt-sub">by {by}</div>}</td>
+                  <td className="dim dt" data-l="Raised → closed">{jc.log_date}<div className="lt-sub">{rb ? `→ ${rb.log_date}` : '→ open'}</div></td>
+                  <td className="wrap-cell" data-l="Job card">
+                    {ref ? <span className="lt-jc">{ref}</span> : <span className="dim">—</span>}
+                    {jcNew && <div className="lt-head lt-sub" title={jcNew}>{jcNew}</div>}
+                    <JcScan jc={jc} rb={rb} canWrite={canWrite} />
                   </td>
                   {canWrite && (
                     <td className="td-edit" data-l="Action" onClick={(e) => e.stopPropagation()}>
                       {status === 'open'
-                        ? <><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`}>✓ Rectify / close</a>
+                        ? <><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`} title="Rectify / close this job card">✓ Close</a>
                             <a className="mini-btn muted" href={`#/log?d=${jc.log_date}&edit=${jc.id}`}>Edit</a></>
                         : <EditLink id={jc.id} date={jc.log_date} label="Edit / open" />}
                     </td>
                   )}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
+          <MoreRows shown={Math.min(limit, shown.length)} total={shown.length} setLimit={setLimit} />
         </div>
       )}
     </>
