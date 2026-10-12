@@ -2419,3 +2419,11 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .more-rows { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; padding: 12px; border-top: 1px solid var(--border); font-size: 13px; }
 @media print { .more-rows, .jc-clip { display: none; } .lt-head { -webkit-line-clamp: unset; display: block; } }
 .jc-table td.td-edit .fa-rect { margin: 0 4px 4px 0; }
+
+/* logbook ribbon wraps instead of clipping the search/actions off the edge */
+.log-ribbon { flex-wrap: wrap; overflow-x: visible; row-gap: 8px; }
+.log-tools { flex: 1 1 560px; flex-wrap: wrap; row-gap: 6px; }
+.log-tools .asset-search { flex: 1 1 180px; min-width: 160px; max-width: 320px; }
+.log-shift.empty .log-shift-h .on { color: var(--accent); }
+.log-entry { padding: 8px 16px; }
+.log-entry .lt-meta { margin-top: 3px; }

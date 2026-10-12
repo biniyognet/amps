@@ -261,6 +261,40 @@ const fmtTime = (ts) =>
 const hhmm = (iso) => (iso && iso.slice(11, 16) !== '00:00' ? iso.slice(11, 16) : '')
 /* drop the leading "[TYPE]" tag from the body — the type is already a chip */
 const bodyText = (t) => (t || '').replace(/^\[[^\]]*\]\s*/, '')
+/* split "headline · key: value · …" into the headline + small tags, dropping
+   the parts the row already shows (category/system chip, action line, asset
+   link) and the "[historical import …]" note */
+const lnorm = (x) => (x || '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+const logParts = (en) => {
+  const [head, ...rest] = bodyText(en.text).split(/\s*·\s+/)
+  const seen = new Set([en.category, en.system, en.action_taken, en.asset_code, head].map(lnorm))
+  const meta = []
+  for (const part of rest) {
+    if (/^\[historical import/i.test(part)) continue
+    const m = part.match(/^([a-z][a-z _-]{0,20}):\s*(.+)$/i)
+    const [k, v] = m ? [m[1].trim().toLowerCase(), m[2].trim()] : /^JC\b/.test(part) ? ['jc', part] : ['', part]
+    if (seen.has(lnorm(v)) || (k === 'asset' && en.asset_code)) continue
+    seen.add(lnorm(v))
+    meta.push([k === 'jc' ? 'jc' : k, v])
+  }
+  return { head, meta }
+}
+const fmtHrs = (h) => h == null ? '' : h < 48 ? `${+(+h).toFixed(1)} h` : h < 8760 ? `${Math.round(h / 24)} d` : `${(h / 8760).toFixed(1)} y`
+const LogBody = ({ en }) => {
+  const { head, meta } = logParts(en)
+  return (
+    <>
+      <div className="log-text">{head}</div>
+      {meta.length > 0 && (
+        <div className="lt-meta">
+          {meta.map(([k, v], i) => k === 'jc'
+            ? <span key={i} className="lt-jc">{v}</span>
+            : <span key={i}>{k && <i>{k}</i>}{v}</span>)}
+        </div>
+      )}
+    </>
+  )
+}
 
 const PencilIcon = () => (
   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none"
@@ -1800,13 +1834,24 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             {/* All four shifts always appear, so an empty shift reads as
                 "nothing was logged" rather than as missing data. Empty ones
                 collapse to one line; the shift being written to is marked. */}
-            {ENTRY_SHIFTS.map((sh) => {
+            {ENTRY_SHIFTS.reduce((segs, sh) => {
               const rows = list.filter((en) => en.shift === sh)
-              const isSel = sh === shift
+              const last = segs[segs.length - 1]
+              if (!rows.length && last && !last.rows.length) last.shs.push(sh)
+              else segs.push({ shs: [sh], rows })
+              return segs
+            }, []).map(({ shs, rows }) => {
+              const sh = shs[0]
+              const isSel = shs.includes(shift)
               if (!rows.length) {
+                // consecutive quiet shifts share one line: "M · E · N — no entries"
                 return (
-                  <div key={sh} className={`log-shift empty${isSel ? ' sel' : ''}`}>
-                    <span className="log-shift-h">{sh} — {SHIFT_LABEL[sh]}</span>
+                  <div key={sh} className={`log-shift empty${isSel ? ' sel' : ''}`}
+                       title={shs.map((x) => `${x} — ${SHIFT_LABEL[x]}`).join('\n')}>
+                    <span className="log-shift-h">
+                      {shs.length === 1 ? `${sh} — ${SHIFT_LABEL[sh]}`
+                        : shs.map((x, i) => <span key={x} className={x === shift ? 'on' : ''}>{i ? ' · ' : ''}{x}</span>)}
+                    </span>
                     <span className="dim">no entries</span>
                   </div>
                 )
@@ -1834,7 +1879,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                               ? <a className="code" href={`#/asset/${encodeURIComponent(en.asset_code)}`}>{en.asset_code}</a>
                               : en.type === 'failure' && <span className="chip d-overdue"><span className="dot" />unlinked</span>}
                             {en.type === 'failure' && (en.ended_at
-                              ? <span className="chip w-done"><span className="dot" />resolved{en.down_hours != null ? ` · ${en.down_hours}h` : ''}</span>
+                              ? <span className="chip w-done"><span className="dot" />resolved{en.down_hours != null ? ` · ${fmtHrs(en.down_hours)}` : ''}</span>
                               : <span className="chip d-overdue"><span className="dot" />open</span>)}
                             {en.rectifies_id && <span className="dim le-ref">rectifies #{en.rectifies_id}</span>}
                             {en.corrects_id && (
@@ -1843,7 +1888,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                                       title="Show edit history"><HistoryIcon /> edited</button>
                             )}
                           </div>
-                          <div className="log-text">{bodyText(en.text)}</div>
+                          <LogBody en={en} />
                           {en.action_taken && <div className="le-action"><span className="lc-tag">Action taken</span> {en.action_taken}</div>}
                           {en.station && !en.asset_code && <div className="le-station"><span className="lc-tag">Station</span> {en.station}</div>}
                           {en.consumables && <div className="le-consumables"><span className="lc-tag">Consumed</span> {en.consumables}</div>}
