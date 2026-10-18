@@ -4599,7 +4599,7 @@ export default function App() {
   const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
-         src={`${import.meta.env.BASE_URL}landing-art.svg`} />
+         src={`${import.meta.env.BASE_URL}landing-art.webp`} />
   )
 
   // Anonymous surface = landing (line squares + sign-in), a chosen line
