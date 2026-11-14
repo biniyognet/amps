@@ -8,15 +8,21 @@ A read-mostly register imported from each line's coordination sheet: one row
 per letter/email, with the scanned document link, an OCR/summary, and the
 asset(s) it concerns. Reads are line-scoped like the logbook; the bulk import
 is writer-only and idempotent on (line, SL) so re-imports update in place.
+
+The scanned document stays in Drive (its link is the record); the letter viewer
+reads a local copy, pulled from Drive on first open and kept on the media
+volume (letters/<drive id>), so a letter opens in AMPS without a Google login.
 """
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.auth import current_writer, optional_user
+from app import gdrive
+from app.api.auth import current_user, current_writer, optional_user
 from app.db import audit, get_db
 from app.models import Correspondence, Location, LocationKind
 
@@ -147,3 +153,59 @@ def import_correspondence(body: ImportIn, db: Session = Depends(get_db),
     total = db.scalar(select(func.count()).select_from(Correspondence)
                       .where(Correspondence.line_id == site.id))
     return {"created": created, "updated": updated, "total": total}
+
+
+# ---- the document: local copy of the Drive scan, for the letter viewer ----
+
+def _letter(db: Session, cid: int, user) -> Correspondence:
+    c = db.get(Correspondence, cid)
+    if not c or (user.line_id is not None and c.line_id != user.line_id):
+        raise HTTPException(404, "no such letter")
+    return c
+
+
+def _doc(c: Correspondence) -> tuple[str | None, dict | None]:
+    fid = gdrive.link_id(c.link) if c.link and "/folders/" not in c.link else None
+    return (f"letters/{fid}", {"drive": fid}) if fid else (None, None)
+
+
+def _kind(path) -> str:
+    head = open(path, "rb").read(8)
+    return ("application/pdf" if head.startswith(b"%PDF") else "image/jpeg" if head.startswith(b"\xff\xd8")
+            else "image/png" if head.startswith(b"\x89PNG") else "application/octet-stream")
+
+
+@router.get("/{cid}")
+def one_letter(cid: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    """One letter for the viewer, with whether its document is here or can be pulled."""
+    c = _letter(db, cid, user)
+    line = db.get(Location, c.line_id).name if c.line_id else None
+    rel, src = _doc(c)
+    out = _out(c, line).model_dump()
+    out["on_server"] = bool(rel) and (gdrive.MEDIA / rel).is_file()
+    out["fetchable"] = bool(rel) and gdrive.can_pull(rel, src)
+    return out
+
+
+@router.post("/{cid}/fetch")
+def fetch_letter(cid: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    """Bring the scan onto the server from Drive (the viewer polls this before opening)."""
+    rel, src = _doc(_letter(db, cid, user))
+    if not rel:
+        return {"state": "unknown", "error": "no Drive file linked"}
+    st = gdrive.pull(rel, wait=20, src=src)
+    if st["state"] == "failed" and "404" in st.get("error", ""):
+        st["error"] = "the Drive file is not shared with the AMPS reader account"
+    return st
+
+
+@router.get("/{cid}/file")
+def letter_file(cid: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    rel, src = _doc(_letter(db, cid, user))
+    st = gdrive.pull(rel, wait=50, src=src) if rel else {"state": "unknown"}
+    if st["state"] == "fetching":
+        raise HTTPException(503, "fetching from Drive, try again shortly")
+    if st["state"] != "ready":
+        raise HTTPException(404, "document not on the server")
+    f = gdrive.MEDIA / rel
+    return FileResponse(f, media_type=_kind(f), headers={"Cache-Control": "private, max-age=86400"})

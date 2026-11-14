@@ -1176,6 +1176,12 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [bulkOpen, setBulkOpen] = useState(false)          // spreadsheet-style bulk entry grid
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
+  const filtRef = useRef(null)   // the Filters menu (a <details>) — closes on an outside click
+  useEffect(() => {
+    const off = (e) => { const el = filtRef.current; if (el?.open && !el.contains(e.target)) el.open = false }
+    document.addEventListener('mousedown', off)
+    return () => document.removeEventListener('mousedown', off)
+  }, [])
   const [apiOk, setApiOk] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -1556,6 +1562,14 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           </select>
           <input className="asset-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)}
                  placeholder="Search the log — text, asset, crew, fault…" aria-label="Search the log" />
+          <details className="log-filters" ref={filtRef}>
+            <summary className={`btn ghost sm${[fDepot, fType, fSystem, fLocation].some(Boolean) ? ' on' : ''}`}
+                     title="Filter by depot, type, system, station">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="M2.5 4h11M4.5 8h7M6.5 12h3" /></svg>
+              Filters{[fDepot, fType, fSystem, fLocation].filter(Boolean).length ? ` · ${[fDepot, fType, fSystem, fLocation].filter(Boolean).length}` : ''}
+            </summary>
+            <div className="lf-pop">
           {depots.length > 0 && !me?.depot && (
             <select value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
               <option value="">All depots</option>
@@ -1574,6 +1588,8 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             <option value="">All stations</option>
             {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
+            </div>
+          </details>
           {(search || fType || fSystem || fLocation || !allDates) && (
             <button type="button" className="btn ghost sm" onClick={() => {
               setSearch(''); setFType(''); setFSystem(''); setFLocation(''); setAllDates(true)

@@ -324,3 +324,37 @@ def reset_password(user_id: int, body: PasswordReset,
     audit(db, "user", u.id, "password_reset", actor=admin.username)
     db.commit()
     return {"ok": True, "username": u.username}
+
+
+class DirectoryOut(BaseModel):
+    full_name: str
+    role: str
+    line: str | None
+    depot: str | None
+    username: str | None = None   # admins only
+    last_login: str | None = None  # admins only — UTC ISO, from the audit trail
+
+
+@router.get("/directory", response_model=list[DirectoryOut])
+def directory(user=Depends(current_user), db: Session = Depends(get_db)):
+    """The Guide's 'users & access' list — any signed-in login. Login ids are
+    shown to admins only; nothing secret is ever returned."""
+    if is_anonymous(user):
+        raise HTTPException(401, "login required")
+    admin = user.role == UserRole.ADMIN
+    order = {UserRole.ADMIN: 0, UserRole.INCHARGE: 1, UserRole.SUPERVISOR: 2,
+             UserRole.TECHNICIAN: 3, UserRole.VIEWER: 4}
+    users = [u for u in db.scalars(select(User)).all() if u.password_hash is not None]
+    users.sort(key=lambda u: (u.line.name if u.line else "", order.get(u.role, 9), u.full_name))
+    last = {}
+    if admin:
+        from sqlalchemy import func
+        from app.models import AuditLog
+        last = dict(db.execute(select(AuditLog.entity_id, func.max(AuditLog.at))
+                               .where(AuditLog.entity == "user", AuditLog.action == "login")
+                               .group_by(AuditLog.entity_id)).all())
+    return [DirectoryOut(full_name=u.full_name, role=u.role.value,
+                         line=u.line.name if u.line else None, depot=u.depot,
+                         username=u.username if admin else None,
+                         last_login=last[u.id].isoformat() + "Z" if u.id in last else None)
+            for u in users]

@@ -34,6 +34,8 @@ class AssetScheduleSummary(BaseModel):
     grace_count: int = 0          # lapsed ≤30d on a Monthly+ cycle — records awaited
     last_done: date | None = None   # most recent maintenance across all cycles
     cycles: dict[str, str] = {}     # per-cycle state, e.g. {Monthly: overdue, Yearly: ok}
+    cycle_due: dict[str, date | None] = {}    # per-cycle next due date (the overdue date when lapsed)
+    cycle_last: dict[str, date | None] = {}   # per-cycle last done
 
 
 @router.get("/schedule", response_model=list[AssetScheduleSummary])
@@ -85,8 +87,11 @@ def schedule_all(db: Session = Depends(get_db), user=Depends(optional_user)):
         if s:
             last_done = max((r["last_done"] for r in sched_rows if r["last_done"]), default=None)
             cycles = {r["frequency"]: r["state"] for r in sched_rows}   # per-cycle state matrix
+            cycle_due = {r["frequency"]: r["next_due"] for r in sched_rows}
+            cycle_last = {r["frequency"]: r["last_done"] for r in sched_rows}
             out.append(AssetScheduleSummary(asset_code=code_by[aid], line=line_by.get(aid),
-                                            last_done=last_done, cycles=cycles, **s))
+                                            last_done=last_done, cycles=cycles,
+                                            cycle_due=cycle_due, cycle_last=cycle_last, **s))
     scope = scope_location_ids(db, user)
     if scope is not None:
         codes = {a.code for a in db.scalars(

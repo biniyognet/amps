@@ -1,0 +1,21 @@
+# Office-local overrides (not in git): Metro production settings
+services:
+  db:
+    restart: unless-stopped
+  backend:
+    restart: unless-stopped
+    environment:
+      AMPS_AUTH: "1"
+      AMPS_SECRET: "883b2d11bec0f00da78375d1853fd8d93402c668dc0a6d65e5a1728cb370005d"
+      AMPS_ADMIN_PASSWORD: "Admin@123"
+      AMPS_GDRIVE_SA: /app/secrets/gdrive-sa.json   # read-only Drive pull of missing media (app/gdrive.py)
+    volumes:
+      - /home/ps-digital/.config/amps/gdrive-sa.json:/app/secrets/gdrive-sa.json:ro
+  frontend:
+    restart: unless-stopped
+    build:
+      args:
+        AMPS_DATA: live
+        AMPS_ORG: Metro Railway Kolkata
+    ports:
+      - "80:80"

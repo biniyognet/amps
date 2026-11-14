@@ -24,6 +24,10 @@ import QR, { assetUrl } from './qr.jsx'
 import DutyRoster from './roster.jsx'
 import LogBook, { AttachmentUpload, JobCardEntry } from './logbook.jsx'
 import { CHECKSHEET_FORMATS } from './checksheets.js'
+import { TendersView, ReaderView } from './tenders.jsx'
+import { DrawingsView, DrawingViewer, AssetDrawings } from './drawings.jsx'
+import { GuideView } from './guide.jsx'
+import { LettersView, LetterViewer } from './letters.jsx'
 
 const STATUS_LABEL = {
   in_service: 'In service',
@@ -468,39 +472,51 @@ function LiveDashboard({ go, initialLine = null }) {
           <div className="asset-toolbar" ref={toolbarRef}>
             <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                    placeholder="Search code, asset, class or location…" aria-label="Search assets" />
-            <div className="asset-filter" role="tablist" aria-label="PM state filter">
-              {[['all', `All ${base.length}`], ['faulty', `Faulty ${faulty.length}`],
-                ['overdue', `Overdue ${overdue.length}`],
-                ['never', <>Awaiting 1st service <span className="cnt-never">{neverDone.length}</span></>],
-                ['grace', `Records awaited ${grace.length}`],
-                ['due_soon', `Due soon ${dueSoon.length}`], ['long_overdue', `5-Yearly ${longOverdue.length}`],
-                ['not_scheduled', `Unscheduled ${notScheduled.length}`]]
-                .filter(([k]) => (k !== 'faulty' || faulty.length) && (k !== 'grace' || grace.length) && (k !== 'long_overdue' || longOverdue.length) && (k !== 'not_scheduled' || notScheduled.length) && (k !== 'never' || neverDone.length))
-                .map(([k, lbl]) => {
-                  const active = k === 'all' ? filters.length === 0 : filters.includes(k)
-                  const toggle = () => k === 'all' ? setFilter([])
-                    : setFilter(filters.includes(k) ? filters.filter((x) => x !== k) : [...filters, k])
-                  return (
-                <button key={k} type="button" aria-pressed={active}
-                        className={`btn preset ${k === 'never' ? 'preset-never ' : ''}${active ? 'active' : ''}${(k === 'overdue' && overdue.length) || (k === 'faulty' && faulty.length) ? ' has-od' : ''}`}
-                        title={FILTER_TIP(k, { base: base.length, faulty: faulty.length, overdue: overdue.length, never: neverDone.length, grace: grace.length, dueSoon: dueSoon.length, longOverdue: longOverdue.length, notScheduled: notScheduled.length })}
-                        onClick={toggle}>{lbl}</button>
-                )})}
-              {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
-              {/* criticality A/B/C sit in the same ribbon, after the PM-state chips */}
-              <span className="crit-sep" aria-hidden="true" />
-              {[['A', 'Vital — 33 kV AIS, 11 kV switchgear, transformers, rectifiers, HSCB, MDB, DG, emergency DB'],
-                ['B', 'Important'], ['C', 'Tolerable']].map(([k, tip]) => {
-                const active = fCrit.includes(k)
-                return (
-                  <button key={k} type="button" aria-pressed={active} title={`Criticality ${k} · ${tip}`}
-                          className={`btn preset crit-chip cr-${k}${active ? ' active' : ''}`}
-                          onClick={() => setFCrit(active ? fCrit.filter((x) => x !== k) : [...fCrit, k])}>
-                    <span className="dot" />{k} {critN[k]}
+            {/* 2nd header row = the dashboard's PM bar on this view: a segment click filters (multi-select), All clears */}
+            {(() => {
+              const okN = base.filter((a) => stateOf(a) === 'ok').length
+              const segs = [['ok', 'On schedule', okN, 'seg-ok'], ['due_soon', 'Due soon', dueSoon.length, 'seg-due'],
+                ['grace', 'Records awaited', grace.length, 'seg-grace'], ['overdue', 'Overdue', overdue.length, 'seg-od'],
+                ['never', 'Awaiting 1st service', neverDone.length, 'seg-never'], ['long_overdue', '5-Yearly', longOverdue.length, 'seg-long'],
+                ['not_scheduled', 'Unscheduled', notScheduled.length, 'seg-none']].filter(([, , n]) => n > 0)
+              const sum = segs.reduce((n, sg) => n + sg[2], 0) || 1
+              const tipC = { base: base.length, faulty: faulty.length, overdue: overdue.length, never: neverDone.length, grace: grace.length, dueSoon: dueSoon.length, longOverdue: longOverdue.length, notScheduled: notScheduled.length }
+              const tog = (k) => setFilter(filters.includes(k) ? filters.filter((x) => x !== k) : [...filters, k])
+              return (
+                <div className={`asset-kpis hstrip${filters.length ? ' has-pick' : ''}`} role="group" aria-label="PM state filter">
+                  <button type="button" className={`rk-stat${filters.length ? '' : ' on'}`} aria-pressed={!filters.length}
+                          title={FILTER_TIP('all', tipC)} onClick={() => setFilter([])}>
+                    <span className="v">{base.length.toLocaleString()}</span><span className="k">All assets</span>
                   </button>
-                )
-              })}
-            </div>
+                  {faulty.length > 0 && (
+                    <button type="button" className={`rk-stat bad${filters.includes('faulty') ? ' on' : ''}`} aria-pressed={filters.includes('faulty')}
+                            title={FILTER_TIP('faulty', tipC)} onClick={() => tog('faulty')}>
+                      <span className="v">{faulty.length.toLocaleString()}</span><span className="k">Faulty</span>
+                    </button>
+                  )}
+                  <div className="h-meter">
+                    {segs.map(([k, label, n, cls], i) => (
+                      <button key={k} type="button" aria-pressed={filters.includes(k)} onClick={() => tog(k)}
+                              className={`h-col ${cls}${n / sum < 0.05 ? ' sm' : n / sum < 0.1 ? ' nar' : ''}${filters.includes(k) ? ' on' : ''}`}
+                              style={{ flex: `${n} 1 0`, '--i': i }} title={`${label}: ${n.toLocaleString()} · click to filter`}>
+                        <span className={`h-seg cc-seg ${cls}`} />
+                        <span className="h-cn">{n.toLocaleString()}</span>
+                        <span className="h-cl">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {schedLoading && <span className="pm-loading" title="PM schedule still loading — state counts fill in shortly"><span className="pm-spin" />PM data…</span>}
+                </div>
+              )
+            })()}
+            <select className="crit-select" value={fCrit.length === 1 ? fCrit[0] : ''} aria-label="Filter by criticality"
+                    title="Criticality · A Vital · B Important · C Tolerable"
+                    onChange={(e) => setFCrit(e.target.value ? [e.target.value] : [])}>
+              <option value="">All criticality</option>
+              {[['A', 'Vital'], ['B', 'Important'], ['C', 'Tolerable']].map(([k, t]) => (
+                <option key={k} value={k}>{`${k} · ${t} (${critN[k].toLocaleString()})`}</option>
+              ))}
+            </select>
             {/* Class · Location · System · Status filters now live in the table
                 column headers (▾). Only depot stays here — it has no column. */}
             {depotsList.length > 0 && !me?.depot && (
@@ -645,7 +661,7 @@ function LiveDashboard({ go, initialLine = null }) {
                           {codalExceeded(a) && <span className="codal-dot" title={`Past its ${a.codalLifeYears}-year codal life`} />}</td>
                         <td className="dim dt" data-l="Last PM">{s?.last_done || '—'}</td>
                         <td data-l="PM cycles">{s && s.cycles && Object.keys(s.cycles).length
-                          ? <PmMatrix cycles={s.cycles} />
+                          ? <PmMatrix cycles={s.cycles} due={s.cycle_due} last={s.cycle_last} />
                           : <span className="dim">—</span>}</td>
                       </tr>
                     )
@@ -1129,10 +1145,17 @@ function ColFilter({ open, onToggle, onClose, values, toggle, clear, opts, fmt, 
 const CYC_ABBR = [['Monthly', 'M'], ['Quarterly', 'Q'], ['Half-Yearly', 'HY'], ['Yearly', 'Y'], ['5-Yearly', '5Y']]
 const cycStateClass = (st) => st === 'overdue' ? 'pmc-od' : st === 'never' ? 'pmc-never'
   : st === 'grace' ? 'pmc-grace' : st === 'due_soon' ? 'pmc-due' : st === 'ok' ? 'pmc-ok' : st === 'long_overdue' ? 'pmc-long' : 'pmc-none'
-const PmMatrix = ({ cycles = {} }) => (
+// hover = the cycle's state + its due date (the overdue-since date when lapsed) + last done
+const pmcDate = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null
+const pmcTip = (f, st, due, last) => {
+  const days = due ? Math.round((new Date(`${due}T00:00:00`) - new Date(new Date().toDateString())) / 864e5) : null
+  const when = !due ? '' : days < 0 ? ` · overdue since ${pmcDate(due)} (${-days} d)` : days === 0 ? ` · due today` : ` · due ${pmcDate(due)} (in ${days} d)`
+  return `${f}: ${SCHED_LABEL[st] || st}${when}${last ? ` · last done ${pmcDate(last)}` : st === 'never' ? ' · never done' : ''}`
+}
+const PmMatrix = ({ cycles = {}, due = {}, last = {} }) => (
   <span className="pm-matrix">
     {CYC_ABBR.filter(([f]) => f in cycles).map(([f, ab]) => (
-      <span key={f} className={`pmc ${cycStateClass(cycles[f])}`} title={`${f}: ${SCHED_LABEL[cycles[f]] || cycles[f]}`}>{ab}</span>
+      <span key={f} className={`pmc ${cycStateClass(cycles[f])}`} title={pmcTip(f, cycles[f], due?.[f], last?.[f])}>{ab}</span>
     ))}
   </span>
 )
@@ -1442,7 +1465,21 @@ function LiveAssetDetail({ code }) {
   const lastServiced = maint.length ? maint[0].log_date : null
   return (
     <>
-      <BackCrumb fallback="#/assets" />
+      <div className="asset-toolbar pg-dock no-print" style={{ '--line-c': accent }}>
+        <BackCrumb fallback="#/assets" />
+        <span className="pd-code">{a.code}</span>
+        <b className="pd-name" title={a.name}>{a.name}</b>
+        <span className="dash-crumb pd-loc"><span className="ln-dot" style={{ background: accent }} />{a.line ? `${a.line} · ` : ''}{a.location}</span>
+        <span className={`status-pill s-${a.status}`}><span className="dot" />{STATUS_LABEL[a.status]}</span>
+        <span className={`crit-badge c-${a.criticality}`} title="Criticality">Criticality {a.criticality}</span>
+        <span className="pd-sp" />
+        <div className="asset-actions">
+          <button type="button" className="icon-btn" title="Print this record" aria-label="Print asset record" onClick={() => window.print()}>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
+          </button>
+        </div>
+      </div>
       <div className="asset-passport" style={{ '--line-c': accent }}>
         {/* hero: the asset's identity, health and QR in one glance — the face
             of the QR-scan page a visitor or manager lands on */}
@@ -1505,6 +1542,8 @@ function LiveAssetDetail({ code }) {
         </div>
 
         <div className="card"><MaintenanceSchedule schedule={schedule} /></div>
+
+        <AssetDrawings code={a.code} location={a.location} />
 
         {editing && (
           <div className="card">
@@ -2537,7 +2576,10 @@ function Checksheet({ kind, a1, a2 }) {
 function AboutPage() {
   return (
     <div className="about">
-      <a className="crumb" href="#/">← Back</a>
+      <div className="asset-toolbar pg-dock no-print">
+        <BackCrumb fallback="#/" />
+        <h1 className="dash-title">About AMPS</h1>
+      </div>
       <div className="about-hero">
         <h1>AMPS</h1>
         <p className="about-tag">Asset Maintenance &amp; Preventive Scheduling</p>
@@ -2638,6 +2680,22 @@ function Printables({ initial = 'qr', fmtId = '' }) {
   return tab === 'qr' ? <TagSheet /> : <ChecksheetFormats initialId={fmtId} />
 }
 
+/* the shared title row of the printables — same page-head as Letters / Job cards,
+   with a QR ⇄ Checksheets switch (and any page actions) docked on the right */
+function PrintHead({ tab, title, children }) {
+  return (
+    <div className="page-head no-print">
+      <h1>{title}</h1>
+      <div className="asset-filter ph-actions" role="tablist" aria-label="Printables">
+        {children}
+        {children && <span className="crit-sep" aria-hidden="true" />}
+        <a className={`btn preset ${tab === 'qr' ? 'active' : ''}`} href="#/printables?t=qr">QR tags</a>
+        <a className={`btn preset ${tab === 'checksheets' ? 'active' : ''}`} href="#/printables?t=checksheets">Checksheets</a>
+      </div>
+    </div>
+  )
+}
+
 /* the Printables nav item: a dropdown submenu instead of a page-level tab bar */
 function PrintablesNav({ active }) {
   const [open, setOpen] = useState(false)
@@ -2658,6 +2716,12 @@ function PrintablesNav({ active }) {
         <div className="showcase-menu" role="menu">
           <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
             <span className="sc-name">Letters</span><span className="sc-sub">official correspondence — letters, emails & MOM on record</span>
+          </a>
+          <a className="sc-item" role="menuitem" href="#/tenders" onClick={() => setOpen(false)}>
+            <span className="sc-name">Tenders</span><span className="sc-sub">contract volumes, clause index & issue intel</span>
+          </a>
+          <a className="sc-item" role="menuitem" href="#/drawings" onClick={() => setOpen(false)}>
+            <span className="sc-name">Drawings</span><span className="sc-sub">drawing register — tender & as-built</span>
           </a>
           <a className="sc-item" role="menuitem" href="#/printables?t=qr" onClick={() => go('qr')}>
             <span className="sc-name">QR asset tags</span><span className="sc-sub">printable QR labels for every asset</span>
@@ -2706,14 +2770,14 @@ function ChecksheetFormats({ initialId = '' }) {
 
   return (
     <div>
-      {canWrite && (
-        <div className="asset-filter no-print" role="tablist" aria-label="Checksheet mode" style={{ marginBottom: 12 }}>
-          <button type="button" className={`btn preset ${mode === 'print' ? 'active' : ''}`} onClick={() => setMode('print')}>Print blanks</button>
-          <button type="button" className={`btn preset ${mode === 'manage' ? 'active' : ''}`} onClick={() => setMode('manage')}>
+      <PrintHead tab="checksheets" title="Checksheets">
+        {canWrite && <>
+          <button type="button" className={`btn preset ${mode === 'print' ? 'active' : ''}`} onClick={() => { setEditing(null); setMode('print') }}>Print blanks</button>
+          <button type="button" className={`btn preset${mode === 'manage' ? ' active' : ''}${pending ? ' has-od' : ''}`} onClick={() => { setEditing(null); setMode('manage') }}>
             Manage formats{pending ? ` · ${pending} pending` : ''}
           </button>
-        </div>
-      )}
+        </>}
+      </PrintHead>
       {err && <div className="card offline-note no-print">{err}</div>}
       {editing ? (
         <ChecksheetEditor initial={editing} formats={formats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} setErr={setErr} />
@@ -2733,30 +2797,31 @@ function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, childr
   const cycles = [...new Set(formats.flatMap((f) => f.slots?.length ? [f.frequency || 'Log sheet'] : f.frequencies || []))]
     .sort((a, b) => cycleRank(a) - cycleRank(b))
   return (
-    <div className="cs-filters no-print">
-      <div className="asset-toolbar">
-        <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-               placeholder="Search — format, equipment, activity…" aria-label="Search checksheet formats" />
-        {cycles.length > 1 && (
-          <select value={cyc} onChange={(e) => setCyc(e.target.value)} aria-label="Filter by cycle">
-            <option value="">All cycles</option>
-            {cycles.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        )}
-        {(q || sys || cyc) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSys(''); setCyc('') }}>Clear</button>}
-        <span className="asset-count">{shown} of {formats.length}</span>
-        {children}
-      </div>
+    <div className="asset-toolbar cs-toolbar cs-filters no-print">
+      <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
+             placeholder="Search — format, equipment, activity…" aria-label="Search checksheet formats" />
       {systems.length > 1 && (
-        <div className="asset-filter cs-sys-chips" role="tablist" aria-label="Filter by system">
-          <button type="button" className={`btn preset ${!sys ? 'active' : ''}`} onClick={() => setSys('')}>All systems</button>
+        <div className={`asset-kpis hstrip${sys ? ' has-pick' : ''}`} role="group" aria-label="Filter by system">
+          <button type="button" className={`rk-stat${!sys ? ' on' : ''}`} aria-pressed={!sys} onClick={() => setSys('')}>
+            <span className="v">{formats.length}</span><span className="k">All</span>
+          </button>
           {systems.map(([s, n]) => (
-            <button key={s} type="button" className={`btn preset ${sys === s ? 'active' : ''}`} onClick={() => setSys(sys === s ? '' : s)}>
-              {s} <span className="cs-chip-n">{n}</span>
+            <button key={s} type="button" className={`rk-stat${sys === s ? ' on' : ''}`} aria-pressed={sys === s} title={s}
+                    onClick={() => setSys(sys === s ? '' : s)}>
+              <span className="v">{n}</span><span className="k">{s}</span>
             </button>
           ))}
         </div>
       )}
+      {cycles.length > 1 && (
+        <select value={cyc} onChange={(e) => setCyc(e.target.value)} aria-label="Filter by cycle">
+          <option value="">All cycles</option>
+          {cycles.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      )}
+      {(q || sys || cyc) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSys(''); setCyc('') }}>Clear</button>}
+      <span className="asset-count">{shown} of {formats.length}</span>
+      {children}
     </div>
   )
 }
@@ -3144,14 +3209,14 @@ function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr }) {
     .filter((f) => !fStatus || f.status === fStatus)
     .filter((f) => csMatches(f, { q, sys, cyc }))
     .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || csSystem(a).localeCompare(csSystem(b)) || a.label.localeCompare(b.label))
-  const STAT_TABS = [['', `All ${formats.length}`], ['pending', `Pending ${counts.pending || 0}`], ['draft', `Draft ${counts.draft || 0}`], ['published', `Published ${counts.published || 0}`]]
+  const STAT_TABS = [['', 'All', formats.length], ['pending', 'Pending', counts.pending || 0], ['draft', 'Draft', counts.draft || 0], ['published', 'Published', counts.published || 0]]
   return (
     <div>
       <CsFilterBar formats={formats} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={rows.length}>
-        <div className="asset-filter" role="tablist" aria-label="Status filter">
-          {STAT_TABS.filter(([k]) => k !== 'pending' || counts.pending).map(([k, lbl]) => (
-            <button key={k} type="button" className={`btn preset ${fStatus === k ? 'active' : ''}${k === 'pending' && counts.pending ? ' has-od' : ''}`}
-                    onClick={() => setFStatus(k)}>{lbl}</button>
+        <div className="asset-kpis hstrip cs-stat" role="group" aria-label="Status filter">
+          {STAT_TABS.filter(([k]) => k !== 'pending' || counts.pending).map(([k, lbl, v]) => (
+            <button key={k} type="button" className={`rk-stat${fStatus === k ? ' on' : ''}${k === 'pending' && counts.pending ? ' bad' : ''}`}
+                    aria-pressed={fStatus === k} onClick={() => setFStatus(k)}><span className="v">{v}</span><span className="k">{lbl}</span></button>
           ))}
         </div>
         <div className="asset-actions">
@@ -3365,6 +3430,7 @@ function TagSheet() {
   if (all.length === 0) return <div className="card"><p className="dim" style={{ margin: 0 }}>No assets in the register yet — tags appear as assets are added.</p></div>
   return (
     <>
+      <PrintHead tab="qr" title="QR asset tags" />
       <div className="asset-toolbar" ref={toolbarRef}>
         <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="Search code, asset, class or location…" aria-label="Search assets" />
@@ -3385,7 +3451,7 @@ function TagSheet() {
           {statuses.map((s) => <option key={s} value={s}>{STATUS_LABEL[s] || s}</option>)}
         </select>
         {(q || fSystem || fClass || fLocation || fStatus) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFSystem(''); setFClass(''); setFLocation(''); setFStatus('') }}>Clear</button>}
-        <span className="asset-count">{shown.length} tag{shown.length === 1 ? '' : 's'}</span>
+        <span className="asset-count" title="One tag per asset — scanning opens the asset's live record. Filter to the set you need, then print.">{shown.length} tag{shown.length === 1 ? '' : 's'}</span>
         <div className="asset-actions">
           <button type="button" className="icon-btn" title="Print these tags" aria-label="Print tags" onClick={() => window.print()}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -3393,10 +3459,8 @@ function TagSheet() {
           </button>
         </div>
       </div>
-      <p className="dim tags-note no-print" style={{ margin: '0 0 12px' }}>
-        {shown.length} tag{shown.length === 1 ? '' : 's'}{fSystem ? ` · ${fSystem}` : ''} — filter to the set you need, then print. One tag per asset; scanning opens the asset's live record.
-        {shown.length > TAG_CAP && <> <b>Showing the first {TAG_CAP}</b> — refine the filter to reach the rest.</>}
-      </p>
+      {shown.length > TAG_CAP && <p className="dim tags-note no-print" style={{ margin: '0 0 12px' }}>
+        <b>Showing the first {TAG_CAP}</b> of {shown.length} — refine the filter to reach the rest.</p>}
       {shown.length === 0
         ? <div className="card"><p className="dim" style={{ margin: 0 }}>No assets match — adjust the filters.</p></div>
         : (
@@ -3418,6 +3482,46 @@ function TagSheet() {
 
 /* ---------- home dashboard (signed-in landing) ---------- */
 
+// Sheet-sync card: last pull time + per-line imported / held counts. Signed-in
+// viewers also get the held rows themselves (source · date · code · why) so a
+// line's coordinator can fix their own sheet; anonymous viewers see counts only.
+function SyncCard({ sync }) {
+  const lines = Object.entries(sync.lines || {})
+  const at = new Date(sync.at)
+  const ago = Math.max(0, Math.round((Date.now() - at.getTime()) / 3600000))
+  const held = lines.flatMap(([ln, s]) => (s.held || []).map((h) => ({ ln, ...h })))
+  const canSee = lines.some(([, s]) => Array.isArray(s.held))
+  const CAP = 30
+  return (
+    <section className="card viz-card sync-card">
+      <h2 className="viz-h">Sheet sync <span className="viz-note">last pulled {at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} · {ago < 1 ? 'just now' : ago < 48 ? `${ago} h ago` : `${Math.round(ago / 24)} d ago`}</span></h2>
+      <div className="sync-lines">
+        {lines.map(([ln, s]) => (
+          <span key={ln} className={`sync-ln ${s.held_count ? 'warn' : 'ok'}`}>
+            <b>{ln}</b> {s.imported.toLocaleString()} imported{s.pending ? ` · ${s.pending.toLocaleString()} waiting` : ''} · {s.held_count ? `${s.held_count} held` : 'nothing held'}{s.errors ? ` · ${s.errors} source error${s.errors > 1 ? 's' : ''}` : ''}
+          </span>
+        ))}
+      </div>
+      {canSee && held.length > 0 && (
+        <div className="sync-held">
+          {held.slice(0, CAP).map((h, i) => (
+            <div className="sync-row" key={i} title={h.detail || ''}>
+              <span className="sync-src">{h.ln} · {h.source}</span>
+              <span className="dim dt">{h.date || '—'}</span>
+              <span className="sync-code">{h.code || '—'}</span>
+              <span className="sync-why">{h.why}</span>
+            </div>
+          ))}
+          {held.length > CAP && <p className="dim">+{held.length - CAP} more</p>}
+        </div>
+      )}
+      <p className="viz-insight dim">{held.length || lines.some(([, s]) => s.held_count)
+        ? 'Held rows were not imported. Fix them in your sheet (the “AMPS Sync · HOLD” tab lists them); the next pull picks them up.'
+        : 'Every sheet row came in on the last pull.'}</p>
+    </section>
+  )
+}
+
 function LineDashboard({ go, initialLine = null }) {
   const { assets: allAssets, sched, openFail, loading, schedLoading } = useLiveAssets()
   // initialLine scopes the whole overview to one line — used for the public,
@@ -3431,10 +3535,12 @@ function LineDashboard({ go, initialLine = null }) {
   const [bkSys, setBkSys] = useState('')   // Overdue-breakup card: system filter ('' = all)
   const [bkStn, setBkStn] = useState('')   // Overdue-breakup card: station filter ('' = all)
   const [now, setNow] = useState(() => new Date())   // live clock in the toolbar
+  const [sync, setSync] = useState(null)   // last sheet pull: per-line imported / held rows
   useEffect(() => {
     const lq = initialLine ? `&line=${encodeURIComponent(initialLine)}` : ''
     getJSON(`/api/logbook/failure-stats?days=180&months=6${lq}`).then(setStats).catch(() => {})
     getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
+    getJSON(`/api/sync/status${initialLine ? `?line=${encodeURIComponent(initialLine)}` : ''}`).then(setSync).catch(() => setSync(null))
   }, [initialLine])
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
   // Dock the hood beneath the sticky topbar like the register's toolbar: measure
@@ -3548,16 +3654,22 @@ function LineDashboard({ go, initialLine = null }) {
     return { k, label, n: list.length, pct, ok, inC, od: lp, na: inC < 10,
       cls: pct >= 90 ? 'good' : pct >= 70 ? 'warn' : 'bad', segs: s }
   }).filter((r) => r.n > 0)
-  // a click opens the register already narrowed to that grade (its persisted chip)
-  const openCrit = (k) => { try { localStorage.setItem('amps.filter.reg.crit', JSON.stringify([k])) } catch { /* private mode */ } }
+  // a click opens the register on exactly that slice: PM state (+ grade for an A/B/C row);
+  // its other persisted column filters reset so the register count matches the dashboard
+  const openReg = (k, crit) => { try {
+    const put = (n, v) => localStorage.setItem(`amps.filter.reg.${n}`, JSON.stringify(v))
+    put('state', k ? [k === 'none' ? 'not_scheduled' : k] : []); put('crit', crit ? [crit] : [])
+    ;['system', 'class', 'location', 'status', 'locdet'].forEach((n) => put(n, [])); put('code', ''); put('name', '')
+  } catch { /* private mode */ } }
+  const openCrit = (k) => openReg(null, k)
   // one stacked meter (headline + A/B/C rows share it). A segment under 5% of
   // its bar drops its caption (the tooltip keeps it) so neighbours never collide.
-  const meter = (rowSegs, aria, tip = '', onClick) => {
+  const meter = (rowSegs, aria, tip = '', crit = null) => {
     const sum = rowSegs.reduce((n, sg) => n + sg[2], 0) || 1
     return (
       <div className="h-meter" role="img" aria-label={aria}>
         {rowSegs.map(([k, label, n, cls], i) => (
-          <a key={k} className={`h-col ${cls}${n / sum < 0.05 ? ' sm' : n / sum < 0.1 ? ' nar' : ''}`} href={regHref} onClick={onClick}
+          <a key={k} className={`h-col ${cls}${n / sum < 0.05 ? ' sm' : n / sum < 0.1 ? ' nar' : ''}`} href={regHref} onClick={() => openReg(k, crit)}
              style={{ flex: `${n} 1 0`, '--i': i }} title={`${tip}${label}: ${n.toLocaleString()}`}>
             <span className={`h-seg cc-seg ${cls}`} />
             <span className="h-cn">{n.toLocaleString()}</span>
@@ -3678,7 +3790,7 @@ function LineDashboard({ go, initialLine = null }) {
                 <Ring pct={r.pct} cls={r.cls} size={40} stroke={4.5} na={r.na}
                       label={r.na ? `Only ${r.inC} in cycle — too few for a %` : `${r.ok.toLocaleString()} of ${r.inC.toLocaleString()} within schedule`} />
               </a>
-              {meter(r.segs, `Criticality ${r.k} PM breakdown`, `${r.k} · `, () => openCrit(r.k))}
+              {meter(r.segs, `Criticality ${r.k} PM breakdown`, `${r.k} · `, r.k)}
             </div>
           ))}
         </section>
@@ -3776,6 +3888,9 @@ function LineDashboard({ go, initialLine = null }) {
         {trend.length ? <TrendChart data={trend} fit /> : <p className="dim">No failure data.</p>}
         <p className="viz-insight"><a className="crumb" href={failHref}>Open the failures dashboard →</a></p>
       </section>
+
+      {/* sheet sync — when the coordination sheets were last pulled, and which rows were held */}
+      {sync && <SyncCard sync={sync} />}
       </div>
     </>
   )
@@ -4150,6 +4265,12 @@ function DocsView() {
           won't import, it is almost always a blank <span className="docs-k">asset_class</span> or
           <span className="docs-k">location</span> — fill it and tell the desk, and it will be picked up the same day.</p>
       </section>
+
+      <section className="card docs-sec">
+        <h2>5 · Tenders &amp; contract reader</h2>
+        <p>Contract volumes, issues and the clauses behind them — editing is for Green Line logins, every other line reads.
+          {' '}<a href="#/tenders?guide">Read the short tenders guide →</a></p>
+      </section>
     </div>
   )
 }
@@ -4375,7 +4496,15 @@ function Landing() {
                       </span>
                     )}
                   </div>
-                  <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations</span>
+                  <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations
+                    {(() => {
+                      // freshness: days since the line's latest logbook entry (amber > 7 d, red > 30 d)
+                      if (!l.last_entry) return <span className="lt-fresh bad">no entries yet</span>
+                      const d = Math.max(0, Math.round((Date.now() - new Date(l.last_entry + 'T00:00:00').getTime()) / 86400000))
+                      return <span className={`lt-fresh ${d > 30 ? 'bad' : d > 7 ? 'warn' : 'ok'}`} title={`last logbook entry ${l.last_entry}`}>
+                        last entry {d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} d ago`}</span>
+                    })()}
+                  </span>
                   {ready && segTot > 1 && (
                     <span className="lt-bar" aria-hidden="true">
                       {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'grace' ? 'grace' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
@@ -4566,6 +4695,33 @@ export default function App() {
     const ro = new ResizeObserver(set); ro.observe(tb)
     return () => ro.disconnect()
   }, [route])
+  // …and the page's docked row (toolbar / logbook ribbon / dashboard hood) into
+  // --toolbar-h, so every table header parks right under it. The row mounts
+  // after its data loads, so a debounced MutationObserver re-finds it.
+  useEffect(() => {
+    // The topbar is re-measured here too: on a cold load it mounts after the
+    // per-route measurer above has already run, which left --topbar-h unset.
+    let el = null, bar = null, ro = null, raf = 0
+    const root = document.documentElement.style
+    const put = () => {
+      if (bar) root.setProperty('--topbar-h', `${bar.offsetHeight}px`)
+      root.setProperty('--toolbar-h', `${el && getComputedStyle(el).position === 'sticky' ? el.offsetHeight : 0}px`)
+    }
+    const sync = () => {
+      raf = 0
+      const t = document.querySelector('.asset-toolbar, .log-ribbon, .dash-hood')
+      const b = document.querySelector('.topbar')
+      if (t !== el || b !== bar) {
+        ro?.disconnect(); ro = null; el = t; bar = b
+        if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(put); if (t) ro.observe(t); if (b) ro.observe(b) }
+      }
+      put()
+    }
+    const mo = new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(sync) })
+    mo.observe(document.body, { childList: true, subtree: true })
+    sync()
+    return () => { mo.disconnect(); ro?.disconnect(); if (raf) cancelAnimationFrame(raf) }
+  }, [])
   const go = (r) => { location.hash = r }
   const authOn = LIVE && me?.auth_enabled
   const signedIn = authOn && me.username !== 'viewer'
@@ -4623,7 +4779,7 @@ export default function App() {
               <span className="li-txt">Sign in</span></a>
           </nav>
         </header>
-        {routePath === '/guide' ? <DocsView />
+        {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
           : lineAssetsMatch ? <LineAssets name={safeDecode(lineAssetsMatch[1])} />
@@ -4647,6 +4803,8 @@ export default function App() {
                      active={lineAssetsMatch ? 'assets' : lineFailMatch ? 'failures' : 'dash'} />
           )}
           {NAV.map(([path, label]) => {
+            // the line cluster above already carries Dashboard / Assets / Failures
+            if ((lineMatch || lineAssetsMatch || lineFailMatch) && navLine && ['/', '/assets', '/failures'].includes(path)) return null
             // Failures is per-line now: send a coordinator to their own line's
             // board, an admin to the line in view (or the redirect picker).
             if (LIVE && path === '/failures') {
@@ -4654,7 +4812,7 @@ export default function App() {
               const href = fl ? `#/line/${encodeURIComponent(fl)}/failures` : '#/failures'
               return <a key={path} href={href} className={lineFailMatch ? 'active' : ''}>{label}</a>
             }
-            if (path === '/printables') return <PrintablesNav key={path} active={routePath === '/printables' || routePath === '/letters'} />
+            if (path === '/printables') return <PrintablesNav key={path} active={['/printables', '/letters', '/letters/view', '/tenders', '/tenders/read', '/drawings', '/drawings/view'].includes(routePath)} />
             return <a key={path} href={`#${path}`} className={routePath === path ? 'active' : ''}>{label}</a>
           })}
           {!LIVE && <ShowcaseDropdown />}
@@ -4682,12 +4840,17 @@ export default function App() {
         /* legacy top-level /failures now redirects to the signed-in line's board */
         : routePath === '/failures' ? (LIVE ? <FailuresRedirect me={me} go={go} /> : <Failures />)
         : routePath === '/job-cards' ? (LIVE ? <JobCardsView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
-        : routePath === '/letters' ? (LIVE ? <CorrespondenceView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
+        : routePath === '/letters/view' ? (LIVE ? <LetterViewer id={routeQuery.get('id')} /> : <NotYet />)
+        : routePath === '/letters' ? (LIVE ? <LettersView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
+        : routePath === '/tenders' ? (LIVE ? <TendersView /> : <NotYet />)
+        : routePath === '/tenders/read' ? (LIVE ? <ReaderView vol={routeQuery.get('v')} page={routeQuery.get('p')} q={routeQuery.get('q')} /> : <NotYet />)
+        : routePath === '/drawings' ? (LIVE ? <DrawingsView /> : <NotYet />)
+        : routePath === '/drawings/view' ? (LIVE ? <DrawingViewer id={routeQuery.get('d')} page={routeQuery.get('p')} /> : <NotYet />)
         : routePath === '/spares' ? (LIVE ? <NotYet /> : <Spares />)
         : routePath === '/procurement' ? (LIVE ? <NotYet /> : <Procurement />)
         : routePath === '/printables' ? <Printables initial={routeQuery.get('t') || 'qr'} fmtId={routeQuery.get('f') || ''} />
         : routePath === '/tags' ? <Printables initial="qr" />
-        : routePath === '/guide' ? <DocsView />
+        : routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
         : routePath === '/about' ? <AboutPage />
         : routePath === '/assets' ? (LIVE ? <LiveDashboard go={go} /> : <Dashboard go={go} />)
         : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}

@@ -40,6 +40,7 @@ class LineOut(BaseModel):
     stations: int
     assets: int
     initiator: bool  # the first site registered — where the system began
+    last_entry: date | None = None  # newest log date on the line (freshness on the landing)
 
 
 @lines_router.get("", response_model=list[LineOut])
@@ -50,13 +51,17 @@ def list_lines(db: Session = Depends(get_db)):
     out = []
     sites = db.scalars(select(Location).where(Location.kind == LocationKind.SITE)
                        .order_by(Location.id)).all()
+    # newest duty date per line; future-dated typos don't count as "fresh"
+    last = dict(db.execute(select(LogEntry.line_id, func.max(LogEntry.log_date))
+                           .where(LogEntry.line_id.is_not(None), LogEntry.log_date <= date.today())
+                           .group_by(LogEntry.line_id)).all())
     for i, site in enumerate(sites):
         child_ids = [c.id for c in site.children]
         n_assets = 0
         if child_ids:
             n_assets = len(db.scalars(select(Asset.id).where(Asset.location_id.in_(child_ids))).all())
         out.append(LineOut(name=site.name, stations=len(child_ids),
-                           assets=n_assets, initiator=(i == 0)))
+                           assets=n_assets, initiator=(i == 0), last_entry=last.get(site.id)))
     return out
 
 

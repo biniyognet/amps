@@ -7,3 +7,6 @@ dist/
 .env
 *.local
 .DS_Store
+
+# Metro register data (real asset ids / Drive ids) lives only on the office server, never in the public repo
+backend/app/data/
