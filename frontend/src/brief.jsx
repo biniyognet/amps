@@ -41,7 +41,7 @@ function Slides({ net }) {
     <div className="bs bs-dark bs-cover" key="cover">
       <p className="bs-eye">STARTUP CONCLAVE · BINIYOG</p>
       <h2 className="bs-huge">AMPS</h2>
-      <p className="bs-lead">Asset Maintenance &amp; Preventive Scheduling — open-source maintenance software for metros, utilities and plants.</p>
+      <p className="bs-lead">Asset Maintenance &amp; Preventive Scheduling — open-source maintenance software for any plant — metros, utilities, factories, campuses.</p>
       <p className="bs-mono">Proven on a live metro railway · ₹0 licence · amps.binihost.com</p>
     </div>,
     <div className="bs" key="problem">
@@ -61,21 +61,21 @@ function Slides({ net }) {
         <div><b>Append-only log book</b><span>Entries can't be rewritten after the fact.</span></div>
         <div><b>Failure analytics</b><span>Failures, downtime, MTTR by system and asset.</span></div>
         <div><b>PM scheduling</b><span>Due and overdue work surfaces on its own.</span></div>
-        <div><b>Multi-site, role-based</b><span>Lines, depots, stations — each with the right access.</span></div>
+        <div><b>Multi-site, role-based</b><span>Sites, areas, units — each with the right access.</span></div>
         <div><b>Any device</b><span>Phone, tablet or desktop browser.</span></div>
       </div>
     </div>,
     <div className="bs" key="demo">
       <p className="bs-eye">LIVE DEMO · THIS SITE</p>
-      <h2>A four-line synthetic network, running now</h2>
+      <h2>Four synthetic plant sites, running now</h2>
       {!net ? <p className="bs-lead">Loading…</p> : (<>
         <div className="bs-kpi">
-          <div><b>{net.lines.length}</b><span>lines</span></div>
-          <div><b>{n(tot('stations'))}</b><span>stations</span></div>
+          <div><b>{net.lines.length}</b><span>sites</span></div>
+          <div><b>{n(tot('stations'))}</b><span>areas</span></div>
           <div><b>{n(tot('assets'))}</b><span>assets</span></div>
           <div><b>{n(net.fs?.outstanding ?? net.fs?.open)}</b><span>failures outstanding</span></div>
         </div>
-        <p className="bs-mono">Synthetic data · open the Dashboard tab to explore every line</p>
+        <p className="bs-mono">Metro · power substation · water works · factory — synthetic data, open any site</p>
       </>)}
     </div>,
     <div className="bs bs-dark" key="proof">
@@ -180,7 +180,7 @@ export default function Brief() {
     <article className="brief">
       <p className="br-kick">BRIEF · AMPS · OPEN-SOURCE EAM · {new Date().getFullYear()}</p>
       <h1>AMPS — maintenance records that run themselves</h1>
-      <p className="br-dek">A next-generation alternative to SAP PM / Maximo-class EAM: QR-first, phone-first,
+      <p className="br-dek">A next-generation alternative to SAP PM / Maximo-class EAM for any plant: QR-first, phone-first,
         live in weeks, ₹0 licence. Already running the power-system maintenance of a metro railway in India.</p>
       <div className="br-delta">
         <div><b>3,050</b><span>assets in production</span></div>
@@ -199,9 +199,9 @@ export default function Brief() {
 
       <h2><span>§2</span>What AMPS does</h2>
       <ul>
-        <li><b>Asset register</b> — every asset by line, station and depot, with a QR tag that opens its history.</li>
+        <li><b>Asset register</b> — every asset by site, area and unit, with a QR tag that opens its history.</li>
         <li><b>Log book</b> — preventive maintenance by cycle (monthly to 5-yearly), append-only; bulk import from Excel.</li>
-        <li><b>Dashboards</b> — on schedule · due soon · overdue, worked out from the logs, per line and network-wide.</li>
+        <li><b>Dashboards</b> — on schedule · due soon · overdue, worked out from the logs, per site and estate-wide.</li>
         <li><b>Failures &amp; job cards</b> — failure → rectification, downtime and MTTR computed; agency work tracked to closure.</li>
         <li><b>Checksheets</b> — per-class formats, approved by an in-charge, printed on demand.</li>
       </ul>
@@ -209,7 +209,7 @@ export default function Brief() {
       <h2><span>§3</span>Proof</h2>
       <p>AMPS is not a prototype. It runs in production on a metro railway power system: 3,050 assets registered and
         tagged, and six years of maintenance and failure records migrated in. The operator paid nothing for licences.
-        This site runs the same code against a synthetic four-line network
+        This site runs the same code against four synthetic plant sites — a metro, a power substation, a water works and a factory
         {net?.lines?.length ? <> ({n(net.lines.reduce((s, l) => s + (l.assets || 0), 0))} assets)</> : null}.</p>
 
       <h2><span>§4</span>Legacy EAM (SAP PM-class) vs AMPS</h2>

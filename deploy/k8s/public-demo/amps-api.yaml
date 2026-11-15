@@ -38,9 +38,9 @@ spec:
         - name: AMPS_SEED
           value: network
         - name: AMPS_ORG
-          value: Demo Metro Network
+          value: Demo Industries Group
         - name: AMPS_STANDARD_LINE
-          value: Teal Line
+          value: Riverside Metro
         - name: AMPS_AUTH
           value: '1'
         - name: AMPS_ADMIN_PASSWORD
@@ -53,7 +53,7 @@ spec:
             secretKeyRef:
               key: AMPS_ADMIN_USER
               name: amps-demo-admin
-        image: ghcr.io/biniyognet/amps-backend:oc11151537-network
+        image: ghcr.io/biniyognet/amps-backend:oc11151605-plants
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

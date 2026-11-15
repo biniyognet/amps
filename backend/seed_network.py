@@ -2,18 +2,19 @@
 # Copyright (c) 2026 Arup Biswas
 # AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
-"""Synthetic NETWORK seed — a fictional four-line metro for the public demo.
+"""Synthetic ESTATE seed — four fictional plant sites for the public demo.
 
-ALL DATA HERE IS FICTIONAL. Line, station, agency and person names are invented;
+ALL DATA HERE IS FICTIONAL. Site, area, agency, make and person names are invented;
 no real organization's assets, locations or records appear in this file.
 
-Deterministic (fixed RNG seed) and relative to today, so the demo always looks
-current: ~2,500 assets, 18 months of maintenance history, breakdowns with their
-rectifications, job cards to outside agencies, staff and a duty roster. Each line
-is given its own health profile so the landing board shows a realistic mix.
+Four industries on one AMPS: a metro, a power substation, a water works and a
+factory. Deterministic (fixed RNG seed) and relative to today, so the demo always
+looks current: ~2,000 assets, 18 months of maintenance history, breakdowns with
+their rectifications, job cards to outside agencies, staff and a duty roster. Each
+site has its own health profile so the landing board shows a realistic mix.
 
 Run:  python seed_network.py   (uses DATABASE_URL, or the local SQLite fallback)
-Idempotent: does nothing when the first line already exists.
+Idempotent: does nothing when the first site already exists.
 """
 import random
 from datetime import date, datetime, time, timedelta
@@ -36,76 +37,153 @@ HISTORY_DAYS = 548  # ~18 months
 #   lagging   — a steady share of cycles missed
 #   cluster   — fine overall, two stations badly overdue
 #   new       — recently opened, many assets awaiting their first service
+# site, unit code, opened, health profile, industry. Each site's last area is its
+# hub (workshop / control building / MCC / utility block) and gets the hub counts.
 LINES = [
-    ("Teal Line",   "TLD", 2004, "exemplary"),
-    ("Amber Line",  "AMD", 2011, "lagging"),
-    ("Indigo Line", "IND", 2016, "cluster"),
-    ("Ruby Line",   "RBD", 2024, "new"),
+    ("Riverside Metro",            "RVM", 2004, "exemplary", "transit"),
+    ("Hillcrest 132kV Substation", "HCS", 2011, "lagging",   "power"),
+    ("Lakeside Water Works",       "LWW", 2016, "cluster",   "water"),
+    ("Foundry Lane Factory",       "FLF", 2024, "new",       "factory"),
 ]
 
 STATIONS = {
-    "Teal Line":   ["Riverside", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
-                    "Old Town", "University", "Lakeview", "Market Square", "Teal Depot"],
-    "Amber Line":  ["Westgate", "Eastbank", "Hillcrest", "Stadium", "Garden City",
-                    "Port Road", "Canal Street", "Foundry Lane", "Orchard", "Amber Depot"],
-    "Indigo Line": ["Library", "Museum", "Bridge End", "Elm Park", "Cedar Hill",
-                    "Stonebridge", "Meadow Cross", "Lighthouse", "Copper Row", "Indigo Depot"],
-    "Ruby Line":   ["Signal Hill", "Brookside", "Pine Grove", "Silver Bay", "Clocktower",
-                    "Ferry Point", "Granary", "Exhibition", "Willow Bank", "Ruby Depot"],
+    "Riverside Metro": ["Riverside", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
+                        "Old Town", "University", "Lakeview", "Market Square", "Depot Workshop"],
+    "Hillcrest 132kV Substation": ["HV Yard North", "HV Yard South", "MV Switchyard",
+                                   "Transformer Bay A", "Transformer Bay B", "Feeder Bay East",
+                                   "Feeder Bay West", "Capacitor Yard", "Cable Gallery", "Control Building"],
+    "Lakeside Water Works": ["Intake Pump House", "Raw Water Main", "Clariflocculator 1",
+                             "Clariflocculator 2", "Rapid Sand Filters", "Chlorination House",
+                             "Clear Water Reservoir", "Booster Station", "Sludge Handling", "Admin & MCC"],
+    "Foundry Lane Factory": ["Press Shop", "Machine Shop A", "Machine Shop B", "Weld Shop",
+                             "Paint Booth", "Assembly Line 1", "Assembly Line 2", "Heat Treatment",
+                             "Finished Goods Store", "Utility Block"],
 }
 
-# class, code prefix, system, criticality, codal life (yrs), per-station count
-# (station / depot), PM cycles, makes
-CLASSES = [
-    ("Traction Transformer", "TTR", "Traction / PS", "A", 25, (1, 1), ["Monthly", "Yearly"], ["Voltara", "Ferrum Elec"]),
-    ("Auxiliary Transformer", "ATR", "Traction / PS", "A", 25, (2, 2), ["Quarterly", "Yearly"], ["Voltara", "Ferrum Elec"]),
-    ("Rectifier", "REC", "Traction / PS", "A", 20, (1, 1), ["Monthly", "Yearly"], ["Ampex Drives", "Northgrid"]),
-    ("HSCB Panel", "HSC", "Traction / PS", "A", 20, (4, 4), ["Monthly", "Half-Yearly"], ["Northgrid", "Kestrel Switchgear"]),
-    ("33kV VCB Panel", "VCB", "Traction / PS", "A", 25, (3, 4), ["Quarterly", "Yearly", "5-Yearly"], ["Kestrel Switchgear", "Northgrid"]),
-    ("Disconnector", "DIS", "Traction / PS", "B", 25, (6, 8), ["Half-Yearly", "Yearly"], ["Kestrel Switchgear"]),
-    ("DCDB", "DCD", "Traction / PS", "B", 20, (2, 2), ["Quarterly"], ["Ampex Drives"]),
-    ("RTU", "RTU", "SCADA", "B", 12, (1, 2), ["Quarterly"], ["Linewise Controls"]),
-    ("LT Panel", "LTP", "E&M", "B", 20, (6, 8), ["Quarterly", "Yearly"], ["Brightline Power", "Ferrum Elec"]),
-    ("UPS", "UPS", "E&M", "A", 10, (2, 3), ["Monthly", "Yearly"], ["Steadycell", "Brightline Power"]),
-    ("Battery Bank", "BAT", "E&M", "B", 6, (2, 3), ["Monthly"], ["Steadycell"]),
-    ("DG Set", "DGS", "E&M", "A", 20, (1, 1), ["Monthly", "Half-Yearly", "Yearly"], ["Ironbark Gensets"]),
-    ("Escalator", "ESC", "Lift & Escalator", "A", 25, (8, 0), ["Monthly", "Half-Yearly"], ["Ascendo", "Liftway"]),
-    ("Lift", "LFT", "Lift & Escalator", "A", 25, (3, 1), ["Monthly", "Yearly"], ["Ascendo", "Liftway"]),
-    ("Tunnel Ventilation Fan", "TVF", "ECS", "A", 25, (2, 0), ["Quarterly", "Yearly"], ["Aerodyne Fans"]),
-    ("AHU", "AHU", "ECS", "B", 15, (6, 2), ["Monthly", "Quarterly"], ["Coolpath", "Aerodyne Fans"]),
-    ("Chiller", "CHL", "ECS", "A", 20, (1, 0), ["Monthly", "Half-Yearly"], ["Coolpath"]),
-    ("Pump Set", "PMP", "Plumbing", "B", 15, (5, 4), ["Quarterly"], ["Hydroflow"]),
-    ("Fire Alarm Panel", "FAP", "Fire", "A", 15, (1, 1), ["Monthly", "Yearly"], ["Sentinel Safety"]),
-    ("Sprinkler Pump", "SPR", "Fire", "A", 15, (2, 2), ["Monthly"], ["Hydroflow", "Sentinel Safety"]),
-    ("EOT Crane", "CRN", "Depot", "B", 25, (0, 4), ["Quarterly", "Yearly"], ["Hoistline"]),
-    ("Pit Wheel Lathe", "PWL", "Depot", "B", 20, (0, 1), ["Monthly", "Yearly"], ["Hoistline"]),
-    ("Compressor", "CMP", "Depot", "B", 15, (0, 3), ["Monthly"], ["Ironbark Gensets"]),
-]
+# per industry: class, code prefix, system, criticality, codal life (yrs),
+# per-area count (area / hub), PM cycles, makes (all invented)
+CLASSES = {
+    "transit": [
+        ("Traction Transformer", "TTR", "Traction / PS", "A", 25, (1, 1), ["Monthly", "Yearly"], ["Voltara", "Ferrum Elec"]),
+        ("Auxiliary Transformer", "ATR", "Traction / PS", "A", 25, (2, 2), ["Quarterly", "Yearly"], ["Voltara", "Ferrum Elec"]),
+        ("Rectifier", "REC", "Traction / PS", "A", 20, (1, 1), ["Monthly", "Yearly"], ["Ampex Drives"]),
+        ("HSCB Panel", "HSC", "Traction / PS", "A", 20, (4, 4), ["Monthly", "Half-Yearly"], ["Kestrel Switchgear"]),
+        ("33kV VCB Panel", "VCB", "Traction / PS", "A", 25, (3, 4), ["Quarterly", "Yearly", "5-Yearly"], ["Kestrel Switchgear"]),
+        ("RTU", "RTU", "SCADA", "B", 12, (1, 2), ["Quarterly"], ["Linewise Controls"]),
+        ("LT Panel", "LTP", "Electrical", "B", 20, (6, 8), ["Quarterly", "Yearly"], ["Brightline Power", "Ferrum Elec"]),
+        ("UPS", "UPS", "Electrical", "A", 10, (2, 3), ["Monthly", "Yearly"], ["Steadycell"]),
+        ("Battery Bank", "BAT", "Electrical", "B", 6, (2, 3), ["Monthly"], ["Steadycell"]),
+        ("DG Set", "DGS", "Utilities", "A", 20, (1, 1), ["Monthly", "Half-Yearly", "Yearly"], ["Ironbark Gensets"]),
+        ("Escalator", "ESC", "Lift & Escalator", "A", 25, (8, 0), ["Monthly", "Half-Yearly"], ["Ascendo", "Liftway"]),
+        ("Lift", "LFT", "Lift & Escalator", "A", 25, (3, 1), ["Monthly", "Yearly"], ["Ascendo", "Liftway"]),
+        ("Tunnel Ventilation Fan", "TVF", "HVAC", "A", 25, (2, 0), ["Quarterly", "Yearly"], ["Aerodyne Fans"]),
+        ("AHU", "AHU", "HVAC", "B", 15, (6, 2), ["Monthly", "Quarterly"], ["Coolpath"]),
+        ("Pump Set", "PMP", "Pumping", "B", 15, (5, 4), ["Quarterly"], ["Hydroflow"]),
+        ("Fire Alarm Panel", "FAP", "Fire", "A", 15, (1, 1), ["Monthly", "Yearly"], ["Sentinel Safety"]),
+        ("EOT Crane", "CRN", "Material Handling", "B", 25, (0, 4), ["Quarterly", "Yearly"], ["Hoistline"]),
+        ("Pit Wheel Lathe", "PWL", "Production", "B", 20, (0, 1), ["Monthly", "Yearly"], ["Tornalis"]),
+        ("Air Compressor", "CMP", "Utilities", "B", 15, (0, 3), ["Monthly"], ["Ironbark Gensets"]),
+    ],
+    "power": [
+        ("Power Transformer", "PTR", "HV Switchyard", "A", 35, (2, 0), ["Monthly", "Yearly", "5-Yearly"], ["Voltara", "Ferrum Elec"]),
+        ("132kV Circuit Breaker", "CB1", "HV Switchyard", "A", 25, (3, 0), ["Quarterly", "Yearly"], ["Kestrel Switchgear"]),
+        ("33kV VCB Panel", "VCB", "HV Switchyard", "A", 25, (5, 2), ["Quarterly", "Yearly"], ["Kestrel Switchgear"]),
+        ("Isolator", "ISO", "HV Switchyard", "B", 25, (10, 0), ["Half-Yearly", "Yearly"], ["Kestrel Switchgear"]),
+        ("CT / PT Set", "CTP", "HV Switchyard", "B", 25, (8, 0), ["Yearly"], ["Ferrum Elec"]),
+        ("Lightning Arrester", "LA", "HV Switchyard", "B", 20, (6, 0), ["Yearly"], ["Ferrum Elec"]),
+        ("Capacitor Bank", "CAP", "HV Switchyard", "B", 15, (2, 0), ["Quarterly"], ["Brightline Power"]),
+        ("Earth Pit", "EP", "HV Switchyard", "C", 30, (6, 2), ["Yearly"], ["Brightline Power"]),
+        ("Relay Panel", "RLY", "Protection", "A", 15, (4, 4), ["Half-Yearly", "Yearly"], ["Linewise Controls"]),
+        ("Battery Bank", "BAT", "Electrical", "A", 6, (1, 2), ["Monthly"], ["Steadycell"]),
+        ("Battery Charger", "BCH", "Electrical", "A", 12, (1, 2), ["Monthly"], ["Steadycell"]),
+        ("RTU", "RTU", "SCADA", "B", 12, (1, 2), ["Quarterly"], ["Linewise Controls"]),
+        ("LT Panel", "LTP", "Electrical", "B", 20, (2, 3), ["Quarterly", "Yearly"], ["Brightline Power"]),
+        ("DG Set", "DGS", "Utilities", "A", 20, (0, 1), ["Monthly", "Yearly"], ["Ironbark Gensets"]),
+        ("Fire Alarm Panel", "FAP", "Fire", "A", 15, (1, 1), ["Monthly", "Yearly"], ["Sentinel Safety"]),
+    ],
+    "water": [
+        ("Raw Water Pump", "RWP", "Pumping", "A", 20, (4, 0), ["Monthly", "Yearly"], ["Hydroflow", "Aquaserv"]),
+        ("Clear Water Pump", "CWP", "Pumping", "A", 20, (4, 0), ["Monthly", "Yearly"], ["Hydroflow", "Aquaserv"]),
+        ("Pump Motor", "MTR", "Electrical", "A", 20, (6, 2), ["Quarterly", "Yearly"], ["Ferrum Elec"]),
+        ("VFD", "VFD", "Electrical", "B", 12, (3, 1), ["Half-Yearly"], ["Ampex Drives"]),
+        ("Valve Actuator", "VAC", "Treatment", "B", 15, (12, 2), ["Quarterly"], ["Aquaserv"]),
+        ("Flow Meter", "FLM", "Instrumentation", "B", 12, (3, 1), ["Half-Yearly"], ["Linewise Controls"]),
+        ("Level Sensor", "LVL", "Instrumentation", "C", 10, (4, 0), ["Half-Yearly"], ["Linewise Controls"]),
+        ("Dosing Pump", "DOS", "Treatment", "A", 12, (3, 0), ["Monthly"], ["Aquaserv"]),
+        ("Chlorinator", "CHL", "Treatment", "A", 15, (1, 0), ["Monthly", "Yearly"], ["Aquaserv"]),
+        ("Clarifier Drive", "CLD", "Treatment", "A", 20, (1, 0), ["Quarterly", "Yearly"], ["Hydroflow"]),
+        ("Backwash Blower", "BWB", "Treatment", "B", 20, (2, 0), ["Quarterly"], ["Aerodyne Fans"]),
+        ("Air Compressor", "CMP", "Utilities", "B", 15, (1, 1), ["Monthly"], ["Ironbark Gensets"]),
+        ("HT Panel", "HTP", "Electrical", "A", 25, (1, 2), ["Quarterly", "Yearly"], ["Kestrel Switchgear"]),
+        ("MCC Panel", "MCC", "Electrical", "A", 20, (3, 4), ["Quarterly", "Yearly"], ["Brightline Power"]),
+        ("PLC Panel", "PLC", "Instrumentation", "A", 12, (1, 2), ["Half-Yearly"], ["Linewise Controls"]),
+        ("Distribution Transformer", "DTR", "Electrical", "A", 25, (1, 2), ["Yearly"], ["Voltara"]),
+        ("DG Set", "DGS", "Utilities", "A", 20, (0, 2), ["Monthly", "Yearly"], ["Ironbark Gensets"]),
+    ],
+    "factory": [
+        ("Hydraulic Press", "HPR", "Production", "A", 20, (3, 0), ["Monthly", "Yearly"], ["Pressforge"]),
+        ("CNC Machine", "CNC", "Production", "A", 15, (8, 0), ["Monthly", "Half-Yearly"], ["Tornalis"]),
+        ("Robot Cell", "ROB", "Production", "A", 12, (2, 0), ["Quarterly"], ["Kinetra Robotics"]),
+        ("Conveyor", "CNV", "Material Handling", "B", 15, (4, 1), ["Monthly"], ["Beltway Systems"]),
+        ("Gearbox", "GBX", "Production", "B", 15, (4, 0), ["Quarterly"], ["Pressforge"]),
+        ("Drive Motor", "MTR", "Electrical", "B", 20, (12, 2), ["Quarterly", "Yearly"], ["Ferrum Elec"]),
+        ("Overhead Crane", "CRN", "Material Handling", "B", 25, (2, 1), ["Quarterly", "Yearly"], ["Hoistline"]),
+        ("Exhaust Fan", "EXF", "HVAC", "C", 15, (4, 1), ["Quarterly"], ["Aerodyne Fans"]),
+        ("LT Panel", "LTP", "Electrical", "B", 20, (3, 2), ["Quarterly", "Yearly"], ["Brightline Power"]),
+        ("MCC Panel", "MCC", "Electrical", "A", 20, (2, 2), ["Quarterly", "Yearly"], ["Brightline Power"]),
+        ("Air Compressor", "CMP", "Utilities", "A", 15, (0, 3), ["Monthly"], ["Ironbark Gensets"]),
+        ("Boiler", "BLR", "Utilities", "A", 25, (0, 2), ["Monthly", "Yearly"], ["Thermacore"]),
+        ("Cooling Tower", "CTW", "Utilities", "B", 20, (0, 2), ["Quarterly"], ["Coolpath"]),
+        ("Chiller", "CHR", "HVAC", "A", 20, (0, 1), ["Monthly", "Half-Yearly"], ["Coolpath"]),
+        ("HT Panel", "HTP", "Electrical", "A", 25, (0, 2), ["Quarterly", "Yearly"], ["Kestrel Switchgear"]),
+        ("Distribution Transformer", "DTR", "Electrical", "A", 25, (0, 2), ["Yearly"], ["Voltara"]),
+        ("Fire Hydrant Pump", "FHP", "Fire", "A", 15, (0, 2), ["Monthly"], ["Hydroflow"]),
+        ("Fire Alarm Panel", "FAP", "Fire", "A", 15, (1, 1), ["Monthly", "Yearly"], ["Sentinel Safety"]),
+        ("DG Set", "DGS", "Utilities", "A", 20, (0, 2), ["Monthly", "Yearly"], ["Ironbark Gensets"]),
+        ("UPS", "UPS", "Electrical", "B", 10, (1, 1), ["Monthly"], ["Steadycell"]),
+    ],
+}
 
-SPOTS = ["TSS room", "ASS room", "Concourse", "Platform level", "Plant room",
-         "Entry A", "Entry B", "Tunnel end", "Roof", "Basement"]
+SPOTS = {
+    "transit": ["TSS room", "ASS room", "Concourse", "Platform level", "Plant room",
+                "Entry A", "Entry B", "Tunnel end", "Roof", "Basement"],
+    "power": ["Bay 1", "Bay 2", "Bay 3", "Bay 4", "Gantry", "Plinth", "Panel room", "Outdoor"],
+    "water": ["Ground floor", "Pump floor", "Gallery", "Walkway", "Panel room", "Outdoor", "Roof"],
+    "factory": ["Bay 1", "Bay 2", "Bay 3", "Mezzanine", "Pit", "Panel room", "Outdoor", "Roof"],
+}
 FIRST = ["R.", "S.", "K.", "P.", "D.", "A.", "M.", "T.", "V.", "N."]
 LAST = ["Mehta", "Iyer", "Nair", "Rao", "Joshi", "Kapoor", "Menon", "Pillai",
         "Shetty", "Varma", "Kulkarni", "Desai", "Reddy", "Bhatt", "Chopra"]
-AGENCIES = ["Voltara Service", "Northgrid Field Team", "Ascendo Care",
-            "Coolpath Services", "Kestrel Switchgear OEM", "Hydroflow Contracts"]
+AGENCIES = ["Voltara Service", "Kestrel Field Team", "Ascendo Care", "Coolpath Services",
+            "Hydroflow Contracts", "Tornalis Support", "Ironbark Service"]
 
 FAULTS = {
     "Traction / PS": ["HSCB tripped on overcurrent", "DC earth fault", "Rectifier diode alarm",
                       "Transformer winding temperature high", "VCB failed to close"],
-    "SCADA": ["RTU communication lost", "Status mismatch at OCC"],
-    "E&M": ["UPS on bypass", "Battery cell low voltage", "DG failed to start", "LT feeder tripped"],
+    "HV Switchyard": ["Breaker SF6 pressure low", "Transformer Buchholz alarm", "Isolator not fully closed",
+                      "Transformer oil temperature high", "Capacitor unit bulged"],
+    "Protection": ["Relay self-check failure", "Trip circuit unhealthy", "Distance relay maloperation"],
+    "SCADA": ["RTU communication lost", "Status mismatch at control room"],
+    "Electrical": ["Feeder tripped on earth fault", "UPS on bypass", "Battery cell low voltage",
+                   "Motor insulation low", "VFD overcurrent fault", "Panel hot spot found on thermography"],
+    "Utilities": ["DG failed to start", "Compressor overheating", "Boiler low water trip",
+                  "Cooling tower fan tripped"],
     "Lift & Escalator": ["Escalator stopped — step sag switch", "Handrail speed fault",
                          "Lift door sensor fault", "Lift stuck between floors"],
-    "ECS": ["TVF vibration high", "AHU belt snapped", "Chiller high-pressure trip"],
-    "Plumbing": ["Pump not starting", "Mechanical seal leak"],
-    "Fire": ["Fire panel loop fault", "Sprinkler pump pressure low"],
-    "Depot": ["Crane long-travel brake fault", "Compressor overheating"],
+    "HVAC": ["Fan vibration high", "AHU belt snapped", "Chiller high-pressure trip"],
+    "Pumping": ["Pump not starting", "Mechanical seal leak", "Pump cavitation noise", "Low discharge pressure"],
+    "Treatment": ["Dosing pump air-locked", "Valve actuator torque trip", "Chlorine leak alarm", "Clarifier drive overload"],
+    "Instrumentation": ["Flow meter reading erratic", "Level sensor stuck", "PLC I/O card fault"],
+    "Fire": ["Fire panel loop fault", "Hydrant pump pressure low"],
+    "Production": ["Press hydraulic leak", "CNC spindle overheat", "Robot cell safety interlock open",
+                   "Gearbox oil leak", "Lathe tailstock seized"],
+    "Material Handling": ["Crane long-travel brake fault", "Conveyor belt misalignment", "Conveyor motor tripped"],
 }
 ACTIONS = ["Reset after inspection; parameters normal.", "Faulty relay replaced; tested OK.",
            "Contactor replaced; trial run OK.", "Loose termination tightened; monitored for one hour.",
            "Sensor cleaned and re-aligned; normalised.", "Fuse replaced; load restored.",
-           "Belt replaced; vibration within limits.", "Card replaced by OEM; system restored."]
+           "Belt replaced; vibration within limits.", "Card replaced by OEM; system restored.",
+           "Seal replaced; no leak on trial.", "Bearing replaced; running smoothly."]
 
 CYCLE_DAYS = {"Weekly": 7, "Monthly": 30, "Quarterly": 91, "Half-Yearly": 182,
               "Yearly": 365, "5-Yearly": 1825}
@@ -115,12 +193,18 @@ def _at(d: date, hour: int) -> datetime:
     return datetime.combine(d, time(hour % 24, RNG.randint(0, 59)))
 
 
+def _abbr(area: str) -> str:
+    """Short area code for asset tags: 'Feeder Bay East' -> 'FBE', 'Riverside' -> 'RIV'."""
+    words = area.replace("&", " ").split()
+    return (words[0][:3] if len(words) == 1 else "".join(w[0] for w in words)[:3]).upper()
+
+
 def _person() -> str:
     return f"{RNG.choice(FIRST)} {RNG.choice(LAST)}"
 
 
 def _skip_prob(profile: str, station_idx: int, days_ago: int) -> float:
-    """Chance a scheduled service was missed — tunes each line's health."""
+    """Chance a scheduled service was missed — tunes each site's health."""
     if profile == "exemplary":
         return 0.01 if days_ago > 45 else 0.03
     if profile == "lagging":
@@ -142,7 +226,9 @@ def seed():
             return
 
         classes = {}
-        for c in CLASSES:
+        for c in (c for cl in CLASSES.values() for c in cl):
+            if c[0] in classes:
+                continue
             classes[c[0]] = db.scalar(select(AssetClass).where(AssetClass.name == c[0])) \
                 or AssetClass(name=c[0])
             db.add(classes[c[0]])
@@ -182,23 +268,23 @@ def seed():
         all_assets: list[tuple[Asset, str, int]] = []  # asset, line, station idx
         logs: list[LogEntry] = []
         plans: list[tuple] = []
-        for line, depot, year, profile in LINES:
+        for line, depot, year, profile, sector in LINES:
             site = sites[line]
             for si, stn in enumerate(STATIONS[line]):
-                is_depot = stn.endswith("Depot")
+                is_depot = si == len(STATIONS[line]) - 1   # the hub area
                 loc = Location(name=stn, kind=LocationKind.STATION, parent=site)
                 db.add(loc)
-                for (cname, pfx, system, crit, life, per, cycles, makes) in CLASSES:
+                for (cname, pfx, system, crit, life, per, cycles, makes) in CLASSES[sector]:
                     count = per[1] if is_depot else per[0]
                     for k in range(count):
                         n_assets += 1
-                        # older lines: some original equipment past its codal life
+                        # older sites: some original equipment past its codal life
                         comm_year = year + (RNG.randint(0, 3) if RNG.random() < 0.8 else RNG.randint(4, 12))
                         comm_year = min(comm_year, TODAY.year)
                         comm = date(comm_year, RNG.randint(1, 12), RNG.randint(1, 28))
                         if comm > TODAY:
                             comm = TODAY - timedelta(days=RNG.randint(60, 300))
-                        code = f"{depot[:2]}-{stn[:3].upper()}-{pfx}-{k + 1:02d}"
+                        code = f"{depot}-{_abbr(stn)}-{pfx}-{k + 1:02d}"
                         status = AssetStatus.IN_SERVICE
                         r = RNG.random()
                         if r < 0.006:
@@ -212,7 +298,7 @@ def seed():
                             system=system, commissioned_on=comm, status=status,
                             criticality=Criticality(crit if RNG.random() > 0.15 else "B"),
                             codal_life_years=life, depot=depot,
-                            location_detail=RNG.choice(SPOTS),
+                            location_detail=RNG.choice(SPOTS[sector]),
                         )
                         db.add(a)
                         all_assets.append((a, line, si))
@@ -228,7 +314,7 @@ def seed():
                             else:
                                 last[f] = comm
                                 plans.append((a, f, None))
-                        # newly opened line: a share never yet serviced
+                        # newly opened site: a share never yet serviced
                         if profile == "new" and RNG.random() < 0.18:
                             continue
                         d = start + timedelta(days=RNG.randint(0, step - 1))
@@ -336,7 +422,7 @@ def seed():
                         db.add(RosterEntry(pattern=pat, user=u, weekday=wd, shift=ShiftCode(c)))
 
         db.commit()
-        print(f"Seeded {len(LINES)} lines, {sum(len(s) for s in STATIONS.values())} stations, "
+        print(f"Seeded {len(LINES)} sites, {sum(len(s) for s in STATIONS.values())} areas, "
               f"{n_assets} assets, {n_logs} maintenance entries, {n_fail} failures "
               f"({n_jc} job cards), {len(users)} users.")
     finally:

@@ -10,7 +10,7 @@
 
    API base: same-origin by default; demo hosting builds with VITE_AMPS_API. */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LIVE, ORG, useMe } from './api.js'
+import { LIVE, ORG, W, useMe } from './api.js'
 
 /* Optional time — the plain native picker. Blank = no time. */
 function TimeInput({ value, onChange, className = '', label = 'Time (optional)' }) {
@@ -970,7 +970,7 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
       <p className="bulk-hint">Tip: copy a block of cells from Excel and paste into any cell — it fills across &amp; down. Drag the small square at a cell's corner to copy its value down the rows.</p>
       <div className="tbl-wrap">
         <table className="bulk-grid">
-          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>System</th><th>{W.Station}</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
@@ -981,7 +981,7 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
                 <td className={inFill(i, 'system') ? 'bg-fillrng' : ''}><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}>
                   <option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'system')}</td>
                 <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}>
-                  <option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
+                  <option value="">{W.Station}…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
                 <td className={inFill(i, 'asset') ? 'bg-fillrng' : ''}>
                   <input value={r.asset} list={`bc-${i}`} placeholder="scan/type code" onPaste={(e) => pasteInto(i, 'asset', e)}
                          onChange={(e) => { const v = e.target.value; const hit = byCode[v]
@@ -1107,14 +1107,14 @@ export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, o
       {bulk && <p className="bulk-hint">Tip: paste a block of cells from Excel into any cell, or drag a cell's corner square to fill down.</p>}
       <div className="tbl-wrap">
         <table className="bulk-grid jc-grid">
-          <thead><tr><th>#</th><th>Date</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued by</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>System</th><th>{W.Station}</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued by</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
                 <td className="dim bg-n">{i + 1}</td>
                 <td className={inFill(i, 'date') ? 'bg-fillrng' : ''}><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} onPaste={(e) => pasteInto(i, 'date', e)} />{handle(i, 'date')}</td>
                 <td className={inFill(i, 'system') ? 'bg-fillrng' : ''}><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}><option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'system')}</td>
-                <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}><option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
+                <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}><option value="">{W.Station}…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
                 <td className={inFill(i, 'asset') ? 'bg-fillrng' : ''}>
                   <input value={r.asset} list={`jc-${i}`} placeholder="scan/type code" onPaste={(e) => pasteInto(i, 'asset', e)}
                          onChange={(e) => { const v = e.target.value; const hit = byCode[v]; setRows((rs) => rs.map((x, j) => (j === i ? { ...x, asset: v, system: hit?.system ?? x.system, station: hit?.location ?? x.station } : x))) }} />
@@ -1585,7 +1585,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
             {systems.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by station">
-            <option value="">All stations</option>
+            <option value="">All {W.stations}</option>
             {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
             </div>
@@ -1692,7 +1692,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                 </label>
                 <label>Station
                   <select value={station} onChange={(e) => setStation(e.target.value)}>
-                    <option value="">Station…</option>
+                    <option value="">{W.Station}…</option>
                     {stationsForSystem.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
@@ -1906,7 +1906,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                           </div>
                           <LogBody en={en} />
                           {en.action_taken && <div className="le-action"><span className="lc-tag">Action taken</span> {en.action_taken}</div>}
-                          {en.station && !en.asset_code && <div className="le-station"><span className="lc-tag">Station</span> {en.station}</div>}
+                          {en.station && !en.asset_code && <div className="le-station"><span className="lc-tag">{W.Station}</span> {en.station}</div>}
                           {en.consumables && <div className="le-consumables"><span className="lc-tag">Consumed</span> {en.consumables}</div>}
                           <div className="le-by">
                             <b>{en.attended_by || en.entered_by}</b>

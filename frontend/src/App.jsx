@@ -10,7 +10,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, OPERATOR, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
+import { LIVE, ORG, OPERATOR, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -347,7 +347,7 @@ function LiveDashboard({ go, initialLine = null }) {
     else { setSortKey(k); setSortDir('asc') }
   }
   const sortArrow = (k) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
-  const COLS = [['code', 'Code'], ['name', 'Asset'], ['cls', 'Class'], ['location', 'Station'],
+  const COLS = [['code', 'Code'], ['name', 'Asset'], ['cls', 'Class'], ['location', W.Station],
     ['locationDetail', 'Location'], ['sys', 'System'], ['status', 'Status'], ['last_done', 'Last PM'], ['pm', 'PM cycles']]
   // per-cycle due counts across the current view — shown in the PM-cycles header (M/Q/HY/Y/5Y)
   const cycleDue = { Monthly: 0, Quarterly: 0, 'Half-Yearly': 0, Yearly: 0, '5-Yearly': 0 }
@@ -365,7 +365,7 @@ function LiveDashboard({ go, initialLine = null }) {
     code: { text: fCode, setText: setFCode },
     name: { text: fName, setText: setFName },
     cls: { values: fClass, toggle: toggleIn(setFClass), clear: () => setFClass([]), opts: classesList, allLabel: 'All classes' },
-    location: { values: fLocation, toggle: toggleIn(setFLocation), clear: () => setFLocation([]), opts: locationsList, allLabel: 'All stations' },
+    location: { values: fLocation, toggle: toggleIn(setFLocation), clear: () => setFLocation([]), opts: locationsList, allLabel: `All ${W.stations}` },
     locationDetail: { values: fLocDet, toggle: toggleIn(setFLocDet), clear: () => setFLocDet([]), opts: locDetList, allLabel: 'All locations' },
     sys: { values: fSystem, toggle: toggleIn(setFSystem), clear: () => setFSystem([]), opts: systemsList, allLabel: 'All systems' },
     status: { values: fStatus, toggle: toggleIn(setFStatus), clear: () => setFStatus([]), opts: statusesList, allLabel: 'Any status', fmt: (v) => STATUS_LABEL[v] || v },
@@ -380,10 +380,10 @@ function LiveDashboard({ go, initialLine = null }) {
   const CSV_CYC = ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly']
   const exportCsv = () => {
     const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
-    const head = ['SL', 'Code', 'Asset', 'Class', 'System', 'Station', 'Location', 'Status',
-      'Criticality', 'Depot', 'Make / model', 'Commissioned', 'Codal life (yrs)',
+    const head = ['SL', 'Code', 'Asset', 'Class', 'System', W.Station, 'Location', 'Status',
+      'Criticality', W.Depot, 'Make / model', 'Commissioned', 'Codal life (yrs)',
       'Last PM', 'Next due', 'PM state', ...CSV_CYC.map((c) => `${c} state`),
-      'Open failures', 'Acknowledged', 'Job card', 'Line']
+      'Open failures', 'Acknowledged', 'Job card', W.Line]
     const body = shown.map((a, i) => {
       const s = sched[assetKey(a)]
       const cyc = s?.cycles || {}
@@ -521,7 +521,7 @@ function LiveDashboard({ go, initialLine = null }) {
             {/* Class · Location · System · Status filters now live in the table
                 column headers (▾). Only depot stays here — it has no column. */}
             {depotsList.length > 0 && !me?.depot && (
-              <select value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
+              <select value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label={`Filter by ${W.depot}`}>
                 <option value="">All depots</option>
                 {depotsList.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -562,7 +562,7 @@ function LiveDashboard({ go, initialLine = null }) {
           </div>
           {/* a caption that appears only on the printout: what's being shown */}
           <div className="print-caption">
-            AMPS · {effLine || 'All lines'} — {filters.length === 0 ? 'all assets' : filters.map((k) => FILTER_LABEL[k] || k).join(' + ')}
+            AMPS · {effLine || `All ${W.lines}`} — {filters.length === 0 ? 'all assets' : filters.map((k) => FILTER_LABEL[k] || k).join(' + ')}
             {fSystem.length ? ` · ${fSystem.join('/')}` : ''}{fClass.length ? ` · ${fClass.join('/')}` : ''}{fLocation.length ? ` · ${fLocation.join('/')}` : ''}{fStatus.length ? ` · ${fStatus.map((s) => STATUS_LABEL[s] || s).join('/')}` : ''}{fCrit.length ? ` · Criticality ${fCrit.join('/')}` : ''}
             {q ? ` · “${q}”` : ''} · {shown.length} assets · {new Date().toISOString().slice(0, 10)}
           </div>
@@ -655,7 +655,7 @@ function LiveDashboard({ go, initialLine = null }) {
                             </span>
                           )}</td>
                         <td className="dim" data-l="Class">{a.cls}</td>
-                        <td className="dim" data-l="Station">{a.location}</td>
+                        <td className="dim" data-l={W.Station}>{a.location}</td>
                         <td className="dim wrap-cell" data-l="Location">{a.locationDetail || '—'}</td>
                         <td className="dim" data-l="System">{a.sys ?? '—'}</td>
                         <td data-l="Status"><StatusChip status={a.status} />
@@ -700,7 +700,7 @@ const codalExceeded = (a) => { const e = codalExpiry(a); return e != null && e <
 /* Lines named after colours get their colour as the chip dot — free for any
    org that names lines that way; everyone else gets a neutral dot. */
 const LINE_COLORS = {
-  green: '#1c7a44', blue: '#2b5c99', teal: '#0e7c86', amber: '#b7791f', indigo: '#4c51bf', ruby: '#b4234a', purple: '#5b3fbf', yellow: '#b98a00',
+  green: '#1c7a44', blue: '#2b5c99', teal: '#0e7c86', amber: '#b7791f', indigo: '#4c51bf', ruby: '#b4234a', metro: '#0e7c86', substation: '#4c51bf', water: '#2b6cb0', factory: '#b7791f', purple: '#5b3fbf', yellow: '#b98a00',
   red: '#a32e2e', orange: '#c2571a', pink: '#b83280', grey: '#52525b', gray: '#52525b',
 }
 const lineColor = (name) => {
@@ -1380,8 +1380,8 @@ function AssetForm({ initial, mode, onDone, onCancel }) {
         <label>Name<input value={f.name} onChange={set('name')} required /></label>
         <label>Asset class<input value={f.asset_class} onChange={set('asset_class')} required
                                  list="af-classes" /></label>
-        <label>Location / station<input value={f.location} onChange={set('location')} required /></label>
-        <label>Line<input value={f.line} onChange={set('line')} placeholder={OPERATOR ? 'e.g. Green Line' : 'e.g. Teal Line'} /></label>
+        <label>Location / {W.station}<input value={f.location} onChange={set('location')} required /></label>
+        <label>{W.Line}<input value={f.line} onChange={set('line')} placeholder={OPERATOR ? 'e.g. Green Line' : 'e.g. Lakeside Water Works'} /></label>
         <label>System<input value={f.system} onChange={set('system')} placeholder="reporting rollup" /></label>
         <label>Make / model<input value={f.make_model} onChange={set('make_model')} /></label>
         <label>Commissioned on<input type="date" value={f.commissioned_on} onChange={set('commissioned_on')} /></label>
@@ -1520,7 +1520,7 @@ function LiveAssetDetail({ code }) {
         <div className="asset-facts card">
           {[
             ['Location', a.location],
-            ['Line', a.line || '—'],
+            [W.Line, a.line || '—'],
             ['System', a.sys || '—'],
             ['Asset class', a.cls],
             ['Make / model', a.makeModel || '—'],
@@ -3146,7 +3146,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
           <QR value={qrVal} size={44} />
         </header>
         <div className="cs-std-meta">
-          <span>Station: <u /></span><span>Equipment ID: <u /></span>
+          <span>{W.Station}: <u /></span><span>Equipment ID: <u /></span>
           <span>{isLog && fmt.frequency === 'Weekly' ? 'Month' : 'Date'}: <u className="s" /></span><span>Shift: <u className="xs" /></span>
         </div>
 
@@ -3739,7 +3739,7 @@ function LineDashboard({ go, initialLine = null }) {
         <h1 className="dash-title" title="Preventive-maintenance compliance & asset health">{line} · Maintenance Overview</h1>
         <span className="dash-kpis">
           <a className="dk" href={regHref} title="Assets in service (spares and decommissioned not counted)"><b>{total.toLocaleString()}</b> assets</a>
-          <span className="dk" title={`${depots} depot${depots === 1 ? '' : 's'}`}><b>{stations}</b> stations</span>
+          <span className="dk" title={`${depots} ${W.depot}${depots === 1 ? '' : 's'}`}><b>{stations}</b> {W.stations}</span>
           <a className={`dk${openF ? ' dk-bad' : ''}`} href={failHref} title="Failures open, acknowledged or on a job card"><b>{openF}</b> open failures</a>
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
@@ -3807,8 +3807,8 @@ function LineDashboard({ go, initialLine = null }) {
               <option value="">All systems</option>
               {bkSystems.map((sy) => <option key={sy} value={sy}>{sy}</option>)}
             </select>
-            <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label="Filter breakup by station">
-              <option value="">All stations</option>
+            <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label={`Filter breakup by ${W.station}`}>
+              <option value="">All {W.stations}</option>
               {bkStations.map((st) => <option key={st} value={st}>{st}</option>)}
             </select>
           </div>
@@ -3902,7 +3902,7 @@ function LineDashboard({ go, initialLine = null }) {
    first, with days-pending front and centre. Signed-in only (operational). */
 function exportJobCards(cards) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const head = ['Raised', 'Status', 'Asset', 'Station', 'Location', 'Fault', 'Issued by', 'Issued to', 'Job card detail', 'Closed', 'Age (d)', 'Action taken']
+  const head = ['Raised', 'Status', 'Asset', W.Station, 'Location', 'Fault', 'Issued by', 'Issued to', 'Job card detail', 'Closed', 'Age (d)', 'Action taken']
   const stat = { open: 'Open', closed: 'Closed by agency', penalty: 'Penalty — we fixed' }
   const iss = (v) => (v && v !== 'unknown' && !v.endsWith('-import') ? v : '')
   const rows = cards.map(({ f, jc, rb, status, age }) => [
@@ -3982,7 +3982,7 @@ function JobCardsView({ line = '' }) {
     oldest: ['Oldest / longest pending', (a, b) => b.age - a.age],
     asset: ['Asset code', (a, b) => (a.f.asset_code || '').localeCompare(b.f.asset_code || '')],
     agency: ['Agency', (a, b) => (a.jc.attended_by || '').localeCompare(b.jc.attended_by || '')],
-    station: ['Station', (a, b) => (a.f.station || a.jc.station || '').localeCompare(b.f.station || b.jc.station || '')],
+    station: [W.Station, (a, b) => (a.f.station || a.jc.station || '').localeCompare(b.f.station || b.jc.station || '')],
   }
   const shown = (TABS.find(([k]) => k === tab)?.[2] || cards).slice().sort(SORTS[sort][1])
   // avg turnaround of closed cards (raised→closed), for the chase metric
@@ -4071,7 +4071,7 @@ function JobCardsView({ line = '' }) {
               <col style={{ width: '9%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
               {canWrite && <col style={{ width: '9%' }} />}
             </colgroup>
-            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
+            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>{W.Station}</th><th>Location</th><th>Fault</th>
               <th className={fAgency.length ? 'th-filtered' : ''}>Issued to
                 <ColFilter open={openCol === 'ag'} onToggle={() => setOpenCol(openCol === 'ag' ? null : 'ag')}
                            onClose={() => setOpenCol(null)} values={fAgency}
@@ -4094,7 +4094,7 @@ function JobCardsView({ line = '' }) {
                       title={status === 'open' ? `open for ${age} days` : `closed in ${age} days`}>{age}d</span></td>
                   <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`} title={STT[status]}>{STL[status][1]}</span></td>
                   <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                  <td className="dim nobreak" data-l="Station">{f.station || jc.station || '—'}</td>
+                  <td className="dim nobreak" data-l={W.Station}>{f.station || jc.station || '—'}</td>
                   <td className="dim" data-l="Location">{f.category || '—'}</td>
                   <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></td>
                   <td className="dim" data-l="Issued to">{jc.attended_by || '—'}
@@ -4457,7 +4457,7 @@ function Landing() {
           <div>
             <div className="gate-badge">⚡ AMPS <span className="gate-live">● LIVE</span></div>
             <h1 className="gate-title">{ORG}</h1>
-            <p className="gate-sub">Asset Maintenance &amp; Preventive Scheduling — every line at a glance</p>
+            <p className="gate-sub">Asset Maintenance &amp; Preventive Scheduling — every {W.line} at a glance</p>
           </div>
           <a className="btn gate-signin-btn" href="#/login">Sign in</a>
         </header>
@@ -4534,9 +4534,9 @@ function Landing() {
           {/* right rail: the network-wide figures, tucked over the train art so
               the right side reads as a balanced "at a glance" panel */}
           <aside className="land-glance">
-            <div className="land-glance-h">Network at a glance</div>
+            <div className="land-glance-h">{W.Network} at a glance</div>
             <div className="land-kpis">
-              {kpi(lines ? lines.length : '—', 'Lines')}
+              {kpi(lines ? lines.length : '—', W.Lines)}
               {kpi(loading ? '—' : nf(net.assets), 'Assets')}
               {kpi(nf(locations), 'Locations')}
               {kpi(net.open == null ? '—' : nf(net.open), 'Open failures', net.open ? 'alert' : '')}
@@ -4563,7 +4563,7 @@ function LoginPage() {
           <div className="gate-auth-brand">Sign in to <span className="brand-name">AMPS</span></div>
           <p className="gate-auth-sub">{ORG} — operational access for your line: report failures, write the log, register assets. Viewing needs no account.</p>
           <LoginForm autoFocus />
-          <a className="gate-back" href="#/">← Back to lines</a>
+          <a className="gate-back" href="#/">← Back to {W.lines}</a>
           <div className="gate-foot"><AmpsLink /> · MIT © 2026 <SignatureMark /></div>
         </div>
       </div>
@@ -4594,7 +4594,7 @@ function LineNav({ line, active, showAllLines }) {
   return (
     <span className="line-nav">
       {showAllLines && (
-        <a className="ln-btn ln-back" href="#/" title="All lines" aria-label="All lines">
+        <a className="ln-btn ln-back" href="#/" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
         </a>
       )}
@@ -4773,7 +4773,7 @@ export default function App() {
           <nav className="nav">
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href="#/" className={!navLine ? 'active' : ''}>Lines</a>}
+              : <a href="#/" className={!navLine ? 'active' : ''}>{W.Lines}</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>Guide</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
