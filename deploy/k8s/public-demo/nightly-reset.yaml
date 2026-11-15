@@ -1,0 +1,60 @@
+# Nightly reset of the public demo: restarting amps-api rebuilds its in-container
+# SQLite from the synthetic seed, so anything visitors changed with the shared
+# admin login is gone by morning. RBAC lets the job restart this one deploy only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: amps-nightly-reset
+  namespace: amps-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: amps-nightly-reset
+  namespace: amps-demo
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  resourceNames: ["amps-api"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: amps-nightly-reset
+  namespace: amps-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: amps-nightly-reset
+subjects:
+- kind: ServiceAccount
+  name: amps-nightly-reset
+  namespace: amps-demo
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: amps-nightly-reset
+  namespace: amps-demo
+spec:
+  schedule: "0 3 * * *"
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          serviceAccountName: amps-nightly-reset
+          restartPolicy: Never
+          containers:
+          - name: reset
+            image: registry.k8s.io/kubectl:v1.32.4
+            args: ["-n", "amps-demo", "rollout", "restart", "deploy/amps-api"]
+            resources:
+              requests: {cpu: 10m, memory: 32Mi}
+              limits: {memory: 128Mi}
