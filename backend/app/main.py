@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import (assets, auth, checksheets, correspondence, drawings, failures,
+from app.api import (ai, assets, auth, checksheets, correspondence, drawings, failures,
                      logbook, maintenance, qr, roster, sync, tenders)
 from app.db import init_db
 
@@ -58,6 +58,7 @@ app.include_router(correspondence.router, prefix="/api/correspondence", tags=["c
 app.include_router(tenders.router, prefix="/api/tenders", tags=["tenders"])
 app.include_router(drawings.router, prefix="/api/drawings", tags=["drawings"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
+app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 
 
 @app.get("/")

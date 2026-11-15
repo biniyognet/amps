@@ -19,7 +19,7 @@ export const W = LIVE && !OPERATOR
   ? { Line: 'Site', Lines: 'Sites', line: 'site', lines: 'sites', Station: 'Area', station: 'area', stations: 'areas', Depot: 'Unit', depot: 'unit', Network: 'Estate' }
   : { Line: 'Line', Lines: 'Lines', line: 'line', lines: 'lines', Station: 'Station', station: 'station', stations: 'stations', Depot: 'Depot', depot: 'depot', Network: 'Network' }
 
-const API = import.meta.env.VITE_AMPS_API ?? '' // same-origin by default
+export const API = import.meta.env.VITE_AMPS_API ?? '' // same-origin by default
 
 // Asset codes can contain '/' (e.g. "EXF- CHEMICAL/OIL/GREASE ROOM (CPD)"). A
 // single-encoded '%2F' in a URL PATH segment is rejected by the router as a

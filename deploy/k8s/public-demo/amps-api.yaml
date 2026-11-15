@@ -53,7 +53,20 @@ spec:
             secretKeyRef:
               key: AMPS_ADMIN_USER
               name: amps-demo-admin
-        image: ghcr.io/biniyognet/amps-backend:oc11151605-plants
+        # Ask AMPS: read-only Q&A. Cluster Ollama now; to switch to Gemini set
+        # AMPS_AI_PROVIDER=gemini + AMPS_GEMINI_API_KEY (secretKeyRef amps-demo-ai/GEMINI_API_KEY)
+        # and point AMPS_AI_FALLBACK_URL/MODEL at the Ollama values below.
+        - name: AMPS_AI_PROVIDER
+          value: openai
+        - name: AMPS_AI_BASE_URL
+          value: http://ollama.bini-ai.svc:11434/v1
+        - name: AMPS_AI_MODEL
+          value: qwen2.5:3b
+        - name: AMPS_AI_PER_MINUTE
+          value: '6'
+        - name: AMPS_AI_PER_DAY
+          value: '400'
+        image: ghcr.io/biniyognet/amps-backend:oc11152016-askai
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

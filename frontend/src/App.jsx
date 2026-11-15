@@ -4,6 +4,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import AskAmps from './ask'
 import {
   ASSETS, PM_SCHEDULES, JOB_CARDS, SPECS, PROCUREMENTS, PROC_STAGES,
   FAILURES, SPARES, spareStats, checksheetFor, CHECKSHEET_TEMPLATES, CHECKSHEET_RESULTS,
@@ -4763,7 +4764,7 @@ export default function App() {
   // view-only, and QR-scanned asset pages. Everything else routes home.
   if (anonymous) {
     if (routePath === '/login') return <>{siteArt}<LoginPage /></>
-    if (onLanding) return <>{siteArt}<Landing /></> // full-screen, own chrome
+    if (onLanding) return <>{siteArt}<Landing /><AskAmps /></> // full-screen, own chrome
     const navLine = failLine || (lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : null) || (lineMatch ? decodeURIComponent(lineMatch[1]) : null)
     return (
       <>{siteArt}
@@ -4787,6 +4788,7 @@ export default function App() {
           : <LineView name={decodeURIComponent(lineMatch[1])} />}
         <footer className="foot">{ORG} · maintenance records · <AmpsLink />, MIT © 2026 <FootSig /></footer>
       </div>
+      <AskAmps />
       </>
     )
   }
@@ -4857,6 +4859,7 @@ export default function App() {
         : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
+      {LIVE && <AskAmps />}
       <footer className="foot">
         {LIVE
           ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>
