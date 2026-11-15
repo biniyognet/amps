@@ -2704,3 +2704,17 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .ask-input button:disabled { opacity: .5; cursor: default; }
 @media (max-width: 560px) { .ask-panel { right: 8px; left: 8px; bottom: 8px; width: auto; height: calc(100vh - 16px); } .ask-fab { right: 12px; bottom: 12px; } }
 @media print { .ask-fab, .ask-panel { display: none !important; } }
+.ask-msg.assistant:has(.ask-plan) { max-width: 100%; width: 100%; box-sizing: border-box; }
+.ask-plan { margin-top: 8px; border: 1px solid var(--accent-line); border-radius: 10px; background: var(--surface, #fff); overflow: hidden; }
+.ask-plan-head { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; font-size: 13px; border-bottom: 1px solid var(--accent-line); }
+.ask-plan-head span { color: var(--ink-3); white-space: nowrap; }
+.ask-plan-rows { max-height: 260px; overflow-y: auto; }
+.ask-plan-row { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 7px 10px; border-bottom: 1px solid color-mix(in srgb, var(--accent-line) 40%, transparent); font-size: 12.5px; }
+.ask-plan-row a { font-size: 12px; }
+.ask-plan-cyc { text-align: right; } .ask-plan-cyc s { color: var(--ink-3); }
+.ask-plan-row small { grid-column: 1 / -1; color: var(--ink-2); }
+.ask-plan-more { display: block; padding: 6px 10px; color: var(--ink-3); }
+.ask-plan-ok { display: block; width: calc(100% - 20px); margin: 10px; padding: 9px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+.ask-plan-ok:disabled { opacity: .6; cursor: default; }
+.ask-plan-note, .ask-plan-done, .ask-plan-err { margin: 0; padding: 9px 10px; font-size: 12.5px; }
+.ask-plan-note { color: var(--ink-2); } .ask-plan-done { color: #1e7e34; font-weight: 600; } .ask-plan-err { color: #c0392b; }

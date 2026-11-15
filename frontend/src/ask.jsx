@@ -3,19 +3,21 @@
 // The backend (/api/ai) gives the model read-only lookups; this is only the chat
 // surface. Hidden entirely when the deployment has no model configured.
 import { useEffect, useRef, useState } from 'react'
-import { API } from './api'
+import { API, useMe } from './api'
 
 const SUGGEST = [
   'Which site has the most overdue maintenance?',
   'Which assets keep failing?',
   'What is the MTTR at Hillcrest?',
   'Vital assets past their design life',
+  'Draft a maintenance plan for Hillcrest',
   'কোন সাইটে সবচেয়ে বেশি ব্রেকডাউন?',
 ]
 
 const TOOL_LABEL = {
   list_sites: 'sites', search_assets: 'asset register', overdue_pm: 'PM schedule',
   failure_summary: 'failure log', asset_history: 'asset history',
+  draft_pm_plan: 'maintenance plan',
 }
 
 // asset codes like HCS-CB-BAT-01 become links to the asset page
@@ -50,12 +52,63 @@ function Answer({ text }) {
   return <>{blocks}</>
 }
 
+// An AI-drafted maintenance plan: shown for review, saved only when a signed-in
+// supervisor approves it. The server re-checks scope and skips any asset whose
+// plan changed since the draft.
+function PlanCard({ plan, canWrite }) {
+  const [state, setState] = useState(null) // null | 'busy' | {applied, skipped} | {error}
+  async function approve() {
+    setState('busy')
+    try {
+      const r = await fetch(`${API}/api/ai/plan/${plan.id}/apply`, { method: 'POST' })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.detail || 'Could not save the plan.')
+      setState(j)
+    } catch (e) { setState({ error: e.message }) }
+  }
+  const more = plan.count - plan.changes.length
+  return (
+    <div className="ask-plan">
+      <div className="ask-plan-head">
+        <b>Draft plan · {plan.scope}</b>
+        <span>{plan.count} asset{plan.count === 1 ? '' : 's'} to change</span>
+      </div>
+      <div className="ask-plan-rows">
+        {plan.changes.map(c => (
+          <div key={c.code} className="ask-plan-row">
+            <a href={`#/asset/${encodeURIComponent(c.code)}`}>{c.code}</a>
+            <span className="ask-plan-cyc">
+              <s>{c.before.join(', ') || 'none'}</s> → <b>{c.after.join(', ')}</b>
+            </span>
+            <small>{c.reason}</small>
+          </div>
+        ))}
+        {more > 0 && <small className="ask-plan-more">and {more} more</small>}
+      </div>
+      {state?.applied !== undefined ? (
+        <p className="ask-plan-done">Approved · {state.applied} saved
+          {state.skipped ? ` · ${state.skipped} skipped (changed since the draft)` : ''}</p>
+      ) : !plan.count ? null : canWrite ? (
+        <>
+          <button className="ask-plan-ok" disabled={state === 'busy'} onClick={approve}>
+            {state === 'busy' ? 'Saving…' : `Approve ${plan.count} change${plan.count === 1 ? '' : 's'}`}
+          </button>
+          {state?.error && <p className="ask-plan-err">{state.error}</p>}
+        </>
+      ) : (
+        <p className="ask-plan-note">Nothing is saved yet. Sign in as a supervisor to approve.</p>
+      )}
+    </div>
+  )
+}
+
 export default function AskAmps() {
   const [status, setStatus] = useState(null)
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [msgs, setMsgs] = useState([])
   const [busy, setBusy] = useState(false)
+  const { canWrite } = useMe()
   const end = useRef(null)
   const input = useRef(null)
 
@@ -82,7 +135,7 @@ export default function AskAmps() {
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.detail || 'The assistant could not answer just now.')
-      setMsgs(m => [...m, { role: 'assistant', text: j.answer, tools: j.tools, model: j.model }])
+      setMsgs(m => [...m, { role: 'assistant', text: j.answer, tools: j.tools, model: j.model, plan: j.plan }])
     } catch (e) {
       setMsgs(m => [...m, { role: 'assistant', text: e.message, error: true }])
     } finally {
@@ -119,6 +172,7 @@ export default function AskAmps() {
             {msgs.map((m, i) => (
               <div key={i} className={`ask-msg ${m.role}${m.error ? ' err' : ''}`}>
                 {m.role === 'assistant' ? <Answer text={m.text} /> : m.text}
+                {m.plan && <PlanCard plan={m.plan} canWrite={canWrite} />}
                 {m.tools?.length > 0 && (
                   <small className="ask-src">
                     Looked up: {[...new Set(m.tools.map(t => TOOL_LABEL[t.tool] || t.tool))].join(' · ')}

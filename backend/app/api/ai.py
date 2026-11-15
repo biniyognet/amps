@@ -22,6 +22,7 @@ Standard library only (urllib) — no new dependency.
 """
 import json
 import os
+import secrets
 import time
 import urllib.error
 import urllib.request
@@ -33,11 +34,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.auth import optional_user, scope_location_ids
+from app.api.auth import current_writer, optional_user, scope_location_ids
 from app.api.maintenance import schedule_all
-from app.db import get_db
-from app.models import (Asset, AssetClass, AssetStatus, Location, LocationKind,
-                        LogEntry, LogEntryType)
+from app.db import audit, get_db
+from app.engine import SCHEDULE_FREQ
+from app.models import (Asset, AssetClass, AssetStatus, Criticality, Location,
+                        LocationKind, LogEntry, LogEntryType, PMPlan)
 
 router = APIRouter()
 
@@ -268,6 +270,128 @@ def t_asset_history(db, user, code, site=None):
     }
 
 
+# ---- maintenance-plan drafting (proposes; a person approves) ----------------
+#
+# The draft is rule-based on the records, so every change carries a reason a
+# supervisor can check: an asset that keeps failing, a vital asset that broke
+# down, or an ageing one (past design life) that failed or is vital, gets the
+# next shorter cycle; a tolerable asset with a clean year has its shortest cycle
+# extended one step; an asset with no plan gets its class's usual plan. Nothing
+# is written here — the draft is held for two hours
+# and only POST /plan/{id}/apply, by a signed-in writer, saves it.
+
+LADDER = sorted(SCHEDULE_FREQ, key=SCHEDULE_FREQ.get)   # Weekly … 5-Yearly
+_drafts: dict[str, dict] = {}
+DRAFT_TTL = 2 * 3600
+ACTIVE = (AssetStatus.IN_SERVICE, AssetStatus.UNDER_MAINTENANCE)
+
+
+def _order(freqs):
+    return sorted(freqs, key=SCHEDULE_FREQ.get)
+
+
+def t_draft_pm_plan(db, user, site=None, asset_class=None):
+    note = None
+    q = _class_filter(_site_filter(_scoped_assets(db, user), db, site), asset_class)
+    assets = [a for a in db.scalars(q).all() if a.status in ACTIVE]
+    if not assets and asset_class:   # an invented class name shouldn't sink the whole draft
+        note = f"no asset class matches '{asset_class}' - drafted for every class instead"
+        asset_class = None
+        q = _site_filter(_scoped_assets(db, user), db, site)
+        assets = [a for a in db.scalars(q).all() if a.status in ACTIVE]
+    if not assets:
+        return {"error": "no in-service assets match that site / class"}
+    ids = [a.id for a in assets]
+    current = defaultdict(set)
+    for p in db.scalars(select(PMPlan).where(PMPlan.asset_id.in_(ids))).all():
+        if p.frequency in SCHEDULE_FREQ:
+            current[p.asset_id].add(p.frequency)
+    logged = defaultdict(set)   # assets without a plan run on what their log shows
+    for aid, sub in db.execute(select(LogEntry.asset_id, LogEntry.subtype).distinct().where(
+            LogEntry.asset_id.in_(ids), LogEntry.type == LogEntryType.MAINTENANCE,
+            LogEntry.subtype.in_(LADDER))).all():
+        logged[aid].add(sub)
+    fails = Counter(f.asset_id for f in _failures(db, user, site, asset_class, 365))
+    today = date.today()
+
+    by_cls = defaultdict(list)
+    for a in assets:
+        by_cls[a.asset_class.name].append(a)
+    standard = {}
+    for c, rows in by_cls.items():
+        sets = Counter(tuple(_order(current[a.id] or logged[a.id])) for a in rows
+                       if current[a.id] or logged[a.id])
+        standard[c] = set(sets.most_common(1)[0][0]) if sets else set()
+
+    changes, cls_stats = [], []
+    for c, rows in sorted(by_cls.items()):
+        n_changed = 0
+        for a in rows:
+            before = current[a.id] or logged[a.id]
+            after, why = set(before), []
+            if not before and standard[c]:
+                after = set(standard[c])
+                why.append(f"no plan yet - {c} standard")
+            if not after:
+                continue
+            age = (today - a.commissioned_on).days / 365.25 if a.commissioned_on else None
+            past_life = bool(age and a.codal_life_years and age > a.codal_life_years)
+            shortest = _order(after)[0]
+            step = LADDER.index(shortest)
+            nf = fails[a.id]
+            vital = a.criticality == Criticality.A
+            if nf >= 2 or (nf and (vital or past_life)) or (vital and past_life):
+                if step > LADDER.index("Monthly"):
+                    after.add(LADDER[step - 1])
+                    why.append(f"failed {nf} times in 12 months" if nf >= 2 else
+                               "vital asset, broke down this year" if nf and vital else
+                               f"past design life ({age:.0f} of {a.codal_life_years} yrs) and failed"
+                               if nf else
+                               f"vital and past design life ({age:.0f} of {a.codal_life_years} yrs)")
+            elif (a.criticality == Criticality.C and nf == 0 and not past_life
+                  and shortest in ("Monthly", "Quarterly") and step + 1 < len(LADDER)):
+                after.discard(shortest)
+                after.add(LADDER[step + 1])
+                why.append(f"tolerable, no breakdowns in 12 months - {shortest} extended to {LADDER[step + 1]}")
+            if after != before:
+                n_changed += 1
+                changes.append({"asset_id": a.id, "code": a.code, "site": _site_of(a), "class": c,
+                                "criticality": a.criticality.value,
+                                "before": _order(before), "after": _order(after),
+                                "reason": "; ".join(why)})
+        cls_stats.append({"class": c, "assets": len(rows),
+                          "failures_12m": sum(fails[a.id] for a in rows),
+                          "standard_plan": _order(standard[c]), "changed": n_changed})
+
+    def visits(sets):   # a longer cycle's visit covers the shorter ones that fall due with it
+        return round(sum(365 / SCHEDULE_FREQ[_order(x)[0]] for x in sets if x))
+    plan_before = [current[a.id] or logged[a.id] for a in assets]
+    chg = {r["asset_id"]: set(r["after"]) for r in changes}
+    plan_after = [chg.get(a.id, current[a.id] or logged[a.id]) for a in assets]
+
+    now = time.time()
+    for k in [k for k, v in _drafts.items() if now - v["at"] > DRAFT_TTL]:
+        _drafts.pop(k, None)
+    did = secrets.token_hex(4)
+    scope = " · ".join(x for x in (site, asset_class) if x) or "all sites"
+    _drafts[did] = {"at": now, "scope": scope, "changes": changes}
+    kind = Counter("fill" if not r["before"] else
+                   "tighten" if SCHEDULE_FREQ[r["after"][0]] < SCHEDULE_FREQ[r["before"][0]] else
+                   "relax" for r in changes)
+    return {
+        "draft_id": did, "scope": scope, "status": "DRAFT - nothing saved; needs approval",
+        **({"note": note} if note else {}),
+        "assets_reviewed": len(assets), "assets_changed": len(changes),
+        "tightened": kind["tighten"], "relaxed": kind["relax"],
+        "assets_given_a_first_plan": kind["fill"],
+        "pm_visits_per_year_before": visits(plan_before),
+        "pm_visits_per_year_after": visits(plan_after),
+        "by_class": sorted(cls_stats, key=lambda r: -r["changed"])[:12],
+        "changes": [{k: v for k, v in r.items() if k != "asset_id"} for r in changes[:ROW_CAP]],
+        "truncated": len(changes) > ROW_CAP,
+    }
+
+
 S, I, B = {"type": "string"}, {"type": "integer"}, {"type": "boolean"}
 _site = {"type": "string", "description": "site / line name, partial match, e.g. 'Hillcrest'"}
 _cls = {"type": "string", "description": "asset class, partial match, e.g. 'transformer', 'isolator'"}
@@ -291,6 +415,12 @@ TOOLS = {
     "asset_history": (t_asset_history, "One asset's details and its recent logbook entries, by asset code.",
                       {"code": {"type": "string", "description": "asset code as printed on the QR tag"},
                        "site": _site}, ["code"]),
+    "draft_pm_plan": (t_draft_pm_plan, "DRAFT a preventive-maintenance plan (which cycles each asset "
+                      "needs) for a site and/or asset class, from failure history, criticality and design "
+                      "life. Proposes changes with a reason each; saves NOTHING - a supervisor approves "
+                      "the draft on screen. Use when asked to make, generate or improve a maintenance "
+                      "schedule or plan.",
+                      {"site": _site, "asset_class": _cls}, []),
 }
 
 SYSTEM = (
@@ -301,7 +431,10 @@ SYSTEM = (
     "Call tools as needed (several if useful), then answer briefly: lead with the direct answer, then at "
     "most 6 short bullet lines. Quote asset codes exactly so they can be looked up. If the tools return "
     "nothing relevant, say so plainly. Reply in the language the question was asked in "
-    "(English, Hindi or Bengali). Today is {today}."
+    "(English, Hindi or Bengali). "
+    "When you draft a maintenance plan, summarise it (assets changed, tightened / relaxed, PM visits "
+    "per year before and after, the main reasons) and say it is a draft awaiting approval below. "
+    "Today is {today}."
 )
 
 
@@ -352,6 +485,8 @@ def _gemini(question, history, db, user, trace):
         for c in calls:
             trace.append({"tool": c["name"], "args": c.get("args") or {}})
             out = _run_tool(c["name"], c.get("args"), db, user)
+            if isinstance(out, dict) and out.get("draft_id"):
+                trace[-1]["draft"] = out["draft_id"]
             results.append({"functionResponse": {"name": c["name"], "response": {"result": out}}})
         contents.append({"role": "user", "parts": results})
     return ""
@@ -382,6 +517,8 @@ def _openai(base, model, question, history, db, user, trace):
             args = json.loads(raw) if isinstance(raw, str) else raw
             trace.append({"tool": name, "args": args})
             out = _run_tool(name, args, db, user)
+            if isinstance(out, dict) and out.get("draft_id"):
+                trace[-1]["draft"] = out["draft_id"]
             msgs.append({"role": "tool", "tool_call_id": c.get("id", name), "name": name,
                          "content": json.dumps(out, default=str)})
     return ""
@@ -403,6 +540,7 @@ class AskOut(BaseModel):
     answer: str
     tools: list[dict]   # each lookup the model made: {tool, args} — shown under the answer
     model: str
+    plan: dict | None = None   # a maintenance-plan draft awaiting approval, if one was made
 
 
 @router.get("/status")
@@ -438,4 +576,46 @@ def ask(body: AskIn, request: Request, db: Session = Depends(get_db), user=Depen
             raise HTTPException(502, "The AI service is busy — please try again shortly.")
     if not answer:
         answer = "I couldn't put an answer together from the records — try asking more specifically."
-    return AskOut(answer=answer, tools=trace, model=model)
+    plan = None
+    did = next((t["draft"] for t in reversed(trace) if t.get("draft")), None)
+    if did:
+        d = _drafts.get(did)
+        if d:
+            plan = {"id": did, "scope": d["scope"], "count": len(d["changes"]),
+                    "changes": [{k: v for k, v in r.items() if k != "asset_id"}
+                                for r in d["changes"][:60]]}
+    return AskOut(answer=answer, tools=trace, model=model, plan=plan)
+
+
+@router.post("/plan/{draft_id}/apply")
+def apply_plan(draft_id: str, db: Session = Depends(get_db), user=Depends(current_writer)):
+    """Save an approved draft. Each asset is re-checked: outside the approver's
+    line, or its plan changed since the draft was made, and it is skipped."""
+    d = _drafts.get(draft_id)
+    if not d or time.time() - d["at"] > DRAFT_TTL:
+        raise HTTPException(404, "This draft has expired — ask for a fresh one.")
+    scope = scope_location_ids(db, user)
+    applied, skipped = 0, 0
+    for r in d["changes"]:
+        a = db.get(Asset, r["asset_id"])
+        if not a or (scope is not None and a.location_id not in scope):
+            skipped += 1
+            continue
+        rows = db.scalars(select(PMPlan).where(PMPlan.asset_id == a.id)).all()
+        now = {p.frequency for p in rows}
+        if now and now != set(r["before"]):
+            skipped += 1
+            continue
+        after = set(r["after"])
+        for p in rows:
+            if p.frequency not in after:
+                db.delete(p)
+        for f in after - now:
+            db.add(PMPlan(asset_id=a.id, frequency=f))
+        audit(db, "asset", a.id, "pm_plan",
+              detail=f"AI draft {draft_id} approved: {', '.join(r['before']) or 'none'} -> "
+                     f"{', '.join(r['after'])} ({r['reason']})", actor=user.username)
+        applied += 1
+    db.commit()
+    _drafts.pop(draft_id, None)
+    return {"applied": applied, "skipped": skipped}
