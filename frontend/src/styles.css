@@ -1602,6 +1602,10 @@ tbody tr:hover .edit-link { color: var(--accent); }
 .foot .sig-mark { height: 13px; vertical-align: -2px; margin-left: 3px; opacity: 0.5; }
 .gate-foot .sig-mark { height: 14px; vertical-align: -2px; opacity: 0.55; }
 .foot-sig { display: inline-block; }
+/* public demo: typeset maker's mark in place of the signature image */
+.sig-type { height: auto; font: italic 600 0.95em/1 Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.02em; vertical-align: baseline; }
+.foot .sig-type, .gate-foot .sig-type { height: auto; vertical-align: baseline; }
 .foot-sig:hover .sig-mark { opacity: 0.9; }
 .foot-amps { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
 .foot-amps:hover { color: var(--ink-3); }

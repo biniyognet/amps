@@ -42,8 +42,10 @@ const StatusChip = ({ status }) => (
 
 /* the maker's mark — Arup's own signature, the way an artist signs a canvas.
    alt carries the full name so the credit stays in the source and for readers. */
-const SignatureMark = () => (
-  <img src="/signature.png" className="sig-mark" alt="maker's signature" title="AMPS" />
+const SignatureMark = () => (LIVE
+  ? <img src="/signature.png" className="sig-mark" alt="maker's signature" title="AMPS" />
+  /* public demo: no handwritten signature asset, a typeset mark instead */
+  : <span className="sig-mark sig-type" title="AMPS">A. Biswas</span>
 )
 /* a pencil that deep-links a log entry into the log book for editing — the
    single editing surface everything else points at */
@@ -77,7 +79,6 @@ const FootSig = () => {
    deployments of AMPS so a demo visitor can see it running in the field.
    Metro AMPS is served from the office server over a Cloudflare Tunnel. */
 const SHOWCASE = [
-  { name: 'Metro AMPS', sub: 'Live · Kolkata Metro power-supply', href: 'https://metro.binihost.com', live: true },
   { name: 'This demo', sub: 'Synthetic data — you are here', href: '#/', here: true },
   { divider: true },
   { name: 'biniHost', sub: 'The platform behind it', href: 'https://binihost.com' },
@@ -2610,7 +2611,7 @@ function AboutPage() {
 
       {/* the department's standing — its infrastructure, its data. On the live
           deployment this states Metro Railway's ownership (per the departmental
-          order); on the demo it names Metro Railway as where AMPS runs for real. */}
+          order); on the public demo the operator stays unnamed (no consent to name it). */}
       <div className="card about-dept">
         {LIVE ? (
           <>
@@ -2632,8 +2633,8 @@ function AboutPage() {
           <>
             <h3>In production</h3>
             <p>
-              AMPS runs in production at <b>Metro Railway, Kolkata</b>, monitoring
-              asset maintenance across the metro network — the open-source
+              AMPS runs in production at <b>a metro railway in India</b>, monitoring
+              power-supply asset maintenance across its network — the open-source
               framework, adopted as a departmental system.
             </p>
             {/* value proof-points — demo/showcase only; the office deployment
@@ -3133,7 +3134,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
     <article className="cs-sheet cs-std">
       <div className="cs-std-page" ref={pageRef}>
         <header className="cs-std-head">
-          <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />
+          {LIVE && <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />}
           <div>
             <div className="cs-std-title"><span className="cs-std-org">{org}</span> · {title}</div>
             <div className="cs-std-sub">
@@ -4450,8 +4451,8 @@ function Landing() {
     <div className="gate land">
       <div className="land-wrap">
         <header className="land-head">
-          <img className="land-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`}
-               alt="Indian Railways" />
+          {LIVE && <img className="land-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`}
+               alt="Indian Railways" />}
           <div className="land-head-rule" aria-hidden="true" />
           <div>
             <div className="gate-badge">⚡ AMPS <span className="gate-live">● LIVE</span></div>
