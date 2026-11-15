@@ -118,7 +118,7 @@ class TenderMark(Base):
 LEGACY_FAILURE_LOG = {254: 17734, 255: 17937}   # failures.id → the same event in log_entries
 LOG_KINDS = (LogEntryType.FAILURE, LogEntryType.JOB_CARD, LogEntryType.RECTIFICATION)
 LOG_LABEL = {LogEntryType.FAILURE: "failure", LogEntryType.JOB_CARD: "job card", LogEntryType.RECTIFICATION: "rectification"}
-LINE = "Green Line"
+LINE = os.environ.get("AMPS_STANDARD_LINE", "Green Line")
 _TABLES = [TenderIssue.__table__, IssueClause.__table__, IssueLink.__table__, TenderMark.__table__]
 _ready = False
 

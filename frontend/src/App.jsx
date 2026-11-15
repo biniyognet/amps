@@ -10,7 +10,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
+import { LIVE, ORG, OPERATOR, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -42,7 +42,7 @@ const StatusChip = ({ status }) => (
 
 /* the maker's mark — Arup's own signature, the way an artist signs a canvas.
    alt carries the full name so the credit stays in the source and for readers. */
-const SignatureMark = () => (LIVE
+const SignatureMark = () => (OPERATOR
   ? <img src="/signature.png" className="sig-mark" alt="maker's signature" title="AMPS" />
   /* public demo: no handwritten signature asset, a typeset mark instead */
   : <span className="sig-mark sig-type" title="AMPS">A. Biswas</span>
@@ -128,7 +128,7 @@ const Brand = () => (
   <a href="#/" className="brand">
     {/* the real Indian Railways emblem is for the live office deployment only —
        a public synthetic demo must not carry a national/government emblem */}
-    {LIVE && <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />}
+    {OPERATOR && <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />}
     <span className="brand-lines">
       <span className="brand-l1">
         <span className="brand-name">AMPS</span>
@@ -700,7 +700,7 @@ const codalExceeded = (a) => { const e = codalExpiry(a); return e != null && e <
 /* Lines named after colours get their colour as the chip dot — free for any
    org that names lines that way; everyone else gets a neutral dot. */
 const LINE_COLORS = {
-  green: '#1c7a44', blue: '#2b5c99', purple: '#5b3fbf', yellow: '#b98a00',
+  green: '#1c7a44', blue: '#2b5c99', teal: '#0e7c86', amber: '#b7791f', indigo: '#4c51bf', ruby: '#b4234a', purple: '#5b3fbf', yellow: '#b98a00',
   red: '#a32e2e', orange: '#c2571a', pink: '#b83280', grey: '#52525b', gray: '#52525b',
 }
 const lineColor = (name) => {
@@ -1381,7 +1381,7 @@ function AssetForm({ initial, mode, onDone, onCancel }) {
         <label>Asset class<input value={f.asset_class} onChange={set('asset_class')} required
                                  list="af-classes" /></label>
         <label>Location / station<input value={f.location} onChange={set('location')} required /></label>
-        <label>Line<input value={f.line} onChange={set('line')} placeholder="e.g. Green Line" /></label>
+        <label>Line<input value={f.line} onChange={set('line')} placeholder={OPERATOR ? 'e.g. Green Line' : 'e.g. Teal Line'} /></label>
         <label>System<input value={f.system} onChange={set('system')} placeholder="reporting rollup" /></label>
         <label>Make / model<input value={f.make_model} onChange={set('make_model')} /></label>
         <label>Commissioned on<input type="date" value={f.commissioned_on} onChange={set('commissioned_on')} /></label>
@@ -1544,7 +1544,7 @@ function LiveAssetDetail({ code }) {
 
         <div className="card"><MaintenanceSchedule schedule={schedule} /></div>
 
-        <AssetDrawings code={a.code} location={a.location} />
+        {OPERATOR && <AssetDrawings code={a.code} location={a.location} />}
 
         {editing && (
           <div className="card">
@@ -2613,7 +2613,7 @@ function AboutPage() {
           deployment this states Metro Railway's ownership (per the departmental
           order); on the public demo the operator stays unnamed (no consent to name it). */}
       <div className="card about-dept">
-        {LIVE ? (
+        {OPERATOR ? (
           <>
             <h3>Departmental deployment</h3>
             <p>
@@ -2715,15 +2715,15 @@ function PrintablesNav({ active }) {
       </button>
       {open && (
         <div className="showcase-menu" role="menu">
-          <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
+          {OPERATOR && <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
             <span className="sc-name">Letters</span><span className="sc-sub">official correspondence — letters, emails & MOM on record</span>
-          </a>
-          <a className="sc-item" role="menuitem" href="#/tenders" onClick={() => setOpen(false)}>
+          </a>}
+          {OPERATOR && <a className="sc-item" role="menuitem" href="#/tenders" onClick={() => setOpen(false)}>
             <span className="sc-name">Tenders</span><span className="sc-sub">contract volumes, clause index & issue intel</span>
-          </a>
-          <a className="sc-item" role="menuitem" href="#/drawings" onClick={() => setOpen(false)}>
+          </a>}
+          {OPERATOR && <a className="sc-item" role="menuitem" href="#/drawings" onClick={() => setOpen(false)}>
             <span className="sc-name">Drawings</span><span className="sc-sub">drawing register — tender & as-built</span>
-          </a>
+          </a>}
           <a className="sc-item" role="menuitem" href="#/printables?t=qr" onClick={() => go('qr')}>
             <span className="sc-name">QR asset tags</span><span className="sc-sub">printable QR labels for every asset</span>
           </a>
@@ -3134,7 +3134,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
     <article className="cs-sheet cs-std">
       <div className="cs-std-page" ref={pageRef}>
         <header className="cs-std-head">
-          {LIVE && <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />}
+          {OPERATOR && <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />}
           <div>
             <div className="cs-std-title"><span className="cs-std-org">{org}</span> · {title}</div>
             <div className="cs-std-sub">
@@ -3170,7 +3170,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
         )}
         <div className="cs-std-rbox" style={{ display: 'none' }}>Remarks / defects observed:</div>
         <footer className="cs-std-sign">
-          {['Done by — Staff / External firm', 'Checked by — (MRLY)'].map((who) => (
+          {['Done by — Staff / External firm', OPERATOR ? 'Checked by — (MRLY)' : 'Checked by — Supervisor'].map((who) => (
             <div key={who}>
               <b>{who}</b>
               <div className="cs-std-sign-l"><span>Name: <u /></span><span>Sign: <u className="s" /></span><span>Date: <u className="xs" /></span></div>
@@ -3340,7 +3340,7 @@ function ChecksheetEditor({ initial, formats = [], onClose, onSaved, setErr }) {
         <label className="fg-span-2">Log columns <span className="ef-opt">(opt — a readings log instead of cycles, comma-separated)</span>
           <input value={slotsTxt} onChange={(e) => setSlotsTxt(e.target.value)} placeholder="e.g. 8:00 AM, 12:00 PM, 4:00 PM  ·  Week 1, Week 2, Week 3, Week 4" /></label>
         <label>Frequency <span className="ef-opt">(opt)</span><input value={freq} onChange={(e) => setFreq(e.target.value)} placeholder="e.g. Yearly" /></label>
-        <label className="fg-span-2">Printed title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="METRO RAILWAY, KOLKATA — 33KV VCB MAINTENANCE" /></label>
+        <label className="fg-span-2">Printed title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${ORG.toUpperCase()} — 33KV VCB MAINTENANCE`} /></label>
         <label>Asset / equipment <span className="ef-opt">(opt)</span><input value={assetCode} onChange={(e) => setAssetCode(e.target.value)} placeholder="e.g. Third Rail, BET, VCB" /></label>
         <label>Asset class <span className="ef-opt">(opt)</span><input value={cls} onChange={(e) => setCls(e.target.value)} placeholder="class this format matches" /></label>
       </div>
@@ -4224,7 +4224,7 @@ function DocsView() {
           <li>AMPS is <b>depot-wise</b>. Each line has one or more depots; each depot has its own
             <b> Assets</b> and <b>Logs</b> tab pair in the coordination sheet.</li>
           <li>Your login is <b>scoped to your depot</b> — you see and edit only your own depot.</li>
-          <li>The <b>Green Line (CPD)</b> register is the reference standard for format.</li>
+          {OPERATOR && <li>The <b>Green Line (CPD)</b> register is the reference standard for format.</li>}
         </ul>
       </section>
 
@@ -4267,11 +4267,11 @@ function DocsView() {
           <span className="docs-k">location</span> — fill it and tell the desk, and it will be picked up the same day.</p>
       </section>
 
-      <section className="card docs-sec">
+      {OPERATOR && <section className="card docs-sec">
         <h2>5 · Tenders &amp; contract reader</h2>
         <p>Contract volumes, issues and the clauses behind them — editing is for Green Line logins, every other line reads.
           {' '}<a href="#/tenders?guide">Read the short tenders guide →</a></p>
-      </section>
+      </section>}
     </div>
   )
 }
@@ -4451,7 +4451,7 @@ function Landing() {
     <div className="gate land">
       <div className="land-wrap">
         <header className="land-head">
-          {LIVE && <img className="land-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`}
+          {OPERATOR && <img className="land-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`}
                alt="Indian Railways" />}
           <div className="land-head-rule" aria-hidden="true" />
           <div>
@@ -4816,7 +4816,7 @@ export default function App() {
             if (path === '/printables') return <PrintablesNav key={path} active={['/printables', '/letters', '/letters/view', '/tenders', '/tenders/read', '/drawings', '/drawings/view'].includes(routePath)} />
             return <a key={path} href={`#${path}`} className={routePath === path ? 'active' : ''}>{label}</a>
           })}
-          {!LIVE && <ShowcaseDropdown />}
+          {!OPERATOR && !LIVE && <ShowcaseDropdown />}
           {signedIn && (
             <span className="who">
               <span className="dot" style={{ background: lineColor(me.line || '') }} />
@@ -4841,12 +4841,12 @@ export default function App() {
         /* legacy top-level /failures now redirects to the signed-in line's board */
         : routePath === '/failures' ? (LIVE ? <FailuresRedirect me={me} go={go} /> : <Failures />)
         : routePath === '/job-cards' ? (LIVE ? <JobCardsView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
-        : routePath === '/letters/view' ? (LIVE ? <LetterViewer id={routeQuery.get('id')} /> : <NotYet />)
-        : routePath === '/letters' ? (LIVE ? <LettersView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
-        : routePath === '/tenders' ? (LIVE ? <TendersView /> : <NotYet />)
-        : routePath === '/tenders/read' ? (LIVE ? <ReaderView vol={routeQuery.get('v')} page={routeQuery.get('p')} q={routeQuery.get('q')} /> : <NotYet />)
-        : routePath === '/drawings' ? (LIVE ? <DrawingsView /> : <NotYet />)
-        : routePath === '/drawings/view' ? (LIVE ? <DrawingViewer id={routeQuery.get('d')} page={routeQuery.get('p')} /> : <NotYet />)
+        : routePath === '/letters/view' ? (OPERATOR ? <LetterViewer id={routeQuery.get('id')} /> : <NotYet />)
+        : routePath === '/letters' ? (OPERATOR ? <LettersView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
+        : routePath === '/tenders' ? (OPERATOR ? <TendersView /> : <NotYet />)
+        : routePath === '/tenders/read' ? (OPERATOR ? <ReaderView vol={routeQuery.get('v')} page={routeQuery.get('p')} q={routeQuery.get('q')} /> : <NotYet />)
+        : routePath === '/drawings' ? (OPERATOR ? <DrawingsView /> : <NotYet />)
+        : routePath === '/drawings/view' ? (OPERATOR ? <DrawingViewer id={routeQuery.get('d')} page={routeQuery.get('p')} /> : <NotYet />)
         : routePath === '/spares' ? (LIVE ? <NotYet /> : <Spares />)
         : routePath === '/procurement' ? (LIVE ? <NotYet /> : <Procurement />)
         : routePath === '/printables' ? <Printables initial={routeQuery.get('t') || 'qr'} fmtId={routeQuery.get('f') || ''} />

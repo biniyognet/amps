@@ -10,6 +10,9 @@ import { useEffect, useState } from 'react'
 
 export const LIVE = import.meta.env.VITE_AMPS_DATA === 'live'
 export const ORG = import.meta.env.VITE_AMPS_ORG || 'Demo Metro Line'
+// VITE_AMPS_BRAND=neutral: live data, but no operator branding or operator-only
+// modules (letters, tenders, drawings) — the public demo runs this way.
+export const OPERATOR = LIVE && import.meta.env.VITE_AMPS_BRAND !== 'neutral'
 
 const API = import.meta.env.VITE_AMPS_API ?? '' // same-origin by default
 

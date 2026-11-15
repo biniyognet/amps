@@ -45,17 +45,22 @@ def _seed_checksheets(engine):
     with SessionLocal() as db:
         if db.query(ChecksheetFormat).first():
             return
-        # the HT formats belong to Green Line — scope them so they never leak to
-        # other lines' coordinators (checksheets are line-specific)
+        # the HT formats belong to the standard line (Green Line on the office
+        # deployment) — scope them so they never leak to other lines'
+        # coordinators (checksheets are line-specific)
+        std = os.environ.get("AMPS_STANDARD_LINE", "Green Line")
         green = db.scalar(select(Location).where(
-            Location.kind == LocationKind.SITE, Location.name == "Green Line"))
+            Location.kind == LocationKind.SITE, Location.name == std))
         line_id = green.id if green else None
+        # AMPS_ORG re-heads the printed titles for another organisation
+        org = os.environ.get("AMPS_ORG", "").strip().upper()
         now = datetime.utcnow()
         for f in HT_CHECKSHEET_SEED:
             slug = _re.sub(r"[^a-z0-9]+", "-", f["label"].lower()).strip("-")[:80]
             db.add(ChecksheetFormat(
                 slug=slug, grp=f.get("grp", "HT"), label=f["label"][:120],
-                title=f.get("title", f["label"])[:240],
+                title=(_re.sub(r"^METRO RAILWAY,?\s*KOLKATA", org, f.get("title", f["label"]))
+                       if org else f.get("title", f["label"]))[:240],
                 items_json=_json.dumps(f["items"], ensure_ascii=False),
                 version=1, status=ChecksheetStatus.PUBLISHED, line_id=line_id,
                 created_by="system", approved_by="system", approved_at=now))

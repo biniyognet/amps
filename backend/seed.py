@@ -119,4 +119,9 @@ def seed():
 
 
 if __name__ == "__main__":
-    seed()
+    import os
+    if os.environ.get("AMPS_SEED") == "network":
+        from seed_network import seed as seed_network
+        seed_network()
+    else:
+        seed()

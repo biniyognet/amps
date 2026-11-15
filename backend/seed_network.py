@@ -1,0 +1,347 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Arup Biswas
+# AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
+
+"""Synthetic NETWORK seed — a fictional four-line metro for the public demo.
+
+ALL DATA HERE IS FICTIONAL. Line, station, agency and person names are invented;
+no real organization's assets, locations or records appear in this file.
+
+Deterministic (fixed RNG seed) and relative to today, so the demo always looks
+current: ~2,500 assets, 18 months of maintenance history, breakdowns with their
+rectifications, job cards to outside agencies, staff and a duty roster. Each line
+is given its own health profile so the landing board shows a realistic mix.
+
+Run:  python seed_network.py   (uses DATABASE_URL, or the local SQLite fallback)
+Idempotent: does nothing when the first line already exists.
+"""
+import random
+from datetime import date, datetime, time, timedelta
+
+from sqlalchemy import select
+
+from app.db import SessionLocal, init_db
+from app.models import (
+    Asset, AssetClass, AssetStatus, Criticality, Location, LocationKind,
+    LogEntry, LogEntryType, PMPlan, RosterEntry, RosterPattern, ShiftCode,
+    User, UserRole,
+)
+
+RNG = random.Random(1115)
+TODAY = date.today()
+HISTORY_DAYS = 548  # ~18 months
+
+# name, depot code, commissioned year, health profile
+#   exemplary — nearly everything on schedule
+#   lagging   — a steady share of cycles missed
+#   cluster   — fine overall, two stations badly overdue
+#   new       — recently opened, many assets awaiting their first service
+LINES = [
+    ("Teal Line",   "TLD", 2004, "exemplary"),
+    ("Amber Line",  "AMD", 2011, "lagging"),
+    ("Indigo Line", "IND", 2016, "cluster"),
+    ("Ruby Line",   "RBD", 2024, "new"),
+]
+
+STATIONS = {
+    "Teal Line":   ["Riverside", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
+                    "Old Town", "University", "Lakeview", "Market Square", "Teal Depot"],
+    "Amber Line":  ["Westgate", "Eastbank", "Hillcrest", "Stadium", "Garden City",
+                    "Port Road", "Canal Street", "Foundry Lane", "Orchard", "Amber Depot"],
+    "Indigo Line": ["Library", "Museum", "Bridge End", "Elm Park", "Cedar Hill",
+                    "Stonebridge", "Meadow Cross", "Lighthouse", "Copper Row", "Indigo Depot"],
+    "Ruby Line":   ["Signal Hill", "Brookside", "Pine Grove", "Silver Bay", "Clocktower",
+                    "Ferry Point", "Granary", "Exhibition", "Willow Bank", "Ruby Depot"],
+}
+
+# class, code prefix, system, criticality, codal life (yrs), per-station count
+# (station / depot), PM cycles, makes
+CLASSES = [
+    ("Traction Transformer", "TTR", "Traction / PS", "A", 25, (1, 1), ["Monthly", "Yearly"], ["Voltara", "Ferrum Elec"]),
+    ("Auxiliary Transformer", "ATR", "Traction / PS", "A", 25, (2, 2), ["Quarterly", "Yearly"], ["Voltara", "Ferrum Elec"]),
+    ("Rectifier", "REC", "Traction / PS", "A", 20, (1, 1), ["Monthly", "Yearly"], ["Ampex Drives", "Northgrid"]),
+    ("HSCB Panel", "HSC", "Traction / PS", "A", 20, (4, 4), ["Monthly", "Half-Yearly"], ["Northgrid", "Kestrel Switchgear"]),
+    ("33kV VCB Panel", "VCB", "Traction / PS", "A", 25, (3, 4), ["Quarterly", "Yearly", "5-Yearly"], ["Kestrel Switchgear", "Northgrid"]),
+    ("Disconnector", "DIS", "Traction / PS", "B", 25, (6, 8), ["Half-Yearly", "Yearly"], ["Kestrel Switchgear"]),
+    ("DCDB", "DCD", "Traction / PS", "B", 20, (2, 2), ["Quarterly"], ["Ampex Drives"]),
+    ("RTU", "RTU", "SCADA", "B", 12, (1, 2), ["Quarterly"], ["Linewise Controls"]),
+    ("LT Panel", "LTP", "E&M", "B", 20, (6, 8), ["Quarterly", "Yearly"], ["Brightline Power", "Ferrum Elec"]),
+    ("UPS", "UPS", "E&M", "A", 10, (2, 3), ["Monthly", "Yearly"], ["Steadycell", "Brightline Power"]),
+    ("Battery Bank", "BAT", "E&M", "B", 6, (2, 3), ["Monthly"], ["Steadycell"]),
+    ("DG Set", "DGS", "E&M", "A", 20, (1, 1), ["Monthly", "Half-Yearly", "Yearly"], ["Ironbark Gensets"]),
+    ("Escalator", "ESC", "Lift & Escalator", "A", 25, (8, 0), ["Monthly", "Half-Yearly"], ["Ascendo", "Liftway"]),
+    ("Lift", "LFT", "Lift & Escalator", "A", 25, (3, 1), ["Monthly", "Yearly"], ["Ascendo", "Liftway"]),
+    ("Tunnel Ventilation Fan", "TVF", "ECS", "A", 25, (2, 0), ["Quarterly", "Yearly"], ["Aerodyne Fans"]),
+    ("AHU", "AHU", "ECS", "B", 15, (6, 2), ["Monthly", "Quarterly"], ["Coolpath", "Aerodyne Fans"]),
+    ("Chiller", "CHL", "ECS", "A", 20, (1, 0), ["Monthly", "Half-Yearly"], ["Coolpath"]),
+    ("Pump Set", "PMP", "Plumbing", "B", 15, (5, 4), ["Quarterly"], ["Hydroflow"]),
+    ("Fire Alarm Panel", "FAP", "Fire", "A", 15, (1, 1), ["Monthly", "Yearly"], ["Sentinel Safety"]),
+    ("Sprinkler Pump", "SPR", "Fire", "A", 15, (2, 2), ["Monthly"], ["Hydroflow", "Sentinel Safety"]),
+    ("EOT Crane", "CRN", "Depot", "B", 25, (0, 4), ["Quarterly", "Yearly"], ["Hoistline"]),
+    ("Pit Wheel Lathe", "PWL", "Depot", "B", 20, (0, 1), ["Monthly", "Yearly"], ["Hoistline"]),
+    ("Compressor", "CMP", "Depot", "B", 15, (0, 3), ["Monthly"], ["Ironbark Gensets"]),
+]
+
+SPOTS = ["TSS room", "ASS room", "Concourse", "Platform level", "Plant room",
+         "Entry A", "Entry B", "Tunnel end", "Roof", "Basement"]
+FIRST = ["R.", "S.", "K.", "P.", "D.", "A.", "M.", "T.", "V.", "N."]
+LAST = ["Mehta", "Iyer", "Nair", "Rao", "Joshi", "Kapoor", "Menon", "Pillai",
+        "Shetty", "Varma", "Kulkarni", "Desai", "Reddy", "Bhatt", "Chopra"]
+AGENCIES = ["Voltara Service", "Northgrid Field Team", "Ascendo Care",
+            "Coolpath Services", "Kestrel Switchgear OEM", "Hydroflow Contracts"]
+
+FAULTS = {
+    "Traction / PS": ["HSCB tripped on overcurrent", "DC earth fault", "Rectifier diode alarm",
+                      "Transformer winding temperature high", "VCB failed to close"],
+    "SCADA": ["RTU communication lost", "Status mismatch at OCC"],
+    "E&M": ["UPS on bypass", "Battery cell low voltage", "DG failed to start", "LT feeder tripped"],
+    "Lift & Escalator": ["Escalator stopped — step sag switch", "Handrail speed fault",
+                         "Lift door sensor fault", "Lift stuck between floors"],
+    "ECS": ["TVF vibration high", "AHU belt snapped", "Chiller high-pressure trip"],
+    "Plumbing": ["Pump not starting", "Mechanical seal leak"],
+    "Fire": ["Fire panel loop fault", "Sprinkler pump pressure low"],
+    "Depot": ["Crane long-travel brake fault", "Compressor overheating"],
+}
+ACTIONS = ["Reset after inspection; parameters normal.", "Faulty relay replaced; tested OK.",
+           "Contactor replaced; trial run OK.", "Loose termination tightened; monitored for one hour.",
+           "Sensor cleaned and re-aligned; normalised.", "Fuse replaced; load restored.",
+           "Belt replaced; vibration within limits.", "Card replaced by OEM; system restored."]
+
+CYCLE_DAYS = {"Weekly": 7, "Monthly": 30, "Quarterly": 91, "Half-Yearly": 182,
+              "Yearly": 365, "5-Yearly": 1825}
+
+
+def _at(d: date, hour: int) -> datetime:
+    return datetime.combine(d, time(hour % 24, RNG.randint(0, 59)))
+
+
+def _person() -> str:
+    return f"{RNG.choice(FIRST)} {RNG.choice(LAST)}"
+
+
+def _skip_prob(profile: str, station_idx: int, days_ago: int) -> float:
+    """Chance a scheduled service was missed — tunes each line's health."""
+    if profile == "exemplary":
+        return 0.01 if days_ago > 45 else 0.03
+    if profile == "lagging":
+        return 0.10 if days_ago > 120 else 0.45
+    if profile == "cluster":
+        if station_idx in (3, 4) and days_ago < 150:
+            return 0.92
+        return 0.03 if days_ago > 45 else 0.08
+    return 0.03 if days_ago > 45 else 0.06   # new
+
+
+def seed():
+    init_db()
+    db = SessionLocal()
+    try:
+        if db.scalar(select(Location).where(Location.kind == LocationKind.SITE,
+                                            Location.name == LINES[0][0])):
+            print("Network already seeded — nothing to do.")
+            return
+
+        classes = {}
+        for c in CLASSES:
+            classes[c[0]] = db.scalar(select(AssetClass).where(AssetClass.name == c[0])) \
+                or AssetClass(name=c[0])
+            db.add(classes[c[0]])
+
+        # ---- people --------------------------------------------------------
+        users: list[User] = []
+        sites: dict[str, Location] = {}
+        for name, depot, *_ in LINES:
+            sites[name] = Location(name=name, kind=LocationKind.SITE)
+            db.add(sites[name])
+        db.flush()
+        used = set()
+
+        def mk_user(role, line=None):
+            while True:
+                full = _person()
+                uname = full.replace(". ", ".").lower()
+                if uname not in used:
+                    used.add(uname)
+                    break
+            u = User(username=uname, full_name=full, role=role,
+                     line_id=sites[line].id if line else None)
+            db.add(u)
+            users.append(u)
+            return u
+
+        crews: dict[str, list[str]] = {}
+        for name, *_ in LINES:
+            mk_user(UserRole.INCHARGE, name)
+            sups = [mk_user(UserRole.SUPERVISOR, name) for _ in range(2)]
+            techs = [mk_user(UserRole.TECHNICIAN, name) for _ in range(2)]
+            crews[name] = [u.full_name for u in sups + techs]
+        mk_user(UserRole.VIEWER)
+
+        # ---- stations + assets --------------------------------------------
+        n_assets = n_logs = 0
+        all_assets: list[tuple[Asset, str, int]] = []  # asset, line, station idx
+        logs: list[LogEntry] = []
+        plans: list[tuple] = []
+        for line, depot, year, profile in LINES:
+            site = sites[line]
+            for si, stn in enumerate(STATIONS[line]):
+                is_depot = stn.endswith("Depot")
+                loc = Location(name=stn, kind=LocationKind.STATION, parent=site)
+                db.add(loc)
+                for (cname, pfx, system, crit, life, per, cycles, makes) in CLASSES:
+                    count = per[1] if is_depot else per[0]
+                    for k in range(count):
+                        n_assets += 1
+                        # older lines: some original equipment past its codal life
+                        comm_year = year + (RNG.randint(0, 3) if RNG.random() < 0.8 else RNG.randint(4, 12))
+                        comm_year = min(comm_year, TODAY.year)
+                        comm = date(comm_year, RNG.randint(1, 12), RNG.randint(1, 28))
+                        if comm > TODAY:
+                            comm = TODAY - timedelta(days=RNG.randint(60, 300))
+                        code = f"{depot[:2]}-{stn[:3].upper()}-{pfx}-{k + 1:02d}"
+                        status = AssetStatus.IN_SERVICE
+                        r = RNG.random()
+                        if r < 0.006:
+                            status = AssetStatus.UNDER_MAINTENANCE
+                        elif r < 0.012:
+                            status = AssetStatus.SPARE
+                        a = Asset(
+                            code=code, name=f"{cname} {k + 1}",
+                            asset_class=classes[cname], location=loc, line_id=site.id,
+                            make_model=f"{RNG.choice(makes)} {pfx}-{RNG.randint(100, 990)}",
+                            system=system, commissioned_on=comm, status=status,
+                            criticality=Criticality(crit if RNG.random() > 0.15 else "B"),
+                            codal_life_years=life, depot=depot,
+                            location_detail=RNG.choice(SPOTS),
+                        )
+                        db.add(a)
+                        all_assets.append((a, line, si))
+                        start = max(comm, TODAY - timedelta(days=HISTORY_DAYS))
+                        step = CYCLE_DAYS[cycles[0]]
+                        # when each cycle was last done; equipment older than the
+                        # history window carries a baseline so long cycles start mid-way
+                        last = {}
+                        for f in cycles:
+                            if comm < start:
+                                last[f] = start - timedelta(days=RNG.randint(0, max(CYCLE_DAYS[f] - step, 1)))
+                                plans.append((a, f, last[f]))
+                            else:
+                                last[f] = comm
+                                plans.append((a, f, None))
+                        # newly opened line: a share never yet serviced
+                        if profile == "new" and RNG.random() < 0.18:
+                            continue
+                        d = start + timedelta(days=RNG.randint(0, step - 1))
+                        while d <= TODAY:
+                            ago = (TODAY - d).days
+                            if RNG.random() >= _skip_prob(profile, si, ago):
+                                # label with the longest cycle that has come round;
+                                # a longer cycle fulfils every shorter one
+                                label = cycles[0]
+                                for f in cycles[1:]:
+                                    if (d - last[f]).days >= CYCLE_DAYS[f] - step // 2:
+                                        label = f
+                                for f in cycles:
+                                    if CYCLE_DAYS[f] <= CYCLE_DAYS[label]:
+                                        last[f] = d
+                                shift = RNG.choice([ShiftCode.NIGHT, ShiftCode.NIGHT, ShiftCode.GENERAL])
+                                logs.append(LogEntry(
+                                    at=_at(d, 1 if shift == ShiftCode.NIGHT else 11),
+                                    log_date=d, shift=shift, type=LogEntryType.MAINTENANCE,
+                                    subtype=label, system=system, station=stn, asset=a,
+                                    line_id=site.id, category=cname,
+                                    text=f"{label} maintenance of {code} carried out as per checksheet.",
+                                    entered_by=RNG.choice(crews[line]),
+                                    attended_by=", ".join(RNG.sample(crews[line], 2)),
+                                ))
+                            # crews work slightly ahead of the due date
+                            d += timedelta(days=step - RNG.randint(0, max(2, step // 15)))
+        db.flush()
+        db.add_all(PMPlan(asset_id=a.id, frequency=f, last_done_seed=b) for a, f, b in plans)
+        db.add_all(logs)
+        n_logs = len(logs)
+        db.flush()
+
+        # ---- breakdowns, rectifications, job cards -------------------------
+        weight = {"exemplary": 0.6, "lagging": 1.8, "cluster": 1.2, "new": 0.8}
+        prof = {l[0]: l[3] for l in LINES}
+        pool = [t for t in all_assets if t[0].status == AssetStatus.IN_SERVICE]
+        n_fail = n_jc = 0
+        target, recent = 150, 18   # the last `recent` are still outstanding
+        while n_fail < target + recent:
+            a, line, si = RNG.choice(pool)
+            if RNG.random() > weight[prof[line]] / 1.8:
+                continue
+            n_fail += 1
+            tail = n_fail > target
+            ago = RNG.randint(0, 25) if tail else int(RNG.triangular(26, HISTORY_DAYS, 40))
+            d = TODAY - timedelta(days=ago)
+            start = _at(d, RNG.randint(5, 23))
+            fault = RNG.choice(FAULTS[a.system])
+            stn = a.location.name
+            f = LogEntry(at=start, log_date=d, shift=ShiftCode.GENERAL, type=LogEntryType.FAILURE,
+                         system=a.system, category=a.asset_class.name, fault_type=fault,
+                         station=stn, asset=a, line_id=a.line_id,
+                         text=f"{fault} on {a.code} at {stn}.",
+                         entered_by=RNG.choice(crews[line]))
+            db.add(f)
+            db.flush()
+            # the most recent few stay outstanding: open / acknowledged / job card
+            outstanding = tail
+            needs_jc = (n_fail - target) % 3 == 0 if tail else RNG.random() < 0.26
+            jc_at = start + timedelta(hours=RNG.uniform(1, 6))
+            if needs_jc:
+                n_jc += 1
+                agency = RNG.choice(AGENCIES)
+                db.add(LogEntry(at=jc_at, log_date=jc_at.date(), shift=ShiftCode.GENERAL,
+                                type=LogEntryType.JOB_CARD, rectifies_id=f.id, asset=a,
+                                line_id=a.line_id, system=a.system, station=stn,
+                                fault_type=fault, attended_by=agency,
+                                entered_by=RNG.choice(crews[line]),
+                                text=f"Job card issued to {agency}: {fault.lower()}."))
+            if outstanding:
+                if not needs_jc and n_fail % 2 == 0:
+                    db.add(LogEntry(at=start + timedelta(hours=1), log_date=d,
+                                    type=LogEntryType.ACKNOWLEDGEMENT, rectifies_id=f.id,
+                                    asset=a, line_id=a.line_id, station=stn,
+                                    entered_by=RNG.choice(crews[line]),
+                                    text="Noted; spares demand raised."))
+                continue
+            hours = min(RNG.lognormvariate(1.1, 0.9), 96.0)
+            if needs_jc:
+                hours += RNG.uniform(24, 24 * 12)
+            end = start + timedelta(hours=hours)
+            if end.date() > TODAY:
+                end = datetime.combine(TODAY, time(6, 0))
+            via_jc = needs_jc and RNG.random() < 0.8
+            db.add(LogEntry(at=end, log_date=end.date(), shift=ShiftCode.GENERAL,
+                            type=LogEntryType.RECTIFICATION, rectifies_id=f.id, asset=a,
+                            line_id=a.line_id, system=a.system, station=stn,
+                            action_taken=RNG.choice(ACTIONS), via_job_card=via_jc or None,
+                            attended_by=", ".join(RNG.sample(crews[line], 2)),
+                            entered_by=RNG.choice(crews[line]),
+                            text=RNG.choice(ACTIONS)))
+
+        # ---- duty roster ----------------------------------------------------
+        if not db.scalar(select(RosterPattern).where(RosterPattern.name == "Network baseline")):
+            pat = RosterPattern(name="Network baseline", is_active=True,
+                                description="Synthetic weekly pattern: M/E/N covered every day.",
+                                maintenance_window_shifts="N")
+            db.add(pat)
+            codes = ["M", "E", "N", "R", "G", "M", "E"]
+            for i, u in enumerate(x for x in users if x.role in (UserRole.SUPERVISOR, UserRole.TECHNICIAN)):
+                for wd in range(7):
+                    c = codes[(wd + i * 2) % 7]
+                    if c != "R":
+                        db.add(RosterEntry(pattern=pat, user=u, weekday=wd, shift=ShiftCode(c)))
+
+        db.commit()
+        print(f"Seeded {len(LINES)} lines, {sum(len(s) for s in STATIONS.values())} stations, "
+              f"{n_assets} assets, {n_logs} maintenance entries, {n_fail} failures "
+              f"({n_jc} job cards), {len(users)} users.")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    seed()
