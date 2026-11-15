@@ -53,14 +53,20 @@ spec:
             secretKeyRef:
               key: AMPS_ADMIN_USER
               name: amps-demo-admin
-        # Ask AMPS: read-only Q&A. Cluster Ollama now; to switch to Gemini set
-        # AMPS_AI_PROVIDER=gemini + AMPS_GEMINI_API_KEY (secretKeyRef amps-demo-ai/GEMINI_API_KEY)
-        # and point AMPS_AI_FALLBACK_URL/MODEL at the Ollama values below.
+        # Ask AMPS: Gemini first, cluster Ollama when Gemini errors or is rate-limited.
+        # Key: secret amps-demo-ai/GEMINI_API_KEY, loaded from bvault imagegen/GEMINI_API_KEY.
         - name: AMPS_AI_PROVIDER
-          value: openai
-        - name: AMPS_AI_BASE_URL
+          value: gemini
+        - name: AMPS_GEMINI_MODEL
+          value: gemini-2.5-flash
+        - name: AMPS_GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GEMINI_API_KEY
+              name: amps-demo-ai
+        - name: AMPS_AI_FALLBACK_URL
           value: http://ollama.bini-ai.svc:11434/v1
-        - name: AMPS_AI_MODEL
+        - name: AMPS_AI_FALLBACK_MODEL
           value: qwen2.5:3b
         - name: AMPS_AI_PER_MINUTE
           value: '6'
