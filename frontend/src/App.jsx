@@ -4286,7 +4286,7 @@ const NAV = LIVE ? [
   ['/failures', 'Failures'],
   ['/job-cards', 'Job cards'],
   ['/printables', 'More'],
-  ['/guide', 'Guide'],
+  ['/guide', OPERATOR ? 'Guide' : 'Pitch'],
 ] : [
   ['/', 'Assets'],
   ['/planner', 'Planner'],
@@ -4731,7 +4731,7 @@ export default function App() {
 
   // split the path from its query (e.g. /log?d=2026-01-13&edit=13863) so a
   // row anywhere can deep-link straight into the logbook to edit an entry
-  const routePath = route.split('?')[0]
+  const routePath = ((p) => p === '/pitch' ? '/guide' : p)(route.split('?')[0])
   const routeQuery = new URLSearchParams(route.split('?')[1] || '')
   const assetMatch = routePath.match(/^\/asset\/(.+)$/)
   // codes carry spaces/parens — the hash percent-encodes them, so decode once
@@ -4757,7 +4757,7 @@ export default function App() {
   const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
-         src={`${import.meta.env.BASE_URL}landing-art.webp?v=57cfb09`} />
+         src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
   )
 
   // Anonymous surface = landing (line squares + sign-in), a chosen line
@@ -4775,7 +4775,7 @@ export default function App() {
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
               : <a href="#/" className={!navLine ? 'active' : ''}>{W.Lines}</a>}
-            <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>Guide</a>
+            <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
               <span className="li-txt">Sign in</span></a>
