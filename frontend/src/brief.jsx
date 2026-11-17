@@ -45,7 +45,7 @@ const SLIDES = [
   'Running today on the power system of a metro railway in India',
   'Next-generation EAM, without the legacy weight', 'The framework is free forever. Services pay the bills.',
   'Anyone who keeps critical equipment running', 'MVP on our own cluster today, built to scale on Google Cloud',
-  'Built by biniyog · delivered by biniDev',
+  'Built and delivered by biniDev',
 ]
 // Live demo entry points — every link opens the real app on synthetic data.
 const TRY = [
@@ -164,7 +164,7 @@ export default function Brief() {
       <dl className="br-faq">{FAQ.map(([q, a]) => <div key={q}><dt>{q}</dt><dd>{a}</dd></div>)}</dl>
 
       <h2><span>§8</span>Team &amp; ask</h2>
-      <p>Built by biniyog · delivered by biniDev. <b>Arup Biswas</b>, Founder · <b>Nilanjan Chakraborty</b>, Co-founder ·
+      <p>Built and delivered by biniDev. <b>Arup Biswas</b>, Founder · <b>Nilanjan Chakraborty</b>, Co-founder ·
         Full-stack Developer.</p>
       <ul>
         <li><b>Pilots</b> — depots, substations and plants ready to run AMPS on their own assets.</li>
