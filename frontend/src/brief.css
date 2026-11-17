@@ -40,3 +40,11 @@
 .brief h2{letter-spacing:-.005em}
 .br-stage img{display:block;width:100%;height:100%;object-fit:contain}
 .br-pdf{margin-left:auto;color:var(--ink);border:1px solid var(--rule);background:var(--card);padding:5px 10px;border-radius:4px;text-decoration:none}
+.br-try{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0 0}
+.br-try a{display:block;border:1px solid var(--rule);background:var(--card);padding:12px 14px;border-radius:4px;text-decoration:none;color:var(--ink)}
+.br-try a:hover{border-color:var(--teal)}
+.br-try b{display:block;font-family:Fraunces,serif;font-weight:500;font-size:17px;color:var(--teal)}
+.br-try span{font-size:14px;color:var(--mute);line-height:1.4}
+.br-faq{margin:8px 0}.br-faq div{padding:10px 0;border-bottom:1px solid var(--rule)}
+.br-faq dt{font-weight:600}.br-faq dd{margin:4px 0 0;color:var(--mute)}
+@media (max-width:640px){.br-try{grid-template-columns:1fr}}

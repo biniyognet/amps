@@ -47,6 +47,27 @@ const SLIDES = [
   'Anyone who keeps critical equipment running', 'MVP on our own cluster today, built to scale on Google Cloud',
   'Built by biniyog · delivered by biniDev',
 ]
+// Live demo entry points — every link opens the real app on synthetic data.
+const TRY = [
+  ['#/', 'Network dashboard', 'Every site’s PM compliance, overdue work and failures on one screen'],
+  ['#/line/Riverside%20Metro', 'A site, close up', 'One line’s schedule: on time, due soon, overdue, by system'],
+  ['#/assets', 'Asset register', 'Filter by site, class, criticality; every row opens its history'],
+  ['#/asset/RVM-RIV-TTR-01', 'What a QR tag opens', 'One transformer: details, PM history, failures, job cards'],
+  ['#/log', 'Log book', 'Preventive maintenance entries by date and cycle'],
+  ['#/failures', 'Failures', 'Breakdowns, rectification, downtime and MTTR'],
+  ['#/job-cards', 'Job cards', 'Agency work tracked from issue to closure'],
+  ['#/printables', 'Printables', 'QR tags and per-class checksheets, ready to print'],
+]
+
+const FAQ = [
+  ['Do we need new hardware?', 'No. AMPS runs on one ordinary server or a small VM; staff use the phones and PCs they already have. Viewing needs no login.'],
+  ['What happens to our old registers?', 'They are imported. Excel and scanned registers are migrated in during onboarding, so history starts on day one, not from zero.'],
+  ['Where does our data live?', 'In your own PostgreSQL database, on your premises or your cloud. Nothing is locked in a vendor format; export is a SQL dump away.'],
+  ['Is the AI optional?', 'Yes. Every register, schedule and report works without it. Ask AMPS uses Gemini today; an on-premises model is an option for sites where no record may leave the building.'],
+  ['How long does a rollout take?', 'Weeks, not months: import the old registers, tag the assets, start logging. No implementation partner needed.'],
+  ['What does it cost?', 'The software is free (MIT). You pay only for what you choose: hosting, onboarding and tagging, support or custom features.'],
+]
+
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
 const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1115b`
 
@@ -90,14 +111,18 @@ export default function Brief() {
       <p className="br-dek">A next-generation alternative to SAP PM / Maximo-class EAM for any plant: QR-first, phone-first,
         live in weeks, ₹0 licence. Already running the power-system maintenance of a metro railway in India.</p>
       <div className="br-delta">
-        <div><b>3,050</b><span>assets in production</span></div>
-        <div><b>18,000+</b><span>records migrated, 2020–2026</span></div>
+        <div><b>7,900+</b><span>assets in production, 5 lines</span></div>
+        <div><b>33,000+</b><span>maintenance records, 2020–2026</span></div>
         <div><b>₹0</b><span>licence cost</span></div>
       </div>
 
       <h2><span>Deck</span>The pitch, in fourteen slides</h2>
       <p className="br-note">← → or n / p to step · Full screen to present</p>
       <Deck />
+
+      <h2><span>Try</span>Open the live demo</h2>
+      <p className="br-note">Same code as production · synthetic data · no login to look around</p>
+      <nav className="br-try">{TRY.map(([href, t, d]) => <a key={href} href={href}><b>{t} →</b><span>{d}</span></a>)}</nav>
 
       <h2><span>§1</span>Problem</h2>
       <p>Most maintenance teams in India still run critical equipment from paper registers. Failure history can't be
@@ -116,8 +141,9 @@ export default function Brief() {
       </ul>
 
       <h2><span>§3</span>Proof</h2>
-      <p>AMPS is not a prototype. It runs in production on a metro railway power system: 3,050 assets registered and
-        tagged, and six years of maintenance and failure records migrated in. The operator paid nothing for licences.
+      <p>AMPS is not a prototype. It runs in production on a metro railway power system in India: over 7,900 assets across five lines and
+        230+ locations registered and tagged, and six years of maintenance and failure records (33,000+) migrated in.
+        Overdue work and assets past design life are visible network-wide, the day they happen. The operator paid nothing for licences.
         This site runs the same code against four synthetic plant sites — a metro, a power substation, a water works and a factory
         {net?.lines?.length ? <> ({n(net.lines.reduce((s, l) => s + (l.assets || 0), 0))} assets)</> : null}.</p>
 
@@ -134,7 +160,10 @@ export default function Brief() {
       <p>Transit (metros, rail depots, traction substations) · utilities (power, water, distribution) · factories ·
         large campuses — anyone with equipment that must not fail.</p>
 
-      <h2><span>§7</span>Team &amp; ask</h2>
+      <h2><span>§7</span>Questions buyers ask</h2>
+      <dl className="br-faq">{FAQ.map(([q, a]) => <div key={q}><dt>{q}</dt><dd>{a}</dd></div>)}</dl>
+
+      <h2><span>§8</span>Team &amp; ask</h2>
       <p>Built by biniyog · delivered by biniDev. <b>Arup Biswas</b>, Founder · <b>Nilanjan Chakraborty</b>, Co-founder ·
         Full-stack Developer.</p>
       <ul>
