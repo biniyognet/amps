@@ -217,8 +217,8 @@ function DataDoc() {
 /* ---------------- GM briefing deck ---------------- */
 function Deck() {
   const [i, setI] = useState(0)
-  // v2 deck (17.11.2026): slide images rendered from AMPS_GM_presentation.pdf
-  const slides = Array.from({ length: 10 }, (_, k) => (
+  // v3 deck (17.11.2026, 19 slides): slide images rendered from AMPS_GM_presentation.pdf
+  const slides = Array.from({ length: 19 }, (_, k) => (
     <img className="gd-img" key={k} src={`/pitch-gm/${String(k + 1).padStart(2, '0')}.webp`} alt={`Slide ${k + 1}`} />))
   const n = slides.length
   useEffect(() => {
