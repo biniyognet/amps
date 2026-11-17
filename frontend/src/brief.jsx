@@ -37,14 +37,25 @@ const COMPARE = [
 // The pitch deck, rendered from the same source as the PDF (public/pitch/) —
 // one deck, two forms. Titles double as alt text.
 const SLIDES = [
-  'AMPS', 'Critical equipment is still maintained from paper registers',
-  'One register for every asset, every record, every device', 'Every site’s PM compliance, at a glance',
-  'From a register to a maintenance cockpit', 'Scattered breakdowns become one clear bottleneck',
+  'AMPS',
+  'Critical equipment is still maintained from paper registers',
+  'One register for every asset, every record, every device',
+  'Every site’s PM compliance, at a glance',
+  'From a register to a maintenance cockpit',
+  'Scattered breakdowns become one clear bottleneck',
+  'Scan this code with your phone',
+  'One system, sixteen working parts',
+  'Every role has its place in the record',
   'Gemini turns the logbook into answers, job cards and early warnings',
   'AI drafts the maintenance plan. A supervisor approves it.',
   'Running today on the power system of a metro railway in India',
-  'Next-generation EAM, without the legacy weight', 'The framework is free forever. Services pay the bills.',
-  'Anyone who keeps critical equipment running', 'MVP on our own cluster today, built to scale on Google Cloud',
+  'Next-generation EAM, without the legacy weight',
+  'The framework is free forever. Services pay the bills.',
+  'Anyone who keeps critical equipment running',
+  'One codebase, any footprint: a single office PC or a cluster',
+  'Three servers, no single point of failure',
+  'MVP on our own cluster today, built to scale on Google Cloud',
+  'Built on the same records, ready to add',
   'Built and delivered by biniDev',
 ]
 // Live demo entry points — every link opens the real app on synthetic data.
@@ -69,7 +80,7 @@ const FAQ = [
 ]
 
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
-const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1115b`
+const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1117`
 
 function Deck() {
   const [i, setI] = useState(0)
@@ -95,7 +106,7 @@ function Deck() {
         <span className="br-count">{i + 1} / {SLIDES.length}</span>
         <button type="button" onClick={() => setI(Math.min(last, i + 1))} disabled={i === last}>Next ›</button>
         <button type="button" onClick={() => ref.current?.requestFullscreen?.()}>Full screen</button>
-        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1115b`} download>Download PDF</a>
+        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1117`} download>Download PDF</a>
       </figcaption>
     </figure>
   )
@@ -116,7 +127,7 @@ export default function Brief() {
         <div><b>₹0</b><span>licence cost</span></div>
       </div>
 
-      <h2><span>Deck</span>The pitch, in fourteen slides</h2>
+      <h2><span>Deck</span>The pitch, in twenty slides</h2>
       <p className="br-note">← → or n / p to step · Full screen to present</p>
       <Deck />
 
