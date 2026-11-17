@@ -1265,8 +1265,8 @@ export function ReaderView({ vol: v0, page: p0, q: q0 }) {
     <button type="button" className={`rd-it mk ${n.kind} ${n.vol === vol && n.page === page ? 'on' : ''}`} onClick={() => open(n.vol, n.page, q0)}>
       <span className="rd-top"><span className="rd-tag">{MKI[n.kind]} {n.title || KIND[n.kind].slice(2)}</span><span className="rd-pg">{n.vol} p{n.page}</span></span>
       {n.text && <div className="rd-sub">{n.text}</div>}
-      {(n.issue_id || (allMarks && !n.mine)) && <div className="rd-sub" style={{ fontSize: 11 }}>
-        {n.issue_id && <>↳ {issueName(n.issue_id)}</>}{allMarks && !n.mine && <> · {n.by}</>}</div>}
+      {(n.issue_id || n.by) && <div className="rd-sub" style={{ fontSize: 11 }}>
+        {n.issue_id && <>↳ {issueName(n.issue_id)}</>}{n.by && <>{n.issue_id ? ' · ' : ''}{n.by}</>}</div>}
     </button>
   )
 
