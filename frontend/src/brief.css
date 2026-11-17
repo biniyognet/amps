@@ -1,8 +1,10 @@
-.brief{--paper:#faf9f7;--ink:#16191d;--mute:#5b6168;--rule:#e4e1db;--signal:#bd3d12;--teal:#1d7871;--card:#fff;
-  font-family:'Source Serif 4',Georgia,serif;color:var(--ink);background:var(--paper);max-width:920px;margin:0 auto;
-  padding:40px 32px 64px;line-height:1.6;font-size:17px;border-radius:6px}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .brief{--paper:#14171a;--ink:#e9e6e0;--mute:#9aa1a8;--rule:#2a2f35;--signal:#e0683c;--teal:#4fb3a9;--card:#1b1f23}}
-:root[data-theme="dark"] .brief{--paper:#14171a;--ink:#e9e6e0;--mute:#9aa1a8;--rule:#2a2f35;--signal:#e0683c;--teal:#4fb3a9;--card:#1b1f23}
+/* The brief sits inside the AMPS app, which is light-only: take the app's own
+   tokens (styles.css :root) so the page reads as one surface, never a dark card. */
+.brief{--paper:var(--card-bg,rgba(255,255,255,.55));--ink:#0B2A3F;--mute:#4B5F6D;--rule:#DDE7EE;--signal:#0078B4;--teal:#0F7FA8;--card:#fff;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--paper);
+  -webkit-backdrop-filter:saturate(1.2) blur(6px);backdrop-filter:saturate(1.2) blur(6px);
+  border:1px solid var(--rule);border-radius:16px;max-width:920px;margin:0 auto;
+  padding:40px 32px 64px;line-height:1.6;font-size:16.5px;color-scheme:light}
 .brief h1{font-family:Fraunces,Georgia,serif;font-weight:650;font-size:44px;line-height:1.1;margin:8px 0 14px;letter-spacing:-.01em}
 .brief h2{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:24px;margin:44px 0 10px;padding-top:14px;border-top:1px solid var(--rule)}
 .brief h2 span{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--signal);margin-right:12px;vertical-align:3px}
@@ -10,7 +12,7 @@
 .br-kick{color:var(--signal)}
 .br-dek{font-size:19px;color:var(--mute);margin:0 0 24px}
 .br-delta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0 8px}
-.br-delta div{border:1px solid var(--rule);border-left:3px solid var(--teal);background:var(--card);padding:14px 16px}
+.br-delta div{border:1px solid var(--rule);border-left:3px solid var(--signal);background:var(--card);padding:14px 16px;border-radius:12px}
 .br-delta b{display:block;font-family:Fraunces,serif;font-size:32px;font-weight:650}
 .br-delta span{font-size:14px;color:var(--mute)}
 .brief ul{padding-left:20px}.brief li{margin:6px 0}
@@ -22,11 +24,11 @@
 .br-foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--rule)}
 /* embedded deck: 16:9 stage showing the PDF deck pages */
 .br-deck{margin:12px 0 0;container-type:inline-size}
-.br-stage{aspect-ratio:16/9;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:#fff;color:#16191d;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.br-stage{aspect-ratio:16/9;border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:#fff;color:#16191d;box-shadow:0 10px 30px rgba(0,0,0,.08)}
 .br-deck:fullscreen{background:radial-gradient(900px 600px at 85% 10%,rgba(20,163,174,.14),transparent 60%),linear-gradient(135deg,#F7F8F4,#EAF2EF);display:flex;flex-direction:column;justify-content:center;padding:2vh 2vw}
 .br-deck:fullscreen .br-stage{max-height:90vh;margin:0 auto;width:min(100%,160vh)}
 .br-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mute)}
-.br-ctl button{font:inherit;border:1px solid var(--rule);background:var(--card);color:var(--ink);padding:5px 10px;border-radius:4px;cursor:pointer}
+.br-ctl button{font:inherit;border:1px solid var(--rule);background:var(--card);color:var(--ink);padding:5px 12px;border-radius:8px;cursor:pointer}
 .br-ctl button:disabled{opacity:.4;cursor:default}
 .br-dots{display:flex;gap:5px;flex:1;justify-content:center}
 .br-dots i{width:7px;height:7px;border-radius:50%;background:var(--rule);cursor:pointer}.br-dots i.on{background:var(--signal)}
@@ -39,10 +41,10 @@
 .brief h1,.brief h2{text-transform:none;letter-spacing:normal;color:inherit}
 .brief h2{letter-spacing:-.005em}
 .br-stage img{display:block;width:100%;height:100%;object-fit:contain}
-.br-pdf{margin-left:auto;color:var(--ink);border:1px solid var(--rule);background:var(--card);padding:5px 10px;border-radius:4px;text-decoration:none}
+.br-pdf{margin-left:auto;color:var(--ink);border:1px solid var(--rule);background:var(--card);padding:5px 12px;border-radius:8px;text-decoration:none}
 .br-try{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0 0}
-.br-try a{display:block;border:1px solid var(--rule);background:var(--card);padding:12px 14px;border-radius:4px;text-decoration:none;color:var(--ink)}
-.br-try a:hover{border-color:var(--teal)}
+.br-try a{display:block;border:1px solid var(--rule);background:var(--card);padding:12px 14px;border-radius:12px;text-decoration:none;color:var(--ink)}
+.br-try a:hover{border-color:var(--accent-line,#60CCF0);background:var(--accent-soft,#F0F9FE)}
 .br-try b{display:block;font-family:Fraunces,serif;font-weight:500;font-size:17px;color:var(--teal)}
 .br-try span{font-size:14px;color:var(--mute);line-height:1.4}
 .br-faq{margin:8px 0}.br-faq div{padding:10px 0;border-bottom:1px solid var(--rule)}
