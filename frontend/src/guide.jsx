@@ -2,7 +2,7 @@
    presentation deck for the GM. Sub-pages are /guide?s=<id>; the deck is
    /guide?s=gm (arrow keys / buttons step the slides). */
 import { useEffect, useState } from 'react'
-import { LIVE, ORG, getJSON, useMe } from './api.js'
+import { LIVE, getJSON, useMe } from './api.js'
 
 const SECTIONS = [
   ['Guides', [
@@ -215,87 +215,11 @@ function DataDoc() {
 }
 
 /* ---------------- GM briefing deck ---------------- */
-function useLinesStats() {
-  const [lines, set] = useState(null)
-  useEffect(() => { getJSON('/api/lines').then(set).catch(() => set([])) }, [])
-  return lines
-}
-
 function Deck() {
-  const lines = useLinesStats()
   const [i, setI] = useState(0)
-  const tot = (k) => (lines || []).reduce((s, l) => s + (l[k] || 0), 0)
-  const active = (lines || []).filter((l) => l.last_entry).length
-  const slides = [
-    <div className="gd-slide gd-title" key="t">
-      <div className="gd-kicker">{ORG}</div>
-      <h2>AMPS</h2>
-      <p className="gd-sub">Asset Maintenance &amp; Preventive Scheduling</p>
-      <p>One register of every asset, every line — and the maintenance done on it.</p>
-    </div>,
-    <div className="gd-slide" key="why">
-      <h2>Why AMPS</h2>
-      <ul>
-        <li>Maintenance records lived in separate registers and spreadsheets per depot.</li>
-        <li>No single view of what is due, overdue, or failing across lines.</li>
-        <li>AMPS puts the asset list and the logs in one place, with the schedule worked out from the logs.</li>
-      </ul>
-    </div>,
-    <div className="gd-slide" key="cov">
-      <h2>Coverage today</h2>
-      {!lines ? <p>Loading…</p> : (<>
-        <div className="gd-big">
-          <div><b>{lines.length}</b><span>lines</span></div>
-          <div><b>{tot('stations').toLocaleString('en-IN')}</b><span>stations</span></div>
-          <div><b>{tot('assets').toLocaleString('en-IN')}</b><span>assets</span></div>
-          <div><b>{active}</b><span>lines logging</span></div>
-        </div>
-        <table className="gd-table">
-          <thead><tr><th>Line</th><th>Stations</th><th>Assets</th><th>Last entry</th></tr></thead>
-          <tbody>{lines.map((l) => <tr key={l.name}><td><b>{l.name}</b></td><td>{l.stations}</td>
-            <td>{(l.assets || 0).toLocaleString('en-IN')}</td><td>{l.last_entry || '—'}</td></tr>)}</tbody>
-        </table>
-      </>)}
-    </div>,
-    <div className="gd-slide" key="mod">
-      <h2>What it does</h2>
-      <div className="gd-grid">
-        <div><b>Assets</b><span>register per line / depot, QR sticker on each</span></div>
-        <div><b>Log book</b><span>PM entries by cycle; bulk entry from Excel</span></div>
-        <div><b>Dashboard</b><span>on schedule · due soon · overdue, per line</span></div>
-        <div><b>Failures</b><span>failure → rectification, downtime computed</span></div>
-        <div><b>Job cards</b><span>agency work tracked to closure</span></div>
-        <div><b>Tenders</b><span>contract volumes searchable clause by clause</span></div>
-      </div>
-    </div>,
-    <div className="gd-slide" key="flow">
-      <h2>How a depot comes on board</h2>
-      <ol>
-        <li>Depot fills its asset rows in the coordination sheet.</li>
-        <li>The coordination desk imports them — no re-entry.</li>
-        <li>Staff record each maintenance and failure in the Log book.</li>
-        <li>The line dashboard shows the true status from those logs.</li>
-      </ol>
-    </div>,
-    <div className="gd-slide" key="sec">
-      <h2>Access &amp; control</h2>
-      <ul>
-        <li>Anyone can scan a QR and read an asset's history — no login needed.</li>
-        <li>Every write needs a named login, limited to its own line and depot.</li>
-        <li>In-charges approve checksheet formats; admins manage users.</li>
-        <li>Every change carries the login that made it.</li>
-      </ul>
-    </div>,
-    <div className="gd-slide" key="next">
-      <h2>Next steps</h2>
-      <ul>
-        <li>All lines to complete their asset registers.</li>
-        <li>Daily logging by every depot, so dashboards reflect the real position.</li>
-        <li>Per-person logins for every supervisor and technician who records work.</li>
-      </ul>
-      <p className="gd-sub">Adopted by office order No. 6746 / 6747, dated 22.07.2026</p>
-    </div>,
-  ]
+  // v2 deck (17.11.2026): slide images rendered from AMPS_GM_presentation.pdf
+  const slides = Array.from({ length: 10 }, (_, k) => (
+    <img className="gd-img" key={k} src={`/pitch-gm/${String(k + 1).padStart(2, '0')}.webp`} alt={`Slide ${k + 1}`} />))
   const n = slides.length
   useEffect(() => {
     const k = (e) => {
@@ -315,6 +239,7 @@ function Deck() {
         <span>{i + 1} / {n}</span>
         <button className="mini-btn" type="button" onClick={() => setI(Math.min(n - 1, i + 1))} disabled={i === n - 1}>Next ›</button>
         <button className="mini-btn muted" type="button" onClick={full}>Full screen</button>
+        <a className="mini-btn muted" href="/pitch-gm/AMPS_GM_presentation.pdf" download>PDF</a>
       </div>
     </div>
   </>)

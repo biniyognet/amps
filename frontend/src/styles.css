@@ -2509,6 +2509,8 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .gd-grid div { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 .gd-grid b { display: block; font-size: 15px; margin-bottom: 4px; }
 .gd-grid span { font-size: 13px; color: var(--ink-2); }
+.gd-img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #F7F8F4; }
+.gd-deck:fullscreen .gd-img { flex: 1; min-height: 0; height: 100%; }
 .gd-ctl { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px; border-top: 1px solid var(--border); font-size: 13px; color: var(--ink-2); }
 @media screen and (max-width: 780px) {
   .gd { grid-template-columns: 1fr; gap: 10px; }
