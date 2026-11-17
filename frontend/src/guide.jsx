@@ -19,7 +19,7 @@ const SECTIONS = [
     ['data', 'What AMPS records'],
   ]],
   ['Presentation', [
-    ['gm', 'Briefing deck for GM'],
+    ['gm', 'Pitch'],
   ]],
 ]
 
@@ -307,7 +307,7 @@ function Deck() {
   }, [n])
   const full = () => document.querySelector('.gd-deck')?.requestFullscreen?.()
   return (<>
-    <h1 className="docs-h1">Briefing deck for GM</h1>
+    <h1 className="docs-h1">Pitch</h1>
     <div className="gd-deck">
       {slides[i]}
       <div className="gd-ctl">
