@@ -66,13 +66,20 @@ spec:
               name: amps-demo-ai
         - name: AMPS_AI_FALLBACK_URL
           value: http://ollama.bini-ai.svc:11434/v1
+        # Gemma 3 (Google, open weights) on the cluster GPU: reads the photo when Gemini is out.
         - name: AMPS_AI_FALLBACK_MODEL
-          value: qwen2.5:3b
+          value: gemma3:4b
+        - name: AMPS_AI_FALLBACK_VISION
+          value: '1'
+        - name: AMPS_AI_BASE_URL
+          value: http://ollama.bini-ai.svc:11434/v1
+        - name: AMPS_AI_MODEL
+          value: gemma3:4b
         - name: AMPS_AI_PER_MINUTE
           value: '6'
         - name: AMPS_AI_PER_DAY
           value: '400'
-        image: ghcr.io/biniyognet/amps-backend:oc11190024-rename
+        image: ghcr.io/biniyognet/amps-backend:oc11190130-gemma
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

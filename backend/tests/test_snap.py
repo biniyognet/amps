@@ -3,8 +3,10 @@
 # AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
 """Snap & Report end to end on a throwaway SQLite DB, Gemini mocked."""
+import json
 import os
 import tempfile
+import urllib.error
 
 _tmp = tempfile.mkdtemp(prefix="amps-snap-")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/t.db"
@@ -150,6 +152,28 @@ def test_ai_down_keeps_photo_for_manual(client, monkeypatch):
     monkeypatch.setattr(ai, "FALLBACK_URL", "")
     out = _analyze(client, "SNAP-02")
     assert out["draft"] is None and out["photo_token"] and out["note"]
+
+
+@pytest.mark.parametrize("vision", [True, False])
+def test_fallback_sends_photo_only_to_vision_model(client, monkeypatch, vision):
+    def boom(prompt, photo):
+        raise urllib.error.URLError("429")
+    sent = {}
+
+    def fake_post(url, body, headers):
+        sent["content"] = body["messages"][1]["content"]
+        return {"choices": [{"message": {"content": json.dumps(DRAFT)}}]}
+    monkeypatch.setattr(snap, "_gemini_draft", boom)
+    monkeypatch.setattr(ai, "FALLBACK_URL", "http://ollama:11434/v1")
+    monkeypatch.setattr(ai, "FALLBACK_MODEL", "gemma3:4b")
+    monkeypatch.setattr(ai, "_post", fake_post)
+    monkeypatch.setattr(snap, "FALLBACK_VISION", vision)
+    out = _analyze(client, "SNAP-02")
+    assert out["model"] == "gemma3:4b" and out["vision"] is vision
+    if vision:
+        assert sent["content"][1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    else:
+        assert isinstance(sent["content"], str) and "No photo" in sent["content"]
 
 
 def test_expired_photo_token_is_410(client):

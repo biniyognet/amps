@@ -40,6 +40,8 @@ HOLD_TTL = 15 * 60
 HOLD_MAX = 64
 SEVERITIES = ("low", "med", "high", "critical")
 DEFAULT_AGENCIES = [a.strip() for a in os.environ.get("AMPS_AGENCIES", "").split(",") if a.strip()]
+# The fallback model can read the photo (e.g. Gemma 3 on the local Ollama).
+FALLBACK_VISION = os.environ.get("AMPS_AI_FALLBACK_VISION", "") == "1"
 
 # photo_token -> (bytes, mime, filename, held_at)
 _held: dict[str, tuple[bytes, str, str, float]] = {}
@@ -146,19 +148,25 @@ def _gemini_draft(prompt: str, photo: tuple[bytes, str] | None) -> dict:
     return json.loads("".join(p.get("text", "") for p in out))
 
 
-def _openai_draft(base: str, model: str, prompt: str) -> dict:
-    """Text-only draft (no vision) through an OpenAI-compatible endpoint — the
-    local Ollama fallback when Gemini is down."""
+def _openai_draft(base: str, model: str, prompt: str,
+                  photo: tuple[bytes, str] | None = None) -> dict:
+    """Draft through an OpenAI-compatible endpoint — the local Ollama fallback
+    when Gemini is down. Sends the photo only when one is given (a vision model)."""
     headers = {}
     if os.environ.get("AMPS_AI_API_KEY"):
         headers["Authorization"] = f"Bearer {os.environ['AMPS_AI_API_KEY']}"
     keys = ", ".join(SCHEMA["properties"])
+    if photo:
+        url = f"data:{photo[1]};base64,{base64.b64encode(photo[0]).decode()}"
+        user_msg = [{"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": url}}]
+    else:
+        user_msg = prompt + "\n\n(No photo is available to you — work from the remark and the history.)"
     resp = ai._post(f"{base}/chat/completions", {
         "model": model, "temperature": 0.2, "response_format": {"type": "json_object"},
         "messages": [{"role": "system", "content": f"Reply with one JSON object with keys: {keys}. "
                       "recommend = {failure: bool, job_card: bool}. severity one of low|med|high|critical."},
-                     {"role": "user", "content": prompt + "\n\n(No photo is available to you — "
-                      "work from the remark and the history.)"}],
+                     {"role": "user", "content": user_msg}],
     }, headers)
     return json.loads(resp["choices"][0]["message"]["content"])
 
@@ -204,7 +212,9 @@ async def analyze(request: Request, asset_code: str = Form(...), remarks: str = 
         try:
             if not (ai.FALLBACK_URL and ai.FALLBACK_MODEL):
                 raise ValueError("no fallback")
-            raw, vision, model = _openai_draft(ai.FALLBACK_URL, ai.FALLBACK_MODEL, prompt), False, ai.FALLBACK_MODEL
+            fb_photo = held[:2] if held and FALLBACK_VISION else None
+            raw = _openai_draft(ai.FALLBACK_URL, ai.FALLBACK_MODEL, prompt, fb_photo)
+            vision, model = bool(fb_photo), ai.FALLBACK_MODEL
         except Exception:
             return manual("The AI service is busy — try again, or fill the report by hand.")
     return {"draft": _clean(raw), "photo_token": token, "model": model, "vision": vision, "note": None}
