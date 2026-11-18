@@ -348,6 +348,96 @@ function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
   )
 }
 
+/* Auto-plan: the server lays due and overdue PM onto the days the roster can
+   staff (criticality × days overdue first, one station per trip). Nothing is
+   saved until the supervisor approves; unticked jobs stay unplanned. */
+const nextMonday = () => { const d = new Date(); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); return iso(d) }
+
+function AutoPlan({ onClose, onApproved }) {
+  const [start, setStart] = useState(nextMonday)
+  const [cap, setCap] = useState('')
+  const [plan, setPlan] = useState(null)
+  const [off, setOff] = useState(() => new Set())
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const key = (j) => `${j.asset_id}|${j.planned_date}`
+  const draft = async (explain = false) => {
+    setBusy(explain ? 'explain' : 'draft'); setErr('')
+    try {
+      const p = await send('POST', '/api/planned/auto', { date_from: start, days: 7, explain, capacity: cap ? Number(cap) : null })
+      setPlan(p); if (!explain) setOff(new Set())
+    } catch (e) { setErr(e.message) }
+    setBusy('')
+  }
+  useEffect(() => { draft() }, [])
+  const jobs = plan ? plan.board.flatMap((d) => d.jobs) : []
+  const keep = jobs.filter((j) => !off.has(key(j)))
+  const flip = (j) => setOff((s) => { const t = new Set(s); t.has(key(j)) ? t.delete(key(j)) : t.add(key(j)); return t })
+  const approve = async () => {
+    setBusy('apply'); setErr('')
+    try {
+      const r = await send('POST', '/api/planned/auto/apply', { jobs: keep.map((j) => ({
+        asset_code: j.asset_code, asset_id: j.asset_id, planned_date: j.planned_date, cycle: j.cycle,
+        contractor: j.contractor, task: `${j.cycle} PM${j.covers.length ? ` (covers ${j.covers.join(', ')})` : ''}` })) })
+      onApproved(`Approved: ${r.created} jobs planned for the week of ${fmt(start)}${r.duplicates ? ` · ${r.duplicates} already there` : ''}`, start)
+    } catch (e) { setErr(e.message); setBusy('') }
+  }
+  return (
+    <section className="card pm-auto" aria-label="Auto-plan a week">
+      <div className="pm-auto-bar">
+        <b>Auto-plan a week</b>
+        <label>Week from <input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></label>
+        <label>Jobs/day <input type="number" min="1" max="60" value={cap} placeholder="roster" onChange={(e) => setCap(e.target.value)} /></label>
+        <button className="btn ghost sm" type="button" disabled={!!busy} onClick={() => draft()}>{busy === 'draft' ? 'Planning…' : 'Re-plan'}</button>
+        <button className="btn ghost sm" type="button" disabled={!!busy || !jobs.length} onClick={() => draft(true)}>{busy === 'explain' ? 'Asking Gemini…' : 'Explain with Gemini'}</button>
+        <span className="pm-auto-sp" />
+        <button className="btn sm" type="button" disabled={!!busy || !keep.length} onClick={approve}>{busy === 'apply' ? 'Saving…' : `Approve ${keep.length} jobs`}</button>
+        <button className="mini-btn" type="button" onClick={onClose} aria-label="Close auto-plan">✕</button>
+      </div>
+      {err && <p className="pc-red">{err}</p>}
+      {!plan ? <p className="dim">Reading the schedule and the roster…</p> : (
+        <>
+          <p className="pm-auto-sum">{plan.summary}{plan.already_planned > 0 && ` ${plan.already_planned} due assets already have an open plan and were left alone.`}</p>
+          {(plan.explanation || plan.explanation_note) && (
+            <div className="pm-auto-ai">
+              <span className="pm-auto-ai-h">{plan.model ? `Gemini · ${plan.model}` : 'AI'}</span>
+              <div className="pm-auto-ai-t">{plan.explanation || plan.explanation_note}</div>
+            </div>
+          )}
+          <div className="pm-week">
+            {plan.board.map((d) => (
+              <div key={d.date} className={`pm-day${d.capacity ? '' : ' rest'}`}>
+                <div className="pm-day-h">
+                  <b>{d.weekday}</b> <span className="dt">{fmt(d.date)}</span>
+                  <small className="dim">{d.jobs.length}/{d.capacity}{d.staff ? ` · ${d.staff} staff` : ''}</small>
+                </div>
+                {d.jobs.length === 0 && <small className="dim">{d.capacity ? 'free' : 'no maintenance window'}</small>}
+                {d.jobs.map((j) => (
+                  <label key={key(j)} className={`pm-job crit-${j.criticality}${off.has(key(j)) ? ' off' : ''}`} title={j.reason}>
+                    <input type="checkbox" checked={!off.has(key(j))} onChange={() => flip(j)} aria-label={`Keep ${j.asset_code}`} />
+                    <span className="pm-job-t"><span className="code">{j.asset_code}</span> <i className="cal-freq">{CYCLE_BADGE[j.cycle] || j.cycle}</i>
+                      <small className="dim">{j.station}</small>
+                      <small className={j.overdue_days ? 'pc-red' : 'dim'}>{j.reason}</small></span>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+          {plan.backlog.length > 0 && (
+            <details className="pm-backlog">
+              <summary>{plan.backlog.length} due jobs did not fit this week's roster</summary>
+              <ul>{plan.backlog.slice(0, 40).map((j) => <li key={j.asset_id}><span className="code">{j.asset_code}</span> · {j.station} · {j.cycle} · {j.reason}</li>)}</ul>
+            </details>
+          )}
+          <p className="roadmap">Order = criticality × days overdue (A counts 3×, C 1×); a station's jobs share a day when that costs at most one day.
+            Capacity = staff on the roster's maintenance-window shift, two to a team, three jobs per team. Untick anything you don't want, then approve:
+            each job becomes a planned row below, done and reconciled like any contractor plan.</p>
+        </>
+      )}
+    </section>
+  )
+}
+
 export function PlannedView({ initialView = 'tl' }) {
   const { canWrite } = useMe()
   const [cursor, setCursor] = useState(todayIso)
@@ -369,6 +459,7 @@ export function PlannedView({ initialView = 'tl' }) {
   const [sel, setSel] = useState(() => new Set())
   const [modal, setModal] = useState(null)
   const [msg, setMsg] = useState('')
+  const [auto, setAuto] = useState(false)
   useEffect(() => {
     setRows(null)
     Promise.all([getJSON(`/api/planned?date_from=${from}&date_to=${to}`),
@@ -423,6 +514,7 @@ export function PlannedView({ initialView = 'tl' }) {
       <div className="plan-bar">
         <h1 style={{ margin: 0 }}>Planned maintenance</h1>
         <div className="plan-nav">
+          {canWrite && !auto && <button className="btn sm" type="button" onClick={() => setAuto(true)}>Auto-plan week</button>}
           <button className="pbtn" onClick={() => shift(-1)} aria-label={`Previous ${per}`}>←</button>
           <span className="plan-month dt">{periodName}</span>
           <button className="pbtn" onClick={() => shift(1)} aria-label={`Next ${per}`}>→</button>
@@ -441,6 +533,9 @@ export function PlannedView({ initialView = 'tl' }) {
           )}
         </div>
       </div>
+
+      {auto && <AutoPlan onClose={() => setAuto(false)}
+        onApproved={(text, wk) => { setAuto(false); setView('tl'); setSpan('week'); setCursor(wk); finish(text) }} />}
 
       {view === 'tl' ? rows && <SlipSummary rows={pre} />
         : sum && sum.contractors.length > 0 && (
