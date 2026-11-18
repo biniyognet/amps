@@ -3237,6 +3237,11 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   /* v57: two-row hood + full A/B/C rows back (v53 look); equal cards at natural height */
   .dash-main .dash-grid3 { flex: 1 1 auto; min-height: 0; max-height: 340px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dash-main .slim-trend { min-height: 170px; max-height: none; }
+  /* captions sit beside the number (not under it) and clip with an ellipsis */
+  .dash-main .h-col { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 5px; row-gap: 4px; }
+  .dash-main .h-seg { flex: 0 0 100%; }
+  .dash-main .h-cn { flex: none; }
+  .dash-main .h-cl { flex: 1 1 0; min-width: 0; margin: 0; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 .brand-emblem.brand-fav { width: 30px; height: 30px; }
 
