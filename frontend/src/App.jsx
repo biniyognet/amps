@@ -3580,7 +3580,7 @@ const feedWhen = (e) => {
     : d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
 }
 function DashFeed({ groups, fails, sync, failHref }) {
-  const [tab, setTab] = useState('log')
+  const [tab, setTab] = usePersistedState('dash.side', 'log')  // last opened sidebar tab survives reloads
   // live feel: on the first load the newest entry pops in; after that every
   // entry a 60 s refresh brings in that was not on screen before pops in
   const seen = useRef(null)
@@ -3939,7 +3939,7 @@ function LineDashboard({ go, initialLine = null }) {
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
         <span className="dash-clock" role="timer" aria-label="Current date and time">
-          <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })}</span>
+          <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
           <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
         </span>
         <div className="asset-actions">

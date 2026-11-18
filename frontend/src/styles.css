@@ -3203,14 +3203,7 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .dash-main .h-cn { font-size: 14px; }
   .dash-main { --dash-lead: 268px; }
   .dash-main .crit-card { margin: 0; padding: 2px 0; flex: none; }
-  .dash-main .crs-head { padding: 2px 14px; }
-  .dash-main .crit-card .h-cl { display: none; }
-  .dash-main .crit-card .h-col { gap: 2px; }
-  .dash-main .crit-card .crs-lbl { font-size: 10.5px; }
-  .dash-main .crit-card .crs-n { font-size: 11.5px; }
-  .dash-main .crit-card .h-meter { padding: 5px 12px; }
-  .dash-main .crit-card .h-seg { height: 6px; }
-  .dash-main .crit-card .h-cn { font-size: 12px; }
+  .dash-main .crs-head { padding: 4px 14px; }
   .dash-main .dash-grid3 { flex: none; grid-template-columns: 1fr 1fr 1.15fr; grid-template-rows: auto; align-items: stretch; gap: 10px; }
   .dash-main .dash-trend { grid-column: auto; }
   .dash-main .dash-grid3 .viz-filters { gap: 4px; }
@@ -3228,15 +3221,6 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .dash-main .dash-grid3 .bk-long, .dash-main .dash-grid3 .bk-never { padding-top: 4px; margin-top: 0; }
   .dash-main .dash-grid3 .viz-insight { padding-top: 5px; font-size: 11.5px; }
   .dash-main .slim-trend { flex: 1; height: auto; min-height: 150px; max-height: 210px; }
-  /* all four meters: value with its caption small and inline beside it; A/B/C rows hide captions */
-  .dash-main .h-col { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 5px; row-gap: 4px; }
-  .dash-main .h-seg { flex: 0 0 100%; }
-  .dash-main .h-cl { margin: 0; font-size: 10px; }
-  .dash-main .h-compl { padding: 5px 14px; gap: 10px; }
-  .dash-main .hstrip .h-meter { padding: 7px 12px 6px; }
-  .dash-main .hstrip .h-seg { height: 7px; }
-  .dash-main .hstrip .ring-v { font-size: 12px; }
-  .dash-main .h-txt .h-cap { white-space: nowrap; font-size: 11px; }
   .dash-side { margin: 0; min-height: 0; padding-left: 14px; border-left: 1px solid var(--border-2, #E3ECF2); }
   .ds-roll { flex: 1; min-height: 0; max-height: none;
     -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent);
@@ -3246,26 +3230,17 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .df-top .df-sub { flex: 0 1 auto; min-width: 0; font-size: 10.5px; }
 .df-top .df-sub::before { content: '· '; }
 
-/* v56: hood = ONE line (ring · meter · counts · clock · actions), 12-month
-   failures as an area of touching bars, three equal bottom cards filling the column */
+/* v56: 12-month
+   failures as an area of touching bars (cap line) */
 .st-cap { stroke: #0078B4; stroke-width: 1.5; }
 @media screen and (min-width: 1100px) and (min-height: 560px) {
-  .dash-main .dash-hood { display: flex; align-items: center; gap: 0 10px; padding-right: 10px; }
-  .dash-main .dash-toolbar { display: contents; }
-  .dash-main .hstrip { order: 1; flex: 1 1 auto; min-width: 0; }
-  .dash-main .h-compl { flex: none; padding: 6px 4px 6px 12px; border-right: 0; }
-  .dash-main .h-txt { display: none; }
-  .dash-main .hstrip .h-meter { flex: 1; min-width: 0; padding: 6px 4px; }
-  .dash-main .hstrip .h-cl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .dash-main .dash-kpis { order: 2; flex-wrap: nowrap; white-space: nowrap; }
-  .dash-main .dash-kpis .dk { font-size: 11px; padding: 2px 7px; }
-  .dash-main .dash-clock { order: 3; margin-left: 0; }
-  .dash-main .dash-clock .dc-date { font-size: 11px; }
-  .dash-main .dash-clock .dc-time { font-size: 14px; }
-  .dash-main .dash-toolbar .asset-actions { order: 4; }
-  .dash-main .dash-toolbar .icon-btn { width: 28px; height: 28px; }
-  .dash-main .dash-grid3 { flex: 1 1 auto; min-height: 0; max-height: 470px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dash-main .dash-grid3 .breakup { flex: 1 1 auto; max-height: 330px; justify-content: space-evenly; }
-  .dash-main .slim-trend { max-height: none; min-height: 140px; }
+  /* v57: two-row hood + full A/B/C rows back (v53 look); equal cards at natural height */
+  .dash-main .dash-grid3 { flex: 1 1 auto; min-height: 0; max-height: 340px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-main .slim-trend { min-height: 170px; max-height: none; }
 }
 .brand-emblem.brand-fav { width: 30px; height: 30px; }
+
+/* v57: footer sits at the window bottom while a page is still loading (short content) */
+.shell { display: flex; flex-direction: column; min-height: 100dvh; box-sizing: border-box; }
+.shell > .foot { margin-top: auto; }
+.shell > :has(+ .foot):not(.ask-fab):not(.ask-panel) { margin-bottom: 40px; }

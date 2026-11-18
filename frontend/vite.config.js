@@ -18,7 +18,7 @@ const api = process.env.AMPS_DEV_API ?? 'http://localhost:8000'
 // the maker's handwritten signature, the operator logo) are dropped from dist.
 const LIVE = process.env.VITE_AMPS_DATA === 'live'
 const NEUTRAL = !LIVE || process.env.VITE_AMPS_BRAND === 'neutral'
-const ORG_UP = (process.env.VITE_AMPS_ORG || 'Demo Metro Line').toUpperCase()
+const ORG_UP = (process.env.VITE_AMPS_ORG || 'Demo Industries').toUpperCase()
 const DEMO_DROP = ['signature.png', 'ir-railways.png', 'ir-logo.png', 'ir-emblem.svg', 'metro-logo.svg', 'pitch-gm']
 const demoUnbrand = {
   name: 'amps-demo-unbrand',
