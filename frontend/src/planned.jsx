@@ -1,10 +1,11 @@
 /* Planned maintenance — the forward schedule contractors commit to (monthly
-   schedule letters), as a list or a month calendar. Filters sit inline in the
+   schedule letters), as a list, a month calendar or a timeline (one row per
+   asset, planned vs actual, drag to reschedule). Filters sit inline in the
    toolbar (state strip · system · station · contractor · cycle), never in a
    drawer. One click on Done files a normal MAINTENANCE log-book entry under
    the signed-in user; "Done ×N" does the same for every ticked row. Rows the
    log book already covers (sheet puller, manual entry) close themselves. */
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { getJSON, useMe, encPath } from './api.js'
 
 const API = import.meta.env.VITE_AMPS_API ?? ''
@@ -15,6 +16,25 @@ const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0'
 const todayIso = () => { const d = new Date(); return `${ym(d)}-${String(d.getDate()).padStart(2, '0')}` }  // local, not UTC
 const fmt = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
 const STATE_LABEL = { overdue: 'Overdue', today: 'Due today', upcoming: 'Upcoming', done: 'Done', skipped: 'Skipped' }
+const VIEWS = [['list', 'List'], ['cal', 'Calendar'], ['tl', 'Timeline']]
+const SPANS = [['week', 'Week'], ['month', 'Month'], ['year', 'Year']]
+
+const D = (s) => new Date(`${s}T00:00:00`)
+const iso = (d) => `${ym(d)}-${String(d.getDate()).padStart(2, '0')}`
+const addDays = (s, n) => { const d = D(s); d.setDate(d.getDate() + n); return iso(d) }
+const diffDays = (a, b) => Math.round((D(b) - D(a)) / 864e5)
+/* [first, last] day of the week (Mon-first), month or year holding `cursor` */
+function spanRange(span, cursor) {
+  const d = D(cursor)
+  if (span === 'week') { const mon = addDays(cursor, -((d.getDay() + 6) % 7)); return [mon, addDays(mon, 6)] }
+  if (span === 'year') return [`${d.getFullYear()}-01-01`, `${d.getFullYear()}-12-31`]
+  return [iso(new Date(d.getFullYear(), d.getMonth(), 1)), iso(new Date(d.getFullYear(), d.getMonth() + 1, 0))]
+}
+/* Days between the date first promised and the day the work was logged —
+   a reschedule does not reset it. null while not done. */
+const slipOf = (r) => (r.done_on ? diffDays(r.original_date || r.planned_date, r.done_on) : null)
+const slipCls = (n) => (n <= 0 ? 'ok' : n <= 3 ? 'warn' : 'bad')
+const slipTxt = (n) => (n > 0 ? `+${n} d late` : n < 0 ? `${-n} d early` : 'on time')
 
 async function send(method, path, body) {
   const r = await fetch(`${API}${path}`, {
@@ -72,8 +92,12 @@ function DoneModal({ rows, onClose, onDone }) {
             Files a MAINTENANCE entry in the log book under your name. All details are optional.
             {!one && ' Leave the date blank to log each row on its own planned date.'}
           </p>
-          <label className="modal-lbl">Done on
+          <label className="modal-lbl">Done on (actual date)
             <input className="modal-in" type="date" value={f.done_date} max={today} onChange={set('done_date')} />
+            {one && f.done_date && (() => {
+              const s = diffDays(one.original_date || one.planned_date, f.done_date)
+              return s !== 0 && <small className={`tl-t-${slipCls(s)}`}>{slipTxt(s)} vs the plan</small>
+            })()}
           </label>
           <label className="modal-lbl">Attended by
             <input className="modal-in" value={f.attended_by} onChange={set('attended_by')}
@@ -165,14 +189,177 @@ function Calendar({ month, rows, onPick, canWrite }) {
   )
 }
 
+/* Per contractor over the rows on screen: planned, done on time, done late
+   (with the average slip) and still overdue. Skipped rows are left out. */
+function SlipSummary({ rows }) {
+  const by = new Map()
+  for (const r of rows) {
+    if (r.state === 'skipped') continue
+    const k = r.contractor || 'No contractor'
+    const c = by.get(k) || { k, planned: 0, onTime: 0, late: 0, lateDays: 0, overdue: 0 }
+    c.planned++
+    const s = slipOf(r)
+    if (s !== null) { if (s > 0) { c.late++; c.lateDays += s } else c.onTime++ }
+    else if (r.state === 'overdue') c.overdue++
+    by.set(k, c)
+  }
+  if (!by.size) return null
+  return (
+    <div className="pm-sum">
+      {[...by.values()].sort((a, b) => b.planned - a.planned).map((c) => (
+        <div key={c.k} className="pm-sum-c tl-sum">
+          <b>{c.k}</b>
+          <span><b className="dt">{c.planned}</b> planned</span>
+          <span className="tl-t-ok">{c.onTime} on time</span>
+          {c.late > 0 && <span className="tl-t-warn">{c.late} late · avg +{(c.lateDays / c.late).toFixed(1)} d</span>}
+          {c.overdue > 0 && <span className="pc-red">{c.overdue} overdue</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* One row per asset, grouped by station; days run left to right. The cycle
+   pin sits on the planned date, a dot on the day it was actually logged, and
+   the bar between them is the slip (green on time, amber ≤3 d, red later).
+   An overdue row's bar runs on to today. Drag an open pin to reschedule (not
+   into the past — late work is logged with its real date via Done). */
+function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
+  const n = diffDays(from, to) + 1
+  const today = todayIso()
+  const x = (d) => `${((Math.min(Math.max(diffDays(from, d), 0), n - 1) + 0.5) / n) * 100}%`
+  const [drag, setDrag] = useState(null)
+  const ticks = useMemo(() => {
+    if (span === 'year') {
+      const y = Number(from.slice(0, 4))
+      return Array.from({ length: 12 }, (_, i) => {
+        const s = iso(new Date(y, i, 1))
+        return { key: s, at: (diffDays(from, s) / n) * 100, w: (new Date(y, i + 1, 0).getDate() / n) * 100,
+                 label: D(s).toLocaleDateString('en-GB', { month: 'short' }) }
+      })
+    }
+    return Array.from({ length: n }, (_, i) => {
+      const s = addDays(from, i), d = D(s)
+      return { key: s, at: (i / n) * 100, w: 100 / n, sun: d.getDay() === 0,
+               label: span === 'week' ? d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }) : d.getDate() }
+    })
+  }, [span, from, n])
+  const groups = useMemo(() => {
+    const assets = new Map()
+    for (const r of rows) {
+      const a = assets.get(r.asset_id) || { id: r.asset_id, code: r.asset_code, name: r.asset_name, station: r.station || '—', system: r.system || '', rows: [] }
+      a.rows.push(r)
+      assets.set(r.asset_id, a)
+    }
+    const byStn = new Map()
+    for (const a of [...assets.values()].sort((p, q) => p.station.localeCompare(q.station)
+      || p.system.localeCompare(q.system) || p.code.localeCompare(q.code, undefined, { numeric: true }))) {
+      (byStn.get(a.station) || byStn.set(a.station, []).get(a.station)).push(a)
+    }
+    return [...byStn]
+  }, [rows])
+  const dateAt = (track, clientX) => {
+    const b = track.getBoundingClientRect()
+    const d = addDays(from, Math.min(Math.max(Math.floor(((clientX - b.left) / b.width) * n), 0), n - 1))
+    return d < today ? today : d
+  }
+  const down = (e, r) => {
+    if (!(canWrite && OPEN(r))) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDrag({ id: r.id, x0: e.clientX, date: r.planned_date, moved: false })
+  }
+  const move = (e, r) => {
+    if (!drag || drag.id !== r.id) return
+    if (!drag.moved && Math.abs(e.clientX - drag.x0) < 5) return
+    const d = dateAt(e.currentTarget.parentElement, e.clientX)
+    if (!drag.moved || d !== drag.date) setDrag({ ...drag, date: d, moved: true })
+  }
+  const up = (r) => {
+    if (drag && drag.id === r.id) {
+      setDrag(null)
+      if (drag.moved) { if (drag.date !== r.planned_date) onMove(r, drag.date); return }
+    }
+    onPick(r)
+  }
+  if (!rows.length) return <div className="card"><p className="dim" style={{ margin: 0 }}>Nothing planned in this period.</p></div>
+  const colW = span === 'week' ? 110 : span === 'year' ? 3.2 : 28
+  const assetCount = groups.reduce((t, [, l]) => t + l.length, 0)
+  return (
+    <div className="card tl">
+      <div className="tl-in" style={{ minWidth: `calc(var(--tl-lbl) + ${Math.round(n * colW)}px)` }}>
+        <div className="tl-head">
+          <div className="tl-lbl dim">{assetCount} asset{assetCount === 1 ? '' : 's'}</div>
+          <div className="tl-scale">
+            {ticks.map((t) => <span key={t.key} className={`tl-tick${t.sun ? ' sun' : ''}`} style={{ left: `${t.at}%`, width: `${t.w}%` }}>{t.label}</span>)}
+          </div>
+        </div>
+        <div className="tl-body">
+          <div className="tl-grid" aria-hidden="true">
+            {ticks.map((t) => <span key={t.key} className={`tl-line${t.sun ? ' sun' : ''}`} style={{ left: `${t.at}%`, width: `${t.w}%` }} />)}
+            {today >= from && today <= to && <span className="tl-now" style={{ left: x(today) }} />}
+          </div>
+          {groups.map(([stn, list]) => (
+            <Fragment key={stn}>
+              <div className="tl-grp"><b>{stn}</b> <span className="dim">· {list.length}</span></div>
+              {list.map((a) => (
+                <div className="tl-row" key={a.id}>
+                  <div className="tl-lbl" title={a.name || ''}>
+                    <a href={`#/asset/${encPath(a.code)}`} className="code">{a.code}</a>
+                    {a.name && <small className="dim"> {a.name}</small>}
+                  </div>
+                  <div className="tl-track">
+                    {a.rows.map((r) => {
+                      const dragging = drag && drag.id === r.id && drag.moved
+                      const plan = dragging ? drag.date : r.planned_date
+                      const anchor = r.original_date || plan
+                      const s = slipOf(r)
+                      const end = r.done_on || (r.state === 'overdue' ? today : plan)
+                      const [lo, hi] = anchor < end ? [anchor, end] : [end, anchor]
+                      const bar = r.done_on ? slipCls(s) : r.state === 'overdue' ? 'bad' : 'moved'
+                      const tip = [`${r.asset_code} · ${r.cycle}`, `planned ${fmt(r.planned_date)}`,
+                        r.original_date && `originally ${fmt(r.original_date)}`,
+                        r.done_on ? `done ${fmt(r.done_on)} (${slipTxt(s)})` : STATE_LABEL[r.state],
+                        r.contractor, canWrite && OPEN(r) && 'drag to reschedule'].filter(Boolean).join(' · ')
+                      return (
+                        <Fragment key={r.id}>
+                          {lo !== hi && <span className={`tl-bar tl-${bar}`} style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />}
+                          {r.original_date && r.original_date !== plan && <span className="tl-ghost" style={{ left: x(r.original_date) }} />}
+                          {r.done_on && <span className={`tl-dot tl-${slipCls(s)}`} style={{ left: x(r.done_on) }} />}
+                          <button type="button" title={tip} style={{ left: x(plan) }}
+                                  className={`tl-pin pm-${r.state}${canWrite && OPEN(r) ? ' movable' : ''}${dragging ? ' drag' : ''}`}
+                                  onPointerDown={(e) => down(e, r)} onPointerMove={(e) => move(e, r)}
+                                  onPointerUp={() => up(r)} onPointerCancel={() => setDrag(null)}
+                                  onClick={(e) => { if (e.detail === 0) onPick(r) }}>
+                            {CYCLE_BADGE[r.cycle] || r.cycle}
+                          </button>
+                          {dragging && <span className="tl-drag-lbl" style={{ left: x(plan) }}>{fmt(plan)}</span>}
+                        </Fragment>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function PlannedView({ initialView = 'list' }) {
   const { canWrite } = useMe()
-  const [month, setMonth] = useState(ym(new Date()))
+  const [cursor, setCursor] = useState(todayIso)
+  const [span, setSpan] = useState('month')
   const [rows, setRows] = useState(null)
   const [sum, setSum] = useState(null)
   const [error, setError] = useState(null)
   const [tick, setTick] = useState(0)
-  const [view, setView] = useState(initialView === 'cal' ? 'cal' : 'list')
+  const [view, setView] = useState(VIEWS.some(([k]) => k === initialView) ? initialView : 'list')
+  const per = view === 'tl' ? span : 'month'      // list + calendar always show one month
+  const [from, to] = spanRange(per, cursor)
+  const month = from.slice(0, 7)
   const [q, setQ] = useState('')
   const [state, setState] = useState('all')
   const [system, setSystem] = useState('')
@@ -184,10 +371,11 @@ export function PlannedView({ initialView = 'list' }) {
   const [msg, setMsg] = useState('')
   useEffect(() => {
     setRows(null)
-    Promise.all([getJSON(`/api/planned?month=${month}`), getJSON(`/api/planned/summary?month=${month}`)])
+    Promise.all([getJSON(`/api/planned?date_from=${from}&date_to=${to}`),
+                 per === 'month' ? getJSON(`/api/planned/summary?month=${month}`) : null])
       .then(([r, s]) => { setRows(r); setSum(s); setError(null) })
       .catch((e) => setError(String(e)))
-  }, [month, tick])
+  }, [from, to, tick])
   const tally = (k) => {
     const c = new Map()
     for (const r of rows || []) if (r[k]) c.set(r[k], (c.get(r[k]) || 0) + 1)
@@ -195,7 +383,12 @@ export function PlannedView({ initialView = 'list' }) {
   }
   const opts = useMemo(() => ({ system: tally('system'), station: tally('station'), contractor: tally('contractor'), cycle: tally('cycle') }), [rows])
   if (error) return <div className="card offline-note">Backend unreachable — {error}.</div>
-  const shiftMonth = (n) => { const [y, m] = month.split('-').map(Number); setMonth(ym(new Date(y, m - 1 + n, 1))); setSel(new Set()) }
+  const shift = (k) => {
+    const d = D(from)
+    setCursor(per === 'week' ? addDays(from, 7 * k)
+      : per === 'year' ? `${d.getFullYear() + k}-01-01` : iso(new Date(d.getFullYear(), d.getMonth() + k, 1)))
+    setSel(new Set())
+  }
   const ql = q.trim().toLowerCase()
   const pre = (rows || []).filter((r) => (!system || r.system === system) && (!station || r.station === station)
     && (!contractor || r.contractor === contractor) && (!cycle || r.cycle === cycle)
@@ -218,24 +411,39 @@ export function PlannedView({ initialView = 'list' }) {
     try { await send('PATCH', `/api/planned/${r.id}`, { planned_date: d }); setTick((t) => t + 1) }
     catch (e) { setMsg(e.message) }
   }
-  const monthName = new Date(`${month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const monthName = D(from).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const periodName = per === 'year' ? from.slice(0, 4)
+    : per === 'week' ? `${fmt(from)} – ${fmt(to)} ${to.slice(0, 4)}` : monthName
+  const pick = (r) => (r.log_entry_id ? (location.hash = `#/log?d=${r.done_on}`)
+    : !(canWrite && OPEN(r)) ? (location.hash = `#/asset/${encPath(r.asset_code)}`)
+    : r.state === 'upcoming' ? setMsg(`${r.asset_code} is planned for ${fmt(r.planned_date)} — it can be marked done from that day.`)
+    : setModal([r]))
   return (
     <>
       <div className="plan-bar">
         <h1 style={{ margin: 0 }}>Planned maintenance</h1>
         <div className="plan-nav">
-          <button className="pbtn" onClick={() => shiftMonth(-1)} aria-label="Previous month">←</button>
-          <span className="plan-month dt">{monthName}</span>
-          <button className="pbtn" onClick={() => shiftMonth(1)} aria-label="Next month">→</button>
+          <button className="pbtn" onClick={() => shift(-1)} aria-label={`Previous ${per}`}>←</button>
+          <span className="plan-month dt">{periodName}</span>
+          <button className="pbtn" onClick={() => shift(1)} aria-label={`Next ${per}`}>→</button>
+          {cursor !== todayIso() && <button className="btn ghost sm" type="button" onClick={() => setCursor(todayIso())}>Today</button>}
           <span className="pm-views" role="group" aria-label="View">
-            {[['list', 'List'], ['cal', 'Calendar']].map(([k, l]) => (
+            {VIEWS.map(([k, l]) => (
               <button key={k} type="button" className={`btn ghost sm${view === k ? ' on' : ''}`} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>
             ))}
           </span>
+          {view === 'tl' && (
+            <span className="pm-views" role="group" aria-label="Span">
+              {SPANS.map(([k, l]) => (
+                <button key={k} type="button" className={`btn ghost sm${span === k ? ' on' : ''}`} aria-pressed={span === k} onClick={() => setSpan(k)}>{l}</button>
+              ))}
+            </span>
+          )}
         </div>
       </div>
 
-      {sum && sum.contractors.length > 0 && (
+      {view === 'tl' ? rows && <SlipSummary rows={pre} />
+        : sum && sum.contractors.length > 0 && (
         <div className="pm-sum">
           {sum.contractors.map((c) => (
             <button key={c.contractor} type="button" className={`pm-sum-c${contractor === c.contractor ? ' on' : ''}`}
@@ -280,10 +488,11 @@ export function PlannedView({ initialView = 'list' }) {
       )}
 
       {rows === null ? <p className="dim">Loading schedule…</p>
-        : view === 'cal' ? <Calendar month={month} rows={shown} canWrite={canWrite} onPick={(r) => (r.state === 'upcoming' ? setMsg(`${r.asset_code} is planned for ${fmt(r.planned_date)} — it can be marked done from that day.`) : setModal([r]))} />
+        : view === 'cal' ? <Calendar month={month} rows={shown} canWrite={canWrite} onPick={pick} />
+        : view === 'tl' ? <Timeline span={per} from={from} to={to} rows={shown} canWrite={canWrite} onPick={pick} onMove={resched} />
         : shown.length === 0 ? (
           <div className="card"><p className="dim" style={{ margin: 0 }}>
-            {rows.length === 0 ? `Nothing planned for ${monthName}. Import a contractor schedule (CSV) to start.` : 'No planned maintenance in this view.'}
+            {rows.length === 0 ? `Nothing planned for ${periodName}. Import a contractor schedule (CSV) to start.` : 'No planned maintenance in this view.'}
           </p></div>
         ) : (
           <div className="card tbl-wrap">
@@ -314,7 +523,8 @@ export function PlannedView({ initialView = 'list' }) {
                     <td>{r.contractor || '—'}</td>
                     <td className="pm-src" title={r.source || ''}>{r.source || '—'}</td>
                     <td><StateChip s={r.state} />
-                      {r.done_on && <small className="dim pm-sub">{fmt(r.done_on)}{r.closed_by === 'reconcile' ? ' · from log' : ''}</small>}</td>
+                      {r.done_on && <small className="dim pm-sub">{fmt(r.done_on)}{r.closed_by === 'reconcile' ? ' · from log' : ''}
+                        {' · '}<span className={`tl-t-${slipCls(slipOf(r))}`}>{slipTxt(slipOf(r))}</span></small>}</td>
                     <td className="pm-act">
                       {r.log_entry_id ? <a className="mini-btn" href={`#/log?d=${r.done_on}`}>Log ↗</a>
                         : canWrite && doneable(r) ? <button className="mini-btn ok" type="button" onClick={() => setModal([r])}>Done</button>
@@ -328,7 +538,11 @@ export function PlannedView({ initialView = 'list' }) {
             </table>
           </div>
         )}
-      <p className="roadmap">Red = overdue and not yet logged · amber = due today · blue = upcoming. Done files a MAINTENANCE entry in the log book under your name;
+      <p className="roadmap">{view === 'tl'
+        ? <>Pin = planned date (○ = the date first promised) · ● = the day it was actually logged · the bar between is the slip:
+          green on time, amber up to 3 days late, red later or still overdue. Drag an open pin to reschedule; click it to mark done.</>
+        : <>Red = overdue and not yet logged · amber = due today · blue = upcoming. Late work: Done takes the actual date, and the slip is kept against the original plan.</>}
+        {' '}Done files a MAINTENANCE entry in the log book under your name;
         an entry for the same asset in the same month (same cycle or longer) closes the plan by itself.</p>
       {modal && <DoneModal rows={modal} onClose={() => setModal(null)} onDone={finish} />}
     </>

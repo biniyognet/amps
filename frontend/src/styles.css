@@ -2710,6 +2710,53 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .cal-item.pm-skipped { background: #f4f4f2; border-left-color: var(--ink-3); opacity: .6; text-decoration: line-through; }
 .pm-modal { max-width: 440px; }
 .pm-modal-sub { font-size: 12.5px; margin: -6px 0 12px; }
+/* timeline: asset label column (sticky) + a day track; the card scrolls sideways */
+.tl-t-ok { color: var(--good); }
+.tl-t-warn { color: var(--warning); }
+.tl-t-bad { color: var(--critical); }
+.pm-sum-c.tl-sum { cursor: default; }
+.card.tl { padding: 0; overflow-x: auto; --tl-lbl: 200px; }
+.tl-in { position: relative; }
+.tl-head, .tl-row { display: flex; }
+.tl-head { position: sticky; top: 0; z-index: 3; background: #fff; border-bottom: 1px solid var(--border); }
+.tl-lbl { flex: 0 0 var(--tl-lbl); position: sticky; left: 0; z-index: 2; background: #fff; padding: 6px 10px;
+  font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-right: 1px solid var(--border); }
+.tl-scale, .tl-track { position: relative; flex: 1; }
+.tl-scale { height: 28px; }
+.tl-tick { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; color: var(--ink-3); overflow: hidden; white-space: nowrap; }
+.tl-tick.sun { color: var(--critical); }
+.tl-body { position: relative; }
+.tl-grid { position: absolute; inset: 0 0 0 var(--tl-lbl); pointer-events: none; }
+.tl-line { position: absolute; top: 0; bottom: 0; border-left: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.tl-line.sun { background: color-mix(in srgb, var(--ink-3) 5%, transparent); }
+.tl-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); opacity: .55; }
+.tl-grp { position: sticky; left: 0; width: max-content; padding: 8px 10px 2px; font-size: 12px; }
+.tl-row { border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+.tl-row:hover .tl-lbl, .tl-row:hover { background: color-mix(in srgb, var(--accent-soft) 45%, #fff); }
+.tl-track { min-height: 30px; }
+.tl-pin, .tl-dot, .tl-ghost, .tl-drag-lbl { position: absolute; top: 50%; transform: translate(-50%, -50%); }
+.tl-pin { z-index: 2; min-width: 22px; height: 20px; padding: 0 4px; border-radius: var(--r-sm); font: inherit; font-size: 10px;
+  font-weight: 650; line-height: 18px; cursor: pointer; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent);
+  touch-action: none; user-select: none; }
+.tl-pin.movable { cursor: grab; }
+.tl-pin.drag { cursor: grabbing; box-shadow: 0 2px 8px rgba(0, 0, 0, .2); z-index: 4; }
+.tl-pin.pm-overdue { border-color: var(--critical); background: #fdf1f1; color: #a32e2e; }
+.tl-pin.pm-today { border-color: #e0a010; background: #fdf3d9; color: #8a6100; }
+.tl-pin.pm-done { border-color: var(--border); background: #fff; color: var(--ink-3); }
+.tl-pin.pm-skipped { border-color: var(--border); background: #f4f4f2; color: var(--ink-3); text-decoration: line-through; opacity: .6; }
+.tl-ghost { width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed var(--ink-3); background: #fff; }
+.tl-dot { z-index: 3; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; }
+.tl-dot.tl-ok { background: var(--good); }
+.tl-dot.tl-warn { background: var(--warning); }
+.tl-dot.tl-bad { background: var(--critical); }
+.tl-bar { position: absolute; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; }
+.tl-bar.tl-ok { background: color-mix(in srgb, var(--good) 45%, transparent); }
+.tl-bar.tl-warn { background: color-mix(in srgb, var(--warning) 55%, transparent); }
+.tl-bar.tl-bad { background: color-mix(in srgb, var(--critical) 50%, transparent); }
+.tl-bar.tl-moved { background: repeating-linear-gradient(90deg, var(--ink-3) 0 4px, transparent 4px 7px); height: 2px; margin-top: -1px; }
+.tl-drag-lbl { z-index: 5; top: -2px; transform: translate(-50%, -100%); font-size: 10.5px; background: var(--ink); color: #fff;
+  padding: 1px 6px; border-radius: var(--r-sm); white-space: nowrap; pointer-events: none; }
 /* mobile: one compact wrapped card per plan instead of a line per cell */
 @media screen and (max-width: 760px) {
   .tbl-wrap .pm-table { min-width: 0; }
@@ -2724,4 +2771,6 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 @media (max-width: 640px) {
   .pm-views { margin-left: 0; }
   .plan-nav { flex-wrap: wrap; }
+  .card.tl { --tl-lbl: 96px; }
+  .tl-lbl small { display: none; }
 }
