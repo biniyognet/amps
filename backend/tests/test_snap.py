@@ -176,6 +176,55 @@ def test_fallback_sends_photo_only_to_vision_model(client, monkeypatch, vision):
         assert isinstance(sent["content"], str) and "No photo" in sent["content"]
 
 
+def test_safety_flags_in_schema_same_call(client, gemini, monkeypatch):
+    props = snap.SCHEMA["properties"]["safety_flags"]["properties"]
+    assert set(props) == {"helmet", "vest", "lockout_tag", "note"}
+    assert props["helmet"]["enum"] == ["present", "missing", "unclear"]
+    assert "safety_flags" in snap.SCHEMA["required"]
+    monkeypatch.setattr(snap, "_gemini_draft", lambda p, ph: {
+        **DRAFT, "safety_flags": {"helmet": "MISSING", "vest": "present", "note": "no hard hat"}})
+    flags = _analyze(client, "SNAP-03")["draft"]["safety_flags"]
+    # garbled case is normalised; a key the model left out reads unclear, never present
+    assert flags == {"helmet": "missing", "vest": "present", "lockout_tag": "unclear", "note": "no hard hat"}
+
+
+def test_safety_flags_absent_or_junk_is_unclear(client):
+    flags = _analyze(client, "SNAP-03")["draft"]["safety_flags"]   # DRAFT has no safety_flags
+    assert flags == {"helmet": "unclear", "vest": "unclear", "lockout_tag": "unclear", "note": ""}
+    assert snap._clean({"safety_flags": "yes"})["safety_flags"]["helmet"] == "unclear"
+
+
+def test_fallback_gets_safety_flags_keys(client, monkeypatch):
+    sent = {}
+
+    def fake_post(url, body, headers):
+        sent["sys"] = body["messages"][0]["content"]
+        return {"choices": [{"message": {"content": json.dumps(
+            {**DRAFT, "safety_flags": {"helmet": "present", "vest": "missing",
+                                       "lockout_tag": "missing", "note": "no vest, no tag"}})}}]}
+
+    def boom(prompt, photo):
+        raise urllib.error.URLError("429")
+    monkeypatch.setattr(snap, "_gemini_draft", boom)
+    monkeypatch.setattr(ai, "FALLBACK_URL", "http://ollama:11434/v1")
+    monkeypatch.setattr(ai, "FALLBACK_MODEL", "gemma3:4b")
+    monkeypatch.setattr(ai, "_post", fake_post)
+    out = _analyze(client, "SNAP-03")
+    assert "safety_flags" in sent["sys"] and "lockout_tag" in sent["sys"]
+    assert out["draft"]["safety_flags"]["vest"] == "missing"
+
+
+def test_missing_gear_lands_in_the_record(client):
+    r = client.post("/api/snap/submit", json={
+        "asset_code": "SNAP-03", "make_failure": True, "remarks": "panel open",
+        "draft": {"summary": "Panel open", "safety_flags": {
+            "helmet": "missing", "vest": "present", "lockout_tag": "missing", "note": "no tag on isolator"}}})
+    assert r.status_code == 201, r.text
+    with SessionLocal() as db:
+        text = db.get(LogEntry, r.json()["failure_id"]).text
+    assert "Safety gear missing: helmet, lockout/tag (no tag on isolator)" in text
+
+
 def test_expired_photo_token_is_410(client):
     r = client.post("/api/snap/submit", json={"asset_code": "SNAP-02", "make_failure": True,
                                               "photo_token": "deadbeef"})

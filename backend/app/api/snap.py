@@ -39,6 +39,9 @@ PHOTO_MIME = ("image/jpeg", "image/png", "image/webp")
 HOLD_TTL = 15 * 60
 HOLD_MAX = 64
 SEVERITIES = ("low", "med", "high", "critical")
+# Safety-gear check, read from the same photo in the same call (no extra quota).
+GEAR = ("helmet", "vest", "lockout_tag")
+GEAR_STATES = ("present", "missing", "unclear")
 DEFAULT_AGENCIES = [a.strip() for a in os.environ.get("AMPS_AGENCIES", "").split(",") if a.strip()]
 # The fallback model can read the photo (e.g. Gemma 3 on the local Ollama).
 FALLBACK_VISION = os.environ.get("AMPS_AI_FALLBACK_VISION", "") == "1"
@@ -96,9 +99,13 @@ SCHEMA = {
             "failure": {"type": "BOOLEAN"}, "job_card": {"type": "BOOLEAN"}},
             "required": ["failure", "job_card"]},
         "summary": {"type": "STRING", "description": "one-line report title"},
+        "safety_flags": {"type": "OBJECT", "description": "PPE / isolation seen in the photo", "properties": {
+            **{k: {"type": "STRING", "enum": list(GEAR_STATES)} for k in GEAR},
+            "note": {"type": "STRING"}},
+            "required": [*GEAR, "note"]},
     },
     "required": ["fault_type", "severity", "likely_cause", "suggested_action",
-                 "safety_note", "confidence", "recommend", "summary"],
+                 "safety_note", "confidence", "recommend", "summary", "safety_flags"],
 }
 
 PROMPT = (
@@ -110,7 +117,10 @@ PROMPT = (
     "breakdown soon; med = needs planned attention; low = cosmetic / monitor. Recommend a "
     "failure report when the asset is faulty, and a job card when outside or specialist "
     "work (OEM, contractor, another department) is needed. If the photo does not show a "
-    "fault, say so and lower the confidence.\n\n"
+    "fault, say so and lower the confidence. safety_flags: for the helmet and hi-vis vest "
+    "on any person in the photo, and a lockout/tag on the isolation point, answer present, "
+    "missing or unclear; unclear when it is not in view or there is no photo. note = one "
+    "short line on what you saw.\n\n"
     "Technician's remark: {remarks}\n\nAsset record and recent log (JSON):\n{history}"
 )
 
@@ -129,7 +139,19 @@ def _clean(d: dict) -> dict:
         "safety_note": s("safety_note"), "confidence": round(conf, 2),
         "recommend": {"failure": bool(rec.get("failure", True)), "job_card": bool(rec.get("job_card", False))},
         "summary": s("summary", 160),
+        "safety_flags": _clean_flags(d.get("safety_flags")),
     }
+
+
+def _clean_flags(f) -> dict:
+    """Anything the model leaves out or garbles reads as unclear, never as present."""
+    f = f if isinstance(f, dict) else {}
+    out = {}
+    for k in GEAR:
+        v = str(f.get(k) or "").strip().lower()
+        out[k] = v if v in GEAR_STATES else "unclear"
+    out["note"] = str(f.get("note") or "").strip()[:200]
+    return out
 
 
 def _gemini_draft(prompt: str, photo: tuple[bytes, str] | None) -> dict:
@@ -165,7 +187,8 @@ def _openai_draft(base: str, model: str, prompt: str,
     resp = ai._post(f"{base}/chat/completions", {
         "model": model, "temperature": 0.2, "response_format": {"type": "json_object"},
         "messages": [{"role": "system", "content": f"Reply with one JSON object with keys: {keys}. "
-                      "recommend = {failure: bool, job_card: bool}. severity one of low|med|high|critical."},
+                      "recommend = {failure: bool, job_card: bool}. severity one of low|med|high|critical. "
+                      "safety_flags = {helmet, vest, lockout_tag: present|missing|unclear, note: string}."},
                      {"role": "user", "content": user_msg}],
     }, headers)
     return json.loads(resp["choices"][0]["message"]["content"])
@@ -230,6 +253,7 @@ class Draft(BaseModel):
     safety_note: str = Field("", max_length=600)
     confidence: float | None = None
     summary: str = Field("", max_length=160)
+    safety_flags: dict | None = None
 
 
 class SubmitIn(BaseModel):
@@ -259,6 +283,10 @@ def _narrative(body: SubmitIn, username: str) -> str:
         lines.append(f"Likely cause: {d.likely_cause.strip()}")
     if d.safety_note.strip():
         lines.append(f"Safety: {d.safety_note.strip()}")
+    flags = _clean_flags(d.safety_flags)
+    missing = [k.replace("_", "/") for k in GEAR if flags[k] == "missing"]
+    if missing:
+        lines.append(f"Safety gear missing: {', '.join(missing)}" + (f" ({flags['note']})" if flags["note"] else ""))
     lines.append(f"Severity: {d.severity if d.severity in SEVERITIES else 'med'}")
     if body.ai_model:
         conf = f", confidence {d.confidence:.2f}" if d.confidence is not None else ""
