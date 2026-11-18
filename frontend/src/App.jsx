@@ -3510,45 +3510,6 @@ function useDashFit(ready) {
   return ref
 }
 
-// Sidebar feed rolls up slowly like credits (same feel as the pitch page): holds
-// while the viewer reads (hover, focus, wheel, touch) or presses Pause, waits at
-// the end, then rewinds. Re-arms on every tab switch. Reduced motion starts paused.
-function useRoll(key) {
-  const ref = useRef(null)
-  const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  const [paused, setPaused] = useState(!!calm)
-  const stop = useRef(paused); stop.current = paused
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.scrollTop = 0
-    const SPEED = 22   // px per second
-    let raf = 0, last = 0, pos = 0, hold = performance.now() + 2500, reading = false, atEnd = false
-    const wait = (ms) => { hold = Math.max(hold, performance.now() + ms) }
-    const tick = (t) => {
-      raf = requestAnimationFrame(tick)
-      const dt = last ? Math.min(t - last, 100) : 0; last = t
-      if (stop.current || reading || document.hidden || t < hold) { pos = el.scrollTop; return }
-      const end = el.scrollHeight - el.clientHeight
-      if (end <= 0) return
-      if (pos >= end - 1) {
-        if (!atEnd) { atEnd = true; hold = t + 4000; return }
-        atEnd = false; el.scrollTo({ top: 0, behavior: 'smooth' }); hold = t + 3000; return
-      }
-      pos = Math.min(end, pos + (SPEED * dt) / 1000); el.scrollTop = pos
-    }
-    raf = requestAnimationFrame(tick)
-    const on = (e) => { if (e.pointerType !== 'touch') reading = true }
-    const off = () => { reading = false; wait(1500) }
-    const nudge = () => wait(6000)
-    const ev = [['pointerenter', on], ['pointerleave', off], ['focusin', () => { reading = true }], ['focusout', off],
-      ['wheel', nudge], ['touchstart', nudge], ['keydown', nudge]]
-    ev.forEach(([k, f]) => el.addEventListener(k, f, { passive: true }))
-    return () => { cancelAnimationFrame(raf); ev.forEach(([k, f]) => el.removeEventListener(k, f)) }
-  }, [key])
-  return [ref, paused, setPaused]
-}
-
 // Slim failures-per-month chart: drawn at the box's own pixel size (no scaled
 // text), thin rounded bars on a soft gradient, the latest month in full accent.
 function SlimTrend({ data }) {
@@ -3616,17 +3577,25 @@ const feedWhen = (e) => {
 }
 function DashFeed({ groups, fails, sync, failHref }) {
   const [tab, setTab] = useState('log')
-  const [roll, paused, setPaused] = useRoll(tab)
+  // live feel: on the first load the newest entry pops in; after that every
+  // entry a 60 s refresh brings in that was not on screen before pops in
+  const seen = useRef(null)
+  const fresh = useRef(new Set())
+  const keys = groups.map((g) => g.key)
+  if (keys.length && keys.join('\n') !== seen.current?.sig) {
+    fresh.current = seen.current ? new Set(keys.filter((k) => !seen.current.all.has(k))) : new Set(keys.slice(0, 1))
+    seen.current = { sig: keys.join('\n'), all: new Set(keys) }
+  }
   const openN = (fails || []).filter((f) => (f.state || 'open') === 'open').length
   const liveN = (fails || []).filter((f) => f.state && f.state !== 'resolved' && f.state !== 'open').length
   const held = sync ? Object.values(sync.lines || {}).reduce((n, s) => n + (s.held_count || 0), 0) : 0
   const tabs = [
     ['log', 'Recent logs', null],
     ['fail', 'Failures', openN ? <b className="dt-n bad">{openN}</b> : liveN ? <b className="dt-n warn">{liveN}</b> : null],
-    ...(sync ? [['sync', 'Sync log', held ? <b className="dt-n warn">{held}</b> : <i className="dt-ok" aria-label="all imported" />]] : []),
+    ['sync', 'Sync log', !sync ? null : held ? <b className="dt-n warn">{held}</b> : <i className="dt-ok" aria-label="all imported" />],
   ]
   return (
-    <aside className="card dash-side" aria-label="Live feed">
+    <aside className="dash-side" aria-label="Live feed">
       <div className="ds-tabs" role="tablist">
         {tabs.map(([k, label, badge]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={`ds-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
@@ -3634,12 +3603,10 @@ function DashFeed({ groups, fails, sync, failHref }) {
           </button>
         ))}
         <span className="ds-live" title="Refreshed every minute"><i />live</span>
-        {tab !== 'sync' && <button type="button" className="ds-pause" onClick={() => setPaused((x) => !x)} aria-pressed={paused}
-                title={paused ? 'Resume rolling' : 'Hold the feed'}>{paused ? '▶' : '❚❚'}</button>}
       </div>
-      <div className="ds-roll" ref={roll} role="tabpanel">
+      <div className="ds-roll" role="tabpanel">
         {tab === 'log' && (groups.length === 0 ? <p className="dim ds-empty">No entries yet.</p> : groups.slice(0, 40).map(({ key, e, n, codes }) => (
-          <a key={key} className={`df-row ${FEED_TYPE[e.type] || 'ft-gen'}`} href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
+          <a key={key} className={`df-row ${FEED_TYPE[e.type] || 'ft-gen'}${fresh.current.has(key) ? ' df-new' : ''}`} href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
              title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
             <span className="df-top">
               <span className="df-type">{(e.type || 'general').replace('_', ' ')}</span>
@@ -3666,7 +3633,8 @@ function DashFeed({ groups, fails, sync, failHref }) {
               </a>
             )
           }))}
-        {tab === 'sync' && sync && <SyncCard sync={sync} bare />}
+        {tab === 'sync' && (sync ? <SyncCard sync={sync} bare />
+          : <p className="dim ds-empty">No sheet sync recorded yet. Each scheduled pull from the coordination sheets reports here: rows imported, rows held and why.</p>)}
       </div>
       <div className="ds-foot">
         {tab === 'log' && <a className="crumb" href="#/log">Open the log book →</a>}
@@ -3936,7 +3904,7 @@ function LineDashboard({ go, initialLine = null }) {
       <div className="dash-main">
       <div className="card dash-hood">
       <div className="dash-toolbar">
-        <h1 className="dash-title" title="Preventive-maintenance compliance & asset health">{line} · Maintenance Overview</h1>
+        <h1 className="sr-only">{line} · Maintenance Overview</h1>
         <span className="dash-kpis">
           <a className="dk" href={regHref} title="Assets in service (spares and decommissioned not counted)"><b>{total.toLocaleString()}</b> assets</a>
           <span className="dk" title={`${depots} ${W.depot}${depots === 1 ? '' : 's'}`}><b>{stations}</b> {W.stations}</span>
@@ -3988,7 +3956,7 @@ function LineDashboard({ go, initialLine = null }) {
                   <span className="crs-lbl">{r.label}</span>
                   <span className="crs-n">{r.n.toLocaleString()} assets{r.od > 0 && <> · <b className="od">{r.od.toLocaleString()} overdue</b></>}</span>
                 </span>
-                <Ring pct={r.pct} cls={r.cls} size={40} stroke={4.5} na={r.na}
+                <Ring pct={r.pct} cls={r.cls} size={32} stroke={4} na={r.na}
                       label={r.na ? `Only ${r.inC} in cycle — too few for a %` : `${r.ok.toLocaleString()} of ${r.inC.toLocaleString()} within schedule`} />
               </a>
               {meter(r.segs, `Criticality ${r.k} PM breakdown`, `${r.k} · `, r.k)}
@@ -4064,7 +4032,7 @@ function LineDashboard({ go, initialLine = null }) {
         <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
-      {/* failures per month — slim bars, the full width of the left column */}
+      {/* failures per month — slim bars */}
       <section className="card viz-card dash-trend">
         <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
           <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
