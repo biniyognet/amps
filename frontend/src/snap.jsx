@@ -14,7 +14,8 @@ import QR, { assetUrl } from './qr.jsx'
 
 const SEVERITIES = ['low', 'med', 'high', 'critical']
 const SEV_LABEL = { low: 'Low', med: 'Medium', high: 'High', critical: 'Critical' }
-const EMPTY = { fault_type: '', severity: 'med', likely_cause: '', suggested_action: '', safety_note: '', confidence: null, summary: '' }
+const EMPTY = { fault_type: '', severity: 'med', likely_cause: '', suggested_action: '', safety_note: '', confidence: null, summary: '', safety_flags: null }
+const GEAR_LABEL = { helmet: 'helmet', vest: 'hi-vis vest', lockout_tag: 'lockout/tag' }
 const enc = encodeURIComponent
 const fmtIST = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -134,6 +135,7 @@ export default function SnapReport({ code }) {
   }
 
   const set = (k) => (e) => setDraft((d) => ({ ...d, [k]: e.target.value }))
+  const gearMissing = Object.entries(GEAR_LABEL).filter(([k]) => draft?.safety_flags?.[k] === 'missing').map(([, l]) => l)
 
   return (
     <div className="snap">
@@ -212,6 +214,10 @@ export default function SnapReport({ code }) {
                     {draft.confidence != null ? ` · confidence ${Math.round(draft.confidence * 100)}%` : ''}</span>
                 )}
               </div>
+              {gearMissing.length > 0 && (
+                <span className="chip snap-gear" role="alert" title={draft.safety_flags?.note || ''}>
+                  <span className="dot" />Safety gear missing: {gearMissing.join(' · ')}</span>
+              )}
               {meta.note && <p className="snap-note">{meta.note}</p>}
 
               <label className="snap-l">Summary</label>
