@@ -2753,6 +2753,8 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 @keyframes snap-shim { to { background-position: -200% 0; } }
 .snap-draft-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .snap-model { font-size: 11.5px; color: var(--ink-3); }
+.snap-gear { margin: 6px 0 0; max-width: 100%; white-space: normal; background: #fdf1f1; border-color: #f5d5d5; color: #a32e2e; font-weight: 600; }
+.snap-gear .dot { background: var(--critical); }
 .snap-note { font-size: 13px; color: #8a6100; background: #fdf3d9; border: 1px solid #f0dca8; border-radius: 8px; padding: 6px 10px; margin: 4px 0 0; }
 .snap-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .snap-sev { display: flex; gap: 4px; flex-wrap: wrap; }
