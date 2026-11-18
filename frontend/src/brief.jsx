@@ -107,8 +107,8 @@ function Deck() {
         <span className="br-dots">{SLIDES.map((t, j) => <i key={j} title={t} className={j === i ? 'on' : ''} onClick={() => setI(j)} />)}</span>
         <span className="br-count">{i + 1} / {SLIDES.length}</span>
         <button type="button" onClick={() => setI(Math.min(last, i + 1))} disabled={i === last}>Next ›</button>
-        <button type="button" onClick={() => ref.current?.requestFullscreen?.()}>Full screen</button>
-        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1118`} download>Download PDF</a>
+        <button type="button" onClick={() => ref.current?.requestFullscreen?.()} title="Full screen · ← → or n / p to step">Present</button>
+        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1118`} download title="Download the deck as PDF">PDF ↓</a>
       </figcaption>
     </figure>
   )
@@ -131,13 +131,54 @@ function useViewportFit() {
   return ref
 }
 
+// Credits: on wide screens the details roll up slowly on their own, hold while the
+// viewer reads (hover, focus, wheel, touch, a drag of the scrollbar) or presses Pause,
+// wait at the end, then rewind. Reduced-motion viewers start paused.
+function useCredits() {
+  const ref = useRef(null)
+  const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const [paused, setPaused] = useState(!!calm)
+  const stop = useRef(paused); stop.current = paused
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const wide = window.matchMedia('screen and (min-width:1100px) and (min-height:560px)')
+    const SPEED = 26   // px per second
+    let raf = 0, last = 0, pos = el.scrollTop, hold = performance.now() + 2500, reading = false, atEnd = false
+    const wait = (ms) => { hold = Math.max(hold, performance.now() + ms) }
+    const tick = (t) => {
+      raf = requestAnimationFrame(tick)
+      const dt = last ? Math.min(t - last, 100) : 0; last = t
+      if (!wide.matches || stop.current || reading || document.hidden || t < hold) { pos = el.scrollTop; return }
+      const end = el.scrollHeight - el.clientHeight
+      if (end <= 0) return
+      if (pos >= end - 1) {
+        if (!atEnd) { atEnd = true; hold = t + 4000; return }
+        atEnd = false; el.scrollTo({ top: 0, behavior: 'smooth' }); hold = t + 3000; return
+      }
+      pos = Math.min(end, pos + (SPEED * dt) / 1000); el.scrollTop = pos
+    }
+    raf = requestAnimationFrame(tick)
+    const on = (e) => { if (e.pointerType !== 'touch') reading = true }
+    const off = () => { reading = false; wait(1500) }
+    const nudge = () => wait(6000)
+    const moved = () => { if (performance.now() >= hold && Math.abs(el.scrollTop - pos) > 2) wait(6000) }
+    const ev = [['pointerenter', on], ['pointerleave', off], ['focusin', () => { reading = true }], ['focusout', off],
+      ['wheel', nudge], ['touchstart', nudge], ['keydown', nudge], ['scroll', moved]]
+    ev.forEach(([k, f]) => el.addEventListener(k, f, { passive: true }))
+    return () => { cancelAnimationFrame(raf); ev.forEach(([k, f]) => el.removeEventListener(k, f)) }
+  }, [])
+  return [ref, paused, setPaused]
+}
+
 export default function Brief() {
   useFonts()
   const net = useNetwork()
   const page = useViewportFit()
+  const [roll, paused, setPaused] = useCredits()
   return (
     <article className="brief" ref={page}>
-      {/* 60:40 on wide screens: headline + deck fill the left, the details roll like credits in the right sidebar */}
+      {/* 60:40 on wide screens: compact headline + the largest deck that fits on the left, the details roll like credits in the right sidebar */}
       <div className="br-split">
       <section className="br-main">
       <header className="br-head">
@@ -153,6 +194,9 @@ export default function Brief() {
       </section>
 
       <aside className="br-side">
+      <div className="br-roll-h"><span>The details</span>
+        <button type="button" onClick={() => setPaused((x) => !x)} aria-pressed={paused}>{paused ? '▶ Roll' : '❚❚ Pause'}</button></div>
+      <div className="br-roll" ref={roll}>
       <div className="br-delta">
         <div><b>7,900+</b><span>assets in production, 5 lines</span></div>
         <div><b>33,000+</b><span>maintenance records, 2020–2026</span></div>
@@ -213,6 +257,7 @@ export default function Brief() {
         <li><b>Google</b> — cloud credits and mentorship to ship the Gemini layer at scale.</li>
       </ul>
       <p className="br-foot">Source: github.com/arupbiswas1994-byte/amps · MIT · Demo data on this site is synthetic.</p>
+      </div>
       </aside>
       </div>
     </article>
