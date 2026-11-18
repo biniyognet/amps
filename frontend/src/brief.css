@@ -50,3 +50,28 @@
 .br-faq{margin:8px 0}.br-faq div{padding:10px 0;border-bottom:1px solid var(--rule)}
 .br-faq dt{font-weight:600}.br-faq dd{margin:4px 0 0;color:var(--mute)}
 @media (max-width:640px){.br-try{grid-template-columns:1fr}}
+/* 60:40 split (wide screens): deck + headline numbers pinned on the left, the
+   rest of the brief (live demo links, §1–§8, FAQ) scrolls in its own right sidebar */
+@media screen and (min-width:1100px){
+  .brief{max-width:1680px;padding:28px 32px 32px}
+  .br-head{max-width:1100px}
+  .br-head h1{font-size:38px;margin:6px 0 8px}
+  .br-head .br-dek{font-size:17px;margin:0 0 18px}
+  .br-split{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:32px;align-items:start}
+  .br-main,.br-side{position:sticky;top:calc(var(--topbar-h,0px) + 12px)}
+  .br-side .br-delta{margin:0 0 4px;gap:10px}
+  .br-side .br-delta div{padding:10px 12px}
+  .br-side .br-delta b{font-size:24px}
+  .br-side .br-delta span{font-size:13px;line-height:1.35;display:block}
+  .br-main .br-deck-h{margin:0 0 10px;padding-top:0;border-top:0}
+  .br-side{max-height:calc(100vh - var(--topbar-h,0px) - 24px);overflow-y:auto;overscroll-behavior:contain;
+    border-left:1px solid var(--rule);padding:0 6px 24px 28px;font-size:15.5px;scrollbar-width:thin;scrollbar-color:var(--rule) transparent}
+  .br-side h2{font-size:21px;margin:30px 0 8px}
+  .br-side > h2:first-of-type{margin-top:22px}
+  .br-side .br-try{grid-template-columns:1fr}
+  .br-side .br-try a{padding:10px 12px}
+  .br-side .br-cmp{font-size:14px}
+  .br-side .br-cmp td:first-child{white-space:normal}
+}
+/* a short laptop screen: let the left column scroll with the page instead of pinning a cut-off deck */
+@media screen and (min-width:1100px) and (max-height:720px){.br-main{position:static}}

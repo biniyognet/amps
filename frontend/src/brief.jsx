@@ -119,19 +119,28 @@ export default function Brief() {
   const net = useNetwork()
   return (
     <article className="brief">
+      <header className="br-head">
       <p className="br-kick">BRIEF · AMPS · OPEN-SOURCE EAM · {new Date().getFullYear()}</p>
       <h1>AMPS — maintenance records that run themselves</h1>
       <p className="br-dek">A next-generation alternative to SAP PM / Maximo-class EAM for any plant: QR-first, phone-first,
         live in weeks, ₹0 licence. Already running the power-system maintenance of a metro railway in India.</p>
+      </header>
+
+      {/* 60:40 on wide screens: the deck stays put on the left, the details scroll in the right sidebar */}
+      <div className="br-split">
+      <section className="br-main">
+
+      <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-one slides</h2>
+      <Deck />
+      <p className="br-note">← → or n / p to step · Full screen to present</p>
+      </section>
+
+      <aside className="br-side">
       <div className="br-delta">
         <div><b>7,900+</b><span>assets in production, 5 lines</span></div>
         <div><b>33,000+</b><span>maintenance records, 2020–2026</span></div>
         <div><b>₹0</b><span>licence cost</span></div>
       </div>
-
-      <h2><span>Deck</span>The pitch, in twenty-one slides</h2>
-      <p className="br-note">← → or n / p to step · Full screen to present</p>
-      <Deck />
 
       <h2><span>Try</span>Open the live demo</h2>
       <p className="br-note">Same code as production · synthetic data · no login to look around</p>
@@ -187,6 +196,8 @@ export default function Brief() {
         <li><b>Google</b> — cloud credits and mentorship to ship the Gemini layer at scale.</li>
       </ul>
       <p className="br-foot">Source: github.com/arupbiswas1994-byte/amps · MIT · Demo data on this site is synthetic.</p>
+      </aside>
+      </div>
     </article>
   )
 }
