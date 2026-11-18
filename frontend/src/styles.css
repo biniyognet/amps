@@ -2964,7 +2964,7 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .rail-fix { --rail: var(--good); }
 .rail-shift { --rail: #a1a1aa; }
 
-.lb-split.wide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 42%); align-items: start; }
+.lb-split.wide { display: grid; grid-template-columns: minmax(0, 7fr) minmax(340px, 3fr); align-items: start; }
 .lb-list { min-width: 0; }
 .lb-split.wide .lb-list { border-right: 1px solid var(--border); }
 .lb-day-h { position: sticky; top: calc(var(--topbar-h, 78px) + var(--lb-rib-h, 52px) - 2px); z-index: 5;
