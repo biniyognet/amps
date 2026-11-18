@@ -2665,3 +2665,63 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 @media screen and (max-width: 760px) {
   .pg-dock .pd-loc, .pg-dock .crit-badge { display: none; }
 }
+
+/* ---- planned maintenance (live planner) ---- */
+.pm-views { display: inline-flex; gap: 4px; margin-left: 8px; }
+.pm-views .btn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.pm-sum { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.pm-sum-c { display: inline-flex; gap: 8px; align-items: baseline; font: inherit; font-size: 12.5px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px 12px; color: var(--ink-2); }
+.pm-sum-c.on, .pm-sum-c:hover { border-color: var(--accent); }
+.pm-pct { font-weight: 650; color: var(--accent); }
+.pm-toolbar .pm-import { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; }
+.pm-dry { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); }
+.pm-msg { font-size: 13px; background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; margin: 0 0 10px; }
+.pm-bulk { display: flex; gap: 10px; align-items: center; font-size: 13px; margin: 0 0 10px; padding: 8px 12px;
+  border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); position: sticky; top: 8px; z-index: 5; }
+.pm-table { min-width: 980px; }
+.pm-table th, .pm-table td { vertical-align: top; }
+.pm-ck { width: 30px; }
+.pm-sub { display: block; font-size: 11px; }
+.pm-src { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-act { white-space: nowrap; }
+.pm-act .mini-btn + .mini-btn { margin-left: 4px; }
+.pm-date { font: inherit; font-size: 12px; border: 1px solid transparent; background: transparent; padding: 1px 2px; border-radius: 5px; color: inherit; }
+.pm-date:hover, .pm-date:focus { border-color: var(--border); background: #fff; }
+.pm-row.pm-overdue td:first-child { box-shadow: inset 3px 0 0 var(--critical); }
+.pm-row.pm-today td:first-child { box-shadow: inset 3px 0 0 #e0a010; }
+.pm-row.pm-done, .pm-row.pm-skipped { color: var(--ink-3); }
+.chip.pm-overdue { background: #fdf1f1; border-color: #f5d5d5; color: #a32e2e; }
+.chip.pm-overdue .dot { background: var(--critical); }
+.chip.pm-today { background: #fdf3d9; border-color: #f0dca8; color: #8a6100; }
+.chip.pm-today .dot { background: #e0a010; }
+.chip.pm-upcoming .dot { background: #0078B4; }
+.chip.pm-done { background: color-mix(in srgb, var(--good) 10%, #fff); border-color: color-mix(in srgb, var(--good) 28%, transparent); color: #1a7a3a; }
+.chip.pm-done .dot { background: var(--good); }
+.chip.pm-skipped .dot { background: var(--ink-3); }
+.rk-stat.pm-k-overdue .v { color: #a32e2e; }
+.rk-stat.pm-k-today .v { color: #8a6100; }
+.rk-stat.pm-k-done .v { color: #1a7a3a; }
+.cal-item.pm-ci { width: 100%; text-align: left; font: inherit; font-size: 11px; border-top: 0; border-right: 0; border-bottom: 0; cursor: pointer; }
+.cal-item.pm-overdue { background: #fdf1f1; border-left-color: var(--critical); }
+.cal-item.pm-overdue .cal-freq { color: #a32e2e; background: #f9dede; }
+.cal-item.pm-today { background: #fdf3d9; border-left-color: #e0a010; }
+.cal-item.pm-done { background: color-mix(in srgb, var(--good) 10%, #fff); border-left-color: var(--good); opacity: .75; }
+.cal-item.pm-skipped { background: #f4f4f2; border-left-color: var(--ink-3); opacity: .6; text-decoration: line-through; }
+.pm-modal { max-width: 440px; }
+.pm-modal-sub { font-size: 12.5px; margin: -6px 0 12px; }
+/* mobile: one compact wrapped card per plan instead of a line per cell */
+@media screen and (max-width: 760px) {
+  .tbl-wrap .pm-table { min-width: 0; }
+  .tbl-wrap .pm-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .tbl-wrap .pm-table td { width: auto; padding: 0; display: block; }
+  .tbl-wrap .pm-table td.pm-ck { order: -2; }
+  .tbl-wrap .pm-table td.dt { order: -1; }
+  .tbl-wrap .pm-table td.pm-act { flex-basis: 100%; display: flex; gap: 6px; }
+  .tbl-wrap .pm-table td:empty { display: none; }
+  .pm-table .pm-sub { display: inline; margin-left: 6px; }
+}
+@media (max-width: 640px) {
+  .pm-views { margin-left: 0; }
+  .plan-nav { flex-wrap: wrap; }
+}
