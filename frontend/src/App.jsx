@@ -1384,7 +1384,7 @@ function AssetForm({ initial, mode, onDone, onCancel }) {
         <label>Asset class<input value={f.asset_class} onChange={set('asset_class')} required
                                  list="af-classes" /></label>
         <label>Location / {W.station}<input value={f.location} onChange={set('location')} required /></label>
-        <label>{W.Line}<input value={f.line} onChange={set('line')} placeholder={OPERATOR ? 'e.g. Green Line' : 'e.g. Lakeside Water Works'} /></label>
+        <label>{W.Line}<input value={f.line} onChange={set('line')} placeholder={OPERATOR ? 'e.g. Green Line' : 'e.g. City Water Treatment Plant'} /></label>
         <label>System<input value={f.system} onChange={set('system')} placeholder="reporting rollup" /></label>
         <label>Make / model<input value={f.make_model} onChange={set('make_model')} /></label>
         <label>Commissioned on<input type="date" value={f.commissioned_on} onChange={set('commissioned_on')} /></label>

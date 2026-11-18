@@ -40,7 +40,7 @@ spec:
         - name: AMPS_ORG
           value: Demo Industries Group
         - name: AMPS_STANDARD_LINE
-          value: Riverside Metro
+          value: Metro Traction & Depot
         - name: AMPS_AUTH
           value: '1'
         - name: AMPS_ADMIN_PASSWORD

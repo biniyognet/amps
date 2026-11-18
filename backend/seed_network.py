@@ -40,24 +40,24 @@ HISTORY_DAYS = 548  # ~18 months
 # site, unit code, opened, health profile, industry. Each site's last area is its
 # hub (workshop / control building / MCC / utility block) and gets the hub counts.
 LINES = [
-    ("Riverside Metro",            "RVM", 2004, "exemplary", "transit"),
-    ("Hillcrest 132kV Substation", "HCS", 2011, "lagging",   "power"),
-    ("Lakeside Water Works",       "LWW", 2016, "cluster",   "water"),
-    ("Foundry Lane Factory",       "FLF", 2024, "new",       "factory"),
+    ("Metro Traction & Depot",         "MTD", 2004, "exemplary", "transit"),
+    ("Eastern Grid 132 kV Substation", "EGS", 2011, "lagging",   "power"),
+    ("City Water Treatment Plant",     "CWT", 2016, "cluster",   "water"),
+    ("Bengal Steel & Rolling Mill",    "BSR", 2024, "new",       "factory"),
 ]
 
 STATIONS = {
-    "Riverside Metro": ["Riverside", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
-                        "Old Town", "University", "Lakeview", "Market Square", "Depot Workshop"],
-    "Hillcrest 132kV Substation": ["HV Yard North", "HV Yard South", "MV Switchyard",
-                                   "Transformer Bay A", "Transformer Bay B", "Feeder Bay East",
-                                   "Feeder Bay West", "Capacitor Yard", "Cable Gallery", "Control Building"],
-    "Lakeside Water Works": ["Intake Pump House", "Raw Water Main", "Clariflocculator 1",
-                             "Clariflocculator 2", "Rapid Sand Filters", "Chlorination House",
-                             "Clear Water Reservoir", "Booster Station", "Sludge Handling", "Admin & MCC"],
-    "Foundry Lane Factory": ["Press Shop", "Machine Shop A", "Machine Shop B", "Weld Shop",
-                             "Paint Booth", "Assembly Line 1", "Assembly Line 2", "Heat Treatment",
-                             "Finished Goods Store", "Utility Block"],
+    "Metro Traction & Depot": ["Central", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
+                               "Old Town", "University", "Lakeview", "Market Square", "Depot Workshop"],
+    "Eastern Grid 132 kV Substation": ["HV Yard North", "HV Yard South", "MV Switchyard",
+                                       "Transformer Bay A", "Transformer Bay B", "Feeder Bay East",
+                                       "Feeder Bay West", "Capacitor Yard", "Cable Gallery", "Control Building"],
+    "City Water Treatment Plant": ["Intake Pump House", "Raw Water Main", "Clariflocculator 1",
+                                   "Clariflocculator 2", "Rapid Sand Filters", "Chlorination House",
+                                   "Clear Water Reservoir", "Booster Station", "Sludge Handling", "Admin & MCC"],
+    "Bengal Steel & Rolling Mill": ["Melt Shop", "Ladle Furnace", "Continuous Caster",
+                                    "Reheating Furnace", "Roughing Mill", "Finishing Mill",
+                                    "Cooling Bed", "Coil Yard", "Roll Shop", "Utility Block"],
 }
 
 # per industry: class, code prefix, system, criticality, codal life (yrs),
@@ -121,9 +121,9 @@ CLASSES = {
         ("DG Set", "DGS", "Utilities", "A", 20, (0, 2), ["Monthly", "Yearly"], ["Ironbark Gensets"]),
     ],
     "factory": [
-        ("Hydraulic Press", "HPR", "Production", "A", 20, (3, 0), ["Monthly", "Yearly"], ["Pressforge"]),
-        ("CNC Machine", "CNC", "Production", "A", 15, (8, 0), ["Monthly", "Half-Yearly"], ["Tornalis"]),
-        ("Robot Cell", "ROB", "Production", "A", 12, (2, 0), ["Quarterly"], ["Kinetra Robotics"]),
+        ("Rolling Mill Stand", "RMS", "Production", "A", 20, (3, 0), ["Monthly", "Yearly"], ["Pressforge"]),
+        ("Hydraulic Power Pack", "HPP", "Production", "A", 15, (8, 0), ["Monthly", "Half-Yearly"], ["Tornalis"]),
+        ("Pinch Roll Unit", "PRU", "Production", "A", 12, (2, 0), ["Quarterly"], ["Kinetra Robotics"]),
         ("Conveyor", "CNV", "Material Handling", "B", 15, (4, 1), ["Monthly"], ["Beltway Systems"]),
         ("Gearbox", "GBX", "Production", "B", 15, (4, 0), ["Quarterly"], ["Pressforge"]),
         ("Drive Motor", "MTR", "Electrical", "B", 20, (12, 2), ["Quarterly", "Yearly"], ["Ferrum Elec"]),
@@ -175,7 +175,7 @@ FAULTS = {
     "Treatment": ["Dosing pump air-locked", "Valve actuator torque trip", "Chlorine leak alarm", "Clarifier drive overload"],
     "Instrumentation": ["Flow meter reading erratic", "Level sensor stuck", "PLC I/O card fault"],
     "Fire": ["Fire panel loop fault", "Hydrant pump pressure low"],
-    "Production": ["Press hydraulic leak", "CNC spindle overheat", "Robot cell safety interlock open",
+    "Production": ["Hydraulic power pack oil leak", "Mill stand roll bearing overheat", "Pinch roll gap fault",
                    "Gearbox oil leak", "Lathe tailstock seized"],
     "Material Handling": ["Crane long-travel brake fault", "Conveyor belt misalignment", "Conveyor motor tripped"],
 }
@@ -194,7 +194,7 @@ def _at(d: date, hour: int) -> datetime:
 
 
 def _abbr(area: str) -> str:
-    """Short area code for asset tags: 'Feeder Bay East' -> 'FBE', 'Riverside' -> 'RIV'."""
+    """Short area code for asset tags: 'Feeder Bay East' -> 'FBE', 'Central' -> 'CEN'."""
     words = area.replace("&", " ").split()
     return (words[0][:3] if len(words) == 1 else "".join(w[0] for w in words)[:3]).upper()
 

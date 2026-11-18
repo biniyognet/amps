@@ -62,12 +62,12 @@ const SLIDES = [
 // Live demo entry points — every link opens the real app on synthetic data.
 const TRY = [
   ['#/', 'Network dashboard', 'Every site’s PM compliance, overdue work and failures on one screen'],
-  ['#/line/Riverside%20Metro', 'A site, close up', 'One line’s schedule: on time, due soon, overdue, by system'],
+  ['#/line/Metro%20Traction%20%26%20Depot', 'A site, close up', 'One line’s schedule: on time, due soon, overdue, by system'],
   ['#/assets', 'Asset register', 'Filter by site, class, criticality; every row opens its history'],
-  ['#/asset/RVM-RIV-TTR-01', 'What a QR tag opens', 'One transformer: details, PM history, failures, job cards'],
+  ['#/asset/MTD-CEN-TTR-01', 'What a QR tag opens', 'One transformer: details, PM history, failures, job cards'],
   ['#/log', 'Log book', 'Preventive maintenance entries by date and cycle'],
   ['#/failures', 'Failures', 'Breakdowns, rectification, downtime and MTTR'],
-  ['#/snap/RVM-RIV-HSC-01', 'Snap & Report', 'Photo + a rough note → Gemini drafts the failure report and job card (sign-in to submit)'],
+  ['#/snap/MTD-CEN-HSC-01', 'Snap & Report', 'Photo + a rough note → Gemini drafts the failure report and job card (sign-in to submit)'],
   ['#/job-cards', 'Job cards', 'Agency work tracked from issue to closure'],
   ['#/printables', 'Printables', 'QR tags and per-class checksheets, ready to print'],
 ]
@@ -159,7 +159,7 @@ export default function Brief() {
       <p>AMPS is not a prototype. It runs in production on a metro railway power system in India: over 7,900 assets across five lines and
         230+ locations registered and tagged, and six years of maintenance and failure records (33,000+) migrated in.
         Overdue work and assets past design life are visible network-wide, the day they happen. The operator paid nothing for licences.
-        This site runs the same code against four synthetic plant sites — a metro, a power substation, a water works and a factory
+        This site runs the same code against four synthetic plant sites — Metro Traction &amp; Depot, Eastern Grid 132 kV Substation, City Water Treatment Plant and Bengal Steel &amp; Rolling Mill
         {net?.lines?.length ? <> ({n(net.lines.reduce((s, l) => s + (l.assets || 0), 0))} assets)</> : null}.</p>
 
       <h2><span>§4</span>Legacy EAM (SAP PM-class) vs AMPS</h2>
