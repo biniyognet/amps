@@ -3048,3 +3048,27 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .ai-ok i { font-style: normal; font-weight: 700; }
 .ai-ok b { font-weight: 600; }
 .pm-src:has(.ai-ok) { white-space: normal; overflow: visible; }
+
+/* ---- logbook head, wide (>=1100px): ONE docked bar = ledger title · KPI chips ·
+   day ruler · scope/search/filters · actions. Wraps to a second row only when the
+   window is too narrow; the rail legend moves to the top of the detail pane. ---- */
+@media screen and (min-width: 1100px) {
+  .log-ribbon.lb-bar { gap: 8px; row-gap: 5px; padding: 5px 0; margin: 2px 0 8px; flex-wrap: wrap; align-items: center; }
+  .lb-bar > * { flex: none; }
+  .lb-bar > .lb-kpis, .lb-bar > .date-ruler, .lb-bar > .lb-filters { padding-left: 8px; border-left: 1px solid var(--border); }
+  .lb-bar-t { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .lb-bar-t h2 { margin: 0; font-size: 14px; font-weight: 700; }
+  .lb-bar-t .lb-cap { font-size: 11.5px; }
+  .lb-bar .lb-kpis { margin: 0; gap: 4px; flex-wrap: nowrap; }
+  .lb-bar .lb-kpi { padding: 3px 7px; gap: 5px; }
+  .lb-bar .lb-kpi b { font-size: 12px; }
+  .lb-bar .lb-kpi span { letter-spacing: .06em; }
+  .lb-bar .date-ruler .ruler-day { padding: 3px 6px; }
+  .lb-bar .lb-filters { flex: 1 1 580px; flex-wrap: nowrap; gap: 4px; min-width: 580px; padding-bottom: 0; border-bottom: 0; }
+  .lb-bar .lb-f, .lb-bar .lb-search { height: 26px; }
+  .lb-bar .lb-f { flex: 0 1 auto; min-width: 92px; max-width: 124px; padding: 3px 2px 3px 5px; }
+  .lb-bar .lb-search { flex: 1 1 150px; min-width: 100px; max-width: 280px; }
+  .lb-bar .asset-actions { margin-left: auto; gap: 2px; }
+  .lb-bar .asset-actions .icon-btn { width: 28px; height: 28px; }
+  .lb-detail > .lb-legend { margin: 0; padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+}

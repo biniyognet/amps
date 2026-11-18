@@ -259,6 +259,14 @@ const periodRange = (period, anchorIso) => {
 
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+/* a date window in a few characters: "Nov 2026" for a whole month, else "1 Nov – 19 Nov" */
+const fmtSpan = (from, to) => {
+  const f = new Date(from + 'T00:00:00'), t = new Date(to + 'T00:00:00')
+  if (f.getDate() === 1 && addDays(to, 1).slice(8) === '01' && from.slice(0, 7) === to.slice(0, 7))
+    return f.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+  const dm = (d) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  return from === to ? dm(f) : `${dm(f)} – ${dm(t)}`
+}
 // entry `at`/`time` are stored as the IST clock time the user typed (naive), so
 // show them literally — no tz conversion (that would double-shift by +5:30).
 const fmtTime = (ts) =>
@@ -1663,6 +1671,117 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     )
   }
 
+  // the head pieces: one docked bar on wide screens (title · KPIs · day ruler ·
+  // filters · actions), the stacked strip + ledger head below 1100px
+  const kpiStrip = (
+    <div className="lb-kpis" role="list">
+      <button type="button" role="listitem" className="lb-kpi"
+              title={`Entries logged on ${fmtDate(today())} — open today`}
+              onClick={() => { setLogDate(today()); setAllDates(false); setSearch('') }}>
+        <b>{kpi.today ?? '—'}</b><span>{wide ? 'today' : 'entries today'}</span>
+      </button>
+      <button type="button" role="listitem" className={`lb-kpi k-fail${kpi.open ? ' hot' : ''}`}
+              title={kpi.open != null ? `Failures not yet rectified and with no job card (${kpi.acked} of them acknowledged) — show failures` : 'Open failures'}
+              onClick={() => { setFType('failure'); setAllDates(true) }}>
+        <b>{kpi.open ?? '—'}</b><span>{wide ? 'failures' : 'open failures'}</span>
+      </button>
+      <a role="listitem" className="lb-kpi k-jc" href="#/job-cards"
+         title="Failures on a job card, awaiting the fix — open the job-card board">
+        <b>{kpi.jc ?? '—'}</b><span>{wide ? 'job cards' : 'open job cards'}</span>
+      </a>
+      <a role="listitem" className="lb-kpi k-pm" href="#/planner"
+         title={kpi.pm != null ? `PM done ${kpi.pmDone} of ${kpi.pmDue} due · ${kpi.pmMonth} — open the planner` : 'PM done % (sign in to see the plan)'}>
+        <b>{kpi.pm != null ? `${kpi.pm}%` : '—'}</b><span>PM done{kpi.pmMonth && !wide ? ` · ${kpi.pmMonth}` : ''}</span>
+        {kpi.pm != null && <i className="lb-kpi-bar" style={{ '--p': `${kpi.pm}%` }} />}
+      </a>
+    </div>
+  )
+  const ruler = <DateRuler value={allDates ? '' : logDate} days={wide ? 4 : 7}
+                           onChange={(d) => { setLogDate(d); setAllDates(false); setNewOpen(false) }} />
+  const ledgerTitle = (
+    <>
+      <span className="lb-tag">LOG</span>
+      <h2>Ledger</h2>
+      <span className="lb-cap" title={allDates && from ? `${fmtDate(from)} — ${fmtDate(to)}` : fmtDate(logDate)}>
+        {qParam.trim() || allDates ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}` : wide ? fmtSpan(logDate, logDate) : fmtDate(logDate)}
+        {allDates && from && !qParam.trim() ? ` · ${wide ? fmtSpan(from, to) : `${fmtDate(from)} — ${fmtDate(to)}`}` : ''}
+      </span>
+    </>
+  )
+  const ledgerActions = (
+    <div className="asset-actions">
+      {canWrite && (
+        <button type="button" className={`icon-btn${newOpen ? ' on' : ''}`} title="New log entry"
+                aria-label="New log entry" onClick={() => { setNewOpen((v) => !v); setBulkOpen(false) }}>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
+        </button>
+      )}
+      {canWrite && (
+        <button type="button" className={`icon-btn${bulkOpen ? ' on' : ''}`} title="Bulk entry — spreadsheet grid"
+                aria-label="Bulk entry" onClick={() => { setBulkOpen((v) => !v); setNewOpen(false) }}>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <rect x="2.2" y="3" width="11.6" height="10" rx="1.2" /><path d="M2.2 6.4h11.6M2.2 9.7h11.6M6 3v10M10 3v10" strokeWidth="1.1" /></svg>
+        </button>
+      )}
+      <button type="button" className="icon-btn" title="Download the entries in view (CSV)"
+              aria-label="Download entries" onClick={exportCsv} disabled={!entries.length}>
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
+      </button>
+      <button type="button" className="icon-btn" title="Print the log in view"
+              aria-label="Print log" onClick={() => window.print()}>
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
+      </button>
+      {canWrite && (
+        <button type="button" className={`icon-btn${impBusy ? ' disabled' : ''}`} title="Import history CSV"
+                aria-label="Import history" onClick={() => fileRef.current?.click()} disabled={impBusy}>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 9.8V2.6M4.8 5.8 8 2.6l3.2 3.2M3 12.8h10" /></svg>
+        </button>
+      )}
+      <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImportFile} />
+    </div>
+  )
+  const ledgerFilters = (
+    <div className="lb-filters no-print">
+      {/* merged scope: "all dates" + the period window in one control. A day
+          picked on the ruler shows the neutral state; choosing a period
+          switches to that window. */}
+      <select className={`lb-f${allDates ? ' on' : ''}`} value={allDates ? period : ''}
+              onChange={(e) => { setPeriod(e.target.value); setAllDates(true) }} aria-label="Date scope">
+        <option value="" disabled hidden>Single day ▸</option>
+        {PERIODS.map(([lbl, v]) => <option key={v} value={v}>{v === 'all' ? 'All dates' : `This ${lbl.toLowerCase()}`}</option>)}
+      </select>
+      <input className="lb-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)}
+             placeholder="Search — text, asset, crew, fault…" aria-label="Search the log" />
+      {depots.length > 0 && !me?.depot && (
+        <select className={`lb-f${fDepot ? ' on' : ''}`} value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
+          <option value="">All depots</option>
+          {filterDepots.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      )}
+      <select className={`lb-f${fType ? ' on' : ''}`} value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Filter by type">
+        <option value="">All types</option>
+        {ENTRY_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+      </select>
+      <select className={`lb-f${fSystem ? ' on' : ''}`} value={fSystem} onChange={(e) => { setFSystem(e.target.value); setFLocation('') }} aria-label="Filter by system">
+        <option value="">All systems</option>
+        {systems.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <select className={`lb-f${fLocation ? ' on' : ''}`} value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by station">
+        <option value="">All {W.stations}</option>
+        {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
+      </select>
+      {(search || fType || fDepot || fSystem || fLocation || !allDates) && (
+        <button type="button" className="lb-clear" onClick={() => {
+          setSearch(''); setFType(''); setFDepot(''); setFSystem(''); setFLocation(''); setAllDates(true)
+        }}>Clear</button>
+      )}
+    </div>
+  )
+
   return (
     <>
       {apiOk === false && (
@@ -1671,35 +1790,22 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
         </div>
       )}
 
-      {/* KPI strip — four figures, one line; each tile is also a shortcut */}
-      <div className="lb-kpis" role="list">
-        <button type="button" role="listitem" className="lb-kpi"
-                title={`Entries logged on ${fmtDate(today())} — open today`}
-                onClick={() => { setLogDate(today()); setAllDates(false); setSearch('') }}>
-          <b>{kpi.today ?? '—'}</b><span>entries today</span>
-        </button>
-        <button type="button" role="listitem" className={`lb-kpi k-fail${kpi.open ? ' hot' : ''}`}
-                title={kpi.open != null ? `Failures not yet rectified and with no job card (${kpi.acked} of them acknowledged) — show failures` : 'Open failures'}
-                onClick={() => { setFType('failure'); setAllDates(true) }}>
-          <b>{kpi.open ?? '—'}</b><span>open failures</span>
-        </button>
-        <a role="listitem" className="lb-kpi k-jc" href="#/job-cards"
-           title="Failures on a job card, awaiting the fix — open the job-card board">
-          <b>{kpi.jc ?? '—'}</b><span>open job cards</span>
-        </a>
-        <a role="listitem" className="lb-kpi k-pm" href="#/planner"
-           title={kpi.pm != null ? `PM done ${kpi.pmDone} of ${kpi.pmDue} due · ${kpi.pmMonth} — open the planner` : 'PM done % (sign in to see the plan)'}>
-          <b>{kpi.pm != null ? `${kpi.pm}%` : '—'}</b><span>PM done{kpi.pmMonth ? ` · ${kpi.pmMonth}` : ''}</span>
-          {kpi.pm != null && <i className="lb-kpi-bar" style={{ '--p': `${kpi.pm}%` }} />}
-        </a>
-      </div>
-
-      {/* the day ruler stays docked under the top bar: it picks the day for
-          both reading and writing */}
-      <div className="log-ribbon" ref={toolbarRef}>
-        <DateRuler value={allDates ? '' : logDate} days={7}
-                   onChange={(d) => { setLogDate(d); setAllDates(false); setNewOpen(false) }} />
-      </div>
+      {wide ? (
+        <div className="log-ribbon lb-bar" ref={toolbarRef}>
+          <div className="lb-bar-t">{ledgerTitle}</div>
+          {kpiStrip}
+          {ruler}
+          {ledgerFilters}
+          {ledgerActions}
+        </div>
+      ) : (
+        <>
+          {kpiStrip}
+          {/* the day ruler stays docked under the top bar: it picks the day for
+              both reading and writing */}
+          <div className="log-ribbon" ref={toolbarRef}>{ruler}</div>
+        </>
+      )}
 
       {canWrite && bulkOpen && (
         <BulkEntry assets={assets} defaultDate={logDate} systems={systems}
@@ -1911,87 +2017,13 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
       {/* the ledger: one full-width card. Head = tag · title · caption, then the
           scope, search and filters inline (never a drawer), then the actions. */}
       <section className="card lb-ledger">
-        <div className="lb-head">
-          <span className="lb-tag">LOG</span>
-          <h2>Ledger</h2>
-          <span className="lb-cap" title={allDates && from ? `${fmtDate(from)} — ${fmtDate(to)}` : fmtDate(logDate)}>
-            {qParam.trim() || allDates ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}` : fmtDate(logDate)}
-            {allDates && from && !qParam.trim() ? ` · ${fmtDate(from)} — ${fmtDate(to)}` : ''}
-          </span>
-          <span className="lb-legend" aria-hidden="true">
-            {RAIL_LEGEND.map(([k, l]) => <span key={k} className={`rail-${k}`}><i />{l}</span>)}
-          </span>
-          <div className="asset-actions">
-            {canWrite && (
-              <button type="button" className={`icon-btn${newOpen ? ' on' : ''}`} title="New log entry"
-                      aria-label="New log entry" onClick={() => { setNewOpen((v) => !v); setBulkOpen(false) }}>
-                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                  <path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
-              </button>
-            )}
-            {canWrite && (
-              <button type="button" className={`icon-btn${bulkOpen ? ' on' : ''}`} title="Bulk entry — spreadsheet grid"
-                      aria-label="Bulk entry" onClick={() => { setBulkOpen((v) => !v); setNewOpen(false) }}>
-                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                  <rect x="2.2" y="3" width="11.6" height="10" rx="1.2" /><path d="M2.2 6.4h11.6M2.2 9.7h11.6M6 3v10M10 3v10" strokeWidth="1.1" /></svg>
-              </button>
-            )}
-            <button type="button" className="icon-btn" title="Download the entries in view (CSV)"
-                    aria-label="Download entries" onClick={exportCsv} disabled={!entries.length}>
-              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
-            </button>
-            <button type="button" className="icon-btn" title="Print the log in view"
-                    aria-label="Print log" onClick={() => window.print()}>
-              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
-            </button>
-            {canWrite && (
-              <button type="button" className={`icon-btn${impBusy ? ' disabled' : ''}`} title="Import history CSV"
-                      aria-label="Import history" onClick={() => fileRef.current?.click()} disabled={impBusy}>
-                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 9.8V2.6M4.8 5.8 8 2.6l3.2 3.2M3 12.8h10" /></svg>
-              </button>
-            )}
-            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImportFile} />
+        {!wide && (
+          <div className="lb-head">
+            {ledgerTitle}
+            {ledgerActions}
           </div>
-        </div>
-
-        <div className="lb-filters no-print">
-          {/* merged scope: "all dates" + the period window in one control. A day
-              picked on the ruler shows the neutral state; choosing a period
-              switches to that window. */}
-          <select className={`lb-f${allDates ? ' on' : ''}`} value={allDates ? period : ''}
-                  onChange={(e) => { setPeriod(e.target.value); setAllDates(true) }} aria-label="Date scope">
-            <option value="" disabled hidden>Single day ▸</option>
-            {PERIODS.map(([lbl, v]) => <option key={v} value={v}>{v === 'all' ? 'All dates' : `This ${lbl.toLowerCase()}`}</option>)}
-          </select>
-          <input className="lb-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-                 placeholder="Search — text, asset, crew, fault…" aria-label="Search the log" />
-          {depots.length > 0 && !me?.depot && (
-            <select className={`lb-f${fDepot ? ' on' : ''}`} value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
-              <option value="">All depots</option>
-              {filterDepots.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          )}
-          <select className={`lb-f${fType ? ' on' : ''}`} value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Filter by type">
-            <option value="">All types</option>
-            {ENTRY_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
-          </select>
-          <select className={`lb-f${fSystem ? ' on' : ''}`} value={fSystem} onChange={(e) => { setFSystem(e.target.value); setFLocation('') }} aria-label="Filter by system">
-            <option value="">All systems</option>
-            {systems.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select className={`lb-f${fLocation ? ' on' : ''}`} value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by station">
-            <option value="">All {W.stations}</option>
-            {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
-          </select>
-          {(search || fType || fDepot || fSystem || fLocation || !allDates) && (
-            <button type="button" className="lb-clear" onClick={() => {
-              setSearch(''); setFType(''); setFDepot(''); setFSystem(''); setFLocation(''); setAllDates(true)
-            }}>Clear</button>
-          )}
-        </div>
+        )}
+        {!wide && ledgerFilters}
 
         <div className={`lb-split${wide ? ' wide' : ''}`}>
           <div className="lb-list">
@@ -2048,6 +2080,9 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
           </div>
           {wide && (
             <aside className="lb-detail" aria-label="Entry detail">
+              <div className="lb-legend" aria-label="Row rails">
+                {RAIL_LEGEND.map(([k, l]) => <span key={k} className={`rail-${k}`}><i />{l}</span>)}
+              </div>
               {sel ? renderDetail(sel)
                 : <p className="dim lb-pick">{entries.length ? 'Pick an entry on the left to see it in full, edit it or log its fix.' : 'Nothing in view.'}</p>}
             </aside>
