@@ -114,21 +114,38 @@ function Deck() {
   )
 }
 
+// Wide screens fit the brief to the viewport: no page scroll, the page's own top
+// offset (topbar + shell padding) is measured so the card ends at the window's edge.
+function useViewportFit() {
+  const ref = useRef(null)
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.add('brief-fit')
+    const set = () => { if (ref.current) root.style.setProperty('--brief-top', `${Math.round(ref.current.getBoundingClientRect().top + window.scrollY)}px`) }
+    set()
+    window.addEventListener('resize', set)
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set)
+    const tb = document.querySelector('.topbar'); if (ro && tb) ro.observe(tb)
+    return () => { root.classList.remove('brief-fit'); window.removeEventListener('resize', set); ro?.disconnect() }
+  }, [])
+  return ref
+}
+
 export default function Brief() {
   useFonts()
   const net = useNetwork()
+  const page = useViewportFit()
   return (
-    <article className="brief">
+    <article className="brief" ref={page}>
+      {/* 60:40 on wide screens: headline + deck fill the left, the details roll like credits in the right sidebar */}
+      <div className="br-split">
+      <section className="br-main">
       <header className="br-head">
       <p className="br-kick">BRIEF · AMPS · OPEN-SOURCE EAM · {new Date().getFullYear()}</p>
       <h1>AMPS — maintenance records that run themselves</h1>
       <p className="br-dek">A next-generation alternative to SAP PM / Maximo-class EAM for any plant: QR-first, phone-first,
         live in weeks, ₹0 licence. Already running the power-system maintenance of a metro railway in India.</p>
       </header>
-
-      {/* 60:40 on wide screens: the deck stays put on the left, the details scroll in the right sidebar */}
-      <div className="br-split">
-      <section className="br-main">
 
       <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-one slides</h2>
       <Deck />
