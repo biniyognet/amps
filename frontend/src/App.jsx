@@ -3586,13 +3586,36 @@ function DashFeed({ groups, fails, sync, failHref }) {
     fresh.current = seen.current ? new Set(keys.filter((k) => !seen.current.all.has(k))) : new Set(keys.slice(0, 1))
     seen.current = { sig: keys.join('\n'), all: new Set(keys) }
   }
+  const roll = useRef(null)
+  const glideSig = useRef('')
+  useEffect(() => {
+    const el = roll.current
+    const sig = `${tab}|${tab === 'log' ? keys[0] || '' : (fails || [])[0]?.id || ''}`
+    if (!el || sig === glideSig.current || el.scrollHeight <= el.clientHeight + 4) return
+    glideSig.current = sig
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { el.scrollTop = 0; return }
+    const from = el.scrollHeight - el.clientHeight, dur = Math.min(2600, 900 + from * 0.9), t0 = performance.now()
+    let raf = 0, stop = false
+    const halt = () => { stop = true }
+    el.addEventListener('wheel', halt, { passive: true }); el.addEventListener('touchstart', halt, { passive: true })
+    el.scrollTop = from
+    const step = (t) => {
+      if (stop) return
+      const k = Math.min(1, (t - t0) / dur)
+      el.scrollTop = from * (1 - (1 - Math.pow(1 - k, 3)))
+      if (k < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => { cancelAnimationFrame(raf); el.removeEventListener('wheel', halt); el.removeEventListener('touchstart', halt) }
+  }, [tab, keys[0], fails])
   const openN = (fails || []).filter((f) => (f.state || 'open') === 'open').length
   const liveN = (fails || []).filter((f) => f.state && f.state !== 'resolved' && f.state !== 'open').length
   const held = sync ? Object.values(sync.lines || {}).reduce((n, s) => n + (s.held_count || 0), 0) : 0
   const tabs = [
     ['log', 'Recent logs', null],
     ['fail', 'Failures', openN ? <b className="dt-n bad">{openN}</b> : liveN ? <b className="dt-n warn">{liveN}</b> : null],
-    ['sync', 'Sync log', !sync ? null : held ? <b className="dt-n warn">{held}</b> : <i className="dt-ok" aria-label="all imported" />],
+    // shown only once a sheet sync has reported (the cron puller on a real deployment)
+    ...(sync ? [['sync', 'Sync log', held ? <b className="dt-n warn">{held}</b> : <i className="dt-ok" aria-label="all imported" />]] : []),
   ]
   return (
     <aside className="dash-side" aria-label="Live feed">
@@ -3604,7 +3627,7 @@ function DashFeed({ groups, fails, sync, failHref }) {
         ))}
         <span className="ds-live" title="Refreshed every minute"><i />live</span>
       </div>
-      <div className="ds-roll" role="tabpanel">
+      <div className="ds-roll" role="tabpanel" ref={roll}>
         {tab === 'log' && (groups.length === 0 ? <p className="dim ds-empty">No entries yet.</p> : groups.slice(0, 40).map(({ key, e, n, codes }) => (
           <a key={key} className={`df-row ${FEED_TYPE[e.type] || 'ft-gen'}${fresh.current.has(key) ? ' df-new' : ''}`} href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
              title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
@@ -3626,10 +3649,10 @@ function DashFeed({ groups, fails, sync, failHref }) {
                 <span className="df-top">
                   <span className="df-state"><i />{label}</span>
                   {f.asset_code && <span className="df-code">{f.asset_code}</span>}
+                  {f.station && <span className="df-sub">{f.station}{f.system ? ` · ${f.system}` : ''}</span>}
                   <span className="df-when">{feedWhen(f)}</span>
                 </span>
                 <span className="df-txt">{tidyLog(f.text)}</span>
-                {f.station && <span className="df-sub">{f.station}{f.system ? ` · ${f.system}` : ''}</span>}
               </a>
             )
           }))}
@@ -3935,11 +3958,10 @@ function LineDashboard({ go, initialLine = null }) {
           legend IS the breakdown — no duplicate KPI row). */}
       <section className="hstrip">
         <div className="h-compl">
-          <Ring pct={compliance} cls={complClass} size={60} stroke={7} label={`PM compliance ${compliance}%`} />
+          <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
             <span className="h-pk">PM compliance</span>
-            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule</span>
-            {bucket.grace > 0 && <span className="h-cap"><b>{bucket.grace.toLocaleString()}</b> records awaited · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>}
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule{bucket.grace > 0 && <> · <b>{bucket.grace.toLocaleString()}</b> awaited</>} · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
           </div>
         </div>
         {meter(segs, 'PM compliance breakdown')}
