@@ -1148,6 +1148,15 @@ async def upload_attachment(entry_id: int, file: UploadFile,
         raise HTTPException(422, "empty file")
     if len(data) > ATTACH_MAX_BYTES:
         raise HTTPException(413, f"file too large ({len(data)//1024} KB) — compress or photograph the sheet instead")
+    return _store_attachment(db, entry_id, data, file.content_type,
+                             file.filename or f"checksheet.{ext}", user)
+
+
+def _store_attachment(db: Session, entry_id: int, data: bytes, mime: str,
+                      filename: str, user, commit: bool = True) -> AttachmentRef:
+    """Write validated bytes to the media disk and record the Attachment row.
+    Shared by the upload route and Snap & Report (one photo → several entries)."""
+    ext = ATTACH_MIME_EXT[mime]
     digest = hashlib.sha256(data).hexdigest()
     dup = db.scalar(select(Attachment).where(
         Attachment.entry_id == entry_id, Attachment.sha256 == digest,
@@ -1161,13 +1170,14 @@ async def upload_attachment(entry_id: int, file: UploadFile,
     with open(os.path.join(MEDIA_DIR, stored), "wb") as f:
         f.write(data)
     att = Attachment(
-        entry_id=entry_id, filename=(file.filename or f"checksheet.{ext}")[:200],
-        stored_name=stored, mime=file.content_type, size=len(data),
+        entry_id=entry_id, filename=filename[:200],
+        stored_name=stored, mime=mime, size=len(data),
         sha256=digest, uploaded_by=user.username)
     db.add(att); db.flush()
     audit(db, "attachment", att.id, "uploaded",
           detail=f"entry={entry_id} {att.filename} {att.size}B", actor=user.username)
-    db.commit(); db.refresh(att)
+    if commit:
+        db.commit(); db.refresh(att)
     return AttachmentRef(id=att.id, filename=att.filename, mime=att.mime,
                          size=att.size, uploaded_by=att.uploaded_by, uploaded_at=att.uploaded_at)
 

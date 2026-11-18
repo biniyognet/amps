@@ -28,6 +28,7 @@ import { CHECKSHEET_FORMATS } from './checksheets.js'
 import { TendersView, ReaderView } from './tenders.jsx'
 import { DrawingsView, DrawingViewer, AssetDrawings } from './drawings.jsx'
 import { GuideView } from './guide.jsx'
+import SnapReport, { SnapPrint, rememberNext } from './snap.jsx'
 import { LettersView, LetterViewer } from './letters.jsx'
 
 const STATUS_LABEL = {
@@ -1507,6 +1508,8 @@ function LiveAssetDetail({ code }) {
                 {canWrite && !editing && (
                   <button className="btn ghost sm" type="button" onClick={() => setEditing(true)}>Edit details</button>
                 )}
+                <a className="btn sm snap-cta no-print" href={`#/snap/${encodeURIComponent(a.code)}`}
+                   onClick={() => { if (!canWrite) rememberNext(`/snap/${encodeURIComponent(a.code)}`) }}>📷 Report a problem</a>
                 <button className="btn ghost sm no-print" type="button" onClick={() => window.print()}>Print</button>
               </div>
             </div>
@@ -4317,7 +4320,9 @@ function LoginForm({ autoFocus = false }) {
     setBusy(true); setErr(null)
     try {
       await apiLogin(username.trim(), password)
-      location.hash = '/'
+      let next = '/'
+      try { next = sessionStorage.getItem('amps-next') || '/'; sessionStorage.removeItem('amps-next') } catch { /* private mode */ }
+      location.hash = next
       location.reload() // fresh session everywhere: nav, scope, authorship
     } catch (ex) {
       setErr(String(ex.message || 'login failed'))
@@ -4748,13 +4753,15 @@ export default function App() {
   const letterMatch = routePath.match(/^\/procurement\/([^/]+)\/letter$/)
   const csMatch = routePath.match(/^\/checksheet\/(wo|pm)\/([^/]+)(?:\/(.+))?$/)
   const jcMatch = routePath.match(/^\/jobcard\/(.+)$/)
+  const snapMatch = routePath.match(/^\/snap\/(.+)$/)
+  const printMatch = routePath.match(/^\/print\/(failure|jobcard)\/(\d+)$/)
 
   if (LIVE && meLoading) return null // one clean paint: landing or app, never both
 
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
@@ -4784,6 +4791,7 @@ export default function App() {
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
+          : snapMatch ? <SnapReport code={safeDecode(snapMatch[1])} />
           : lineAssetsMatch ? <LineAssets name={safeDecode(lineAssetsMatch[1])} />
           : <LineView name={decodeURIComponent(lineMatch[1])} />}
         <footer className="foot">{ORG} · maintenance records · <AmpsLink />, MIT © 2026 <FootSig /></footer>
@@ -4831,6 +4839,8 @@ export default function App() {
       </header>
 
       {assetMatch ? (LIVE ? <LiveAssetDetail code={assetCode} /> : <AssetDetail code={assetCode} />)
+        : snapMatch ? (LIVE ? <SnapReport code={safeDecode(snapMatch[1])} /> : <NotYet />)
+        : printMatch ? (LIVE ? <SnapPrint kind={printMatch[1]} id={printMatch[2]} code={routeQuery.get('asset')} /> : <NotYet />)
         : lineFailMatch ? (LIVE ? <LineFailures name={failLine} /> : <Failures />)
         : lineAssetsMatch ? (LIVE ? <LineAssets name={safeDecode(lineAssetsMatch[1])} /> : <NotYet />)
         : lineMatch ? (LIVE ? <LineView name={decodeURIComponent(lineMatch[1])} /> : <NotYet />)

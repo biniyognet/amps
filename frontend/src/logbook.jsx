@@ -24,8 +24,9 @@ const API = import.meta.env.VITE_AMPS_API ?? ''
 
 /* Compress a photo before upload: downscale to maxDim, grayscale, JPEG q — a
    legible A4 checksheet drops from ~3 MB to ~150 KB, so the free off-box backup
-   holds years of scans. PDFs pass through (already a document). */
-async function compressImage(file, maxDim = 1700, quality = 0.72) {
+   holds years of scans. PDFs pass through (already a document). A fault photo
+   (Snap & Report) keeps its colour: scorch marks and wire colours are evidence. */
+export async function compressImage(file, maxDim = 1700, quality = 0.72, gray = true) {
   if (!file.type.startsWith('image/')) return file
   try {
     const img = await createImageBitmap(file)
@@ -34,7 +35,7 @@ async function compressImage(file, maxDim = 1700, quality = 0.72) {
     const canvas = document.createElement('canvas')
     canvas.width = w; canvas.height = h
     const ctx = canvas.getContext('2d')
-    ctx.filter = 'grayscale(1)'
+    if (gray) ctx.filter = 'grayscale(1)'
     ctx.drawImage(img, 0, 0, w, h)
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', quality))
     if (!blob || blob.size >= file.size) return file   // no gain → keep original

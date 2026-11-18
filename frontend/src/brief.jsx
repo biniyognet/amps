@@ -31,7 +31,7 @@ const COMPARE = [
   ['Rollout', 'Months, with an implementation partner', 'Weeks · import the old registers'],
   ['Field use', 'Desktop-first, built for planners', 'QR-first, any phone, built for technicians'],
   ['Your data', "In the vendor's format", 'Yours, in open PostgreSQL'],
-  ['AI', 'Add-on modules, if any', 'Gemini answers, job cards, early warnings'],
+  ['AI', 'Add-on modules, if any', 'Gemini answers, photo → job card, AI maintenance plans'],
 ]
 
 // The pitch deck, rendered from the same source as the PDF (public/pitch/) —
@@ -48,6 +48,7 @@ const SLIDES = [
   'Every role has its place in the record',
   'Gemini turns the logbook into answers, job cards and early warnings',
   'AI drafts the maintenance plan. A supervisor approves it.',
+  'Snap & Report: a photo becomes a job card',
   'Running today on the power system of a metro railway in India',
   'Next-generation EAM, without the legacy weight',
   'The framework is free forever. Services pay the bills.',
@@ -56,7 +57,7 @@ const SLIDES = [
   'Three servers, no single point of failure',
   'MVP on our own cluster today, built to scale on Google Cloud',
   'Built on the same records, ready to add',
-  'Built and delivered by biniDev',
+  'Built by Arup Biswas, delivered by biniDev',
 ]
 // Live demo entry points — every link opens the real app on synthetic data.
 const TRY = [
@@ -66,6 +67,7 @@ const TRY = [
   ['#/asset/RVM-RIV-TTR-01', 'What a QR tag opens', 'One transformer: details, PM history, failures, job cards'],
   ['#/log', 'Log book', 'Preventive maintenance entries by date and cycle'],
   ['#/failures', 'Failures', 'Breakdowns, rectification, downtime and MTTR'],
+  ['#/snap/RVM-RIV-HSC-01', 'Snap & Report', 'Photo + a rough note → Gemini drafts the failure report and job card (sign-in to submit)'],
   ['#/job-cards', 'Job cards', 'Agency work tracked from issue to closure'],
   ['#/printables', 'Printables', 'QR tags and per-class checksheets, ready to print'],
 ]
@@ -80,7 +82,7 @@ const FAQ = [
 ]
 
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
-const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1117`
+const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1118`
 
 function Deck() {
   const [i, setI] = useState(0)
@@ -106,7 +108,7 @@ function Deck() {
         <span className="br-count">{i + 1} / {SLIDES.length}</span>
         <button type="button" onClick={() => setI(Math.min(last, i + 1))} disabled={i === last}>Next ›</button>
         <button type="button" onClick={() => ref.current?.requestFullscreen?.()}>Full screen</button>
-        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1117`} download>Download PDF</a>
+        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1118`} download>Download PDF</a>
       </figcaption>
     </figure>
   )
@@ -127,7 +129,7 @@ export default function Brief() {
         <div><b>₹0</b><span>licence cost</span></div>
       </div>
 
-      <h2><span>Deck</span>The pitch, in twenty slides</h2>
+      <h2><span>Deck</span>The pitch, in twenty-one slides</h2>
       <p className="br-note">← → or n / p to step · Full screen to present</p>
       <Deck />
 
@@ -149,6 +151,8 @@ export default function Brief() {
         <li><b>Checksheets</b> — per-class formats, approved by an in-charge, printed on demand.</li>
         <li><b>Ask AMPS</b> — plain-language questions (English, हिन्दी, বাংলা) answered from the live records by Gemini;
           AI-drafted maintenance plans that a supervisor approves before anything is saved.</li>
+        <li><b>Snap &amp; Report</b> — scan the asset QR, take a photo, add a rough note: Gemini reads the photo and the asset’s
+          history and drafts the failure report and job card; the technician ticks what to raise and picks the agency.</li>
       </ul>
 
       <h2><span>§3</span>Proof</h2>
@@ -175,8 +179,8 @@ export default function Brief() {
       <dl className="br-faq">{FAQ.map(([q, a]) => <div key={q}><dt>{q}</dt><dd>{a}</dd></div>)}</dl>
 
       <h2><span>§8</span>Team &amp; ask</h2>
-      <p>Built and delivered by biniDev. <b>Arup Biswas</b>, Founder · <b>Nilanjan Chakraborty</b>, Co-founder ·
-        Full-stack Developer.</p>
+      <p>Built by <b>Arup Biswas</b>, delivered by biniDev: <b>Arup Biswas</b>, Founder · <b>Nilanjan Chakraborty</b>, Co-founder ·
+        Full-stack Developer. Supported by biniyog (partner).</p>
       <ul>
         <li><b>Pilots</b> — depots, substations and plants ready to run AMPS on their own assets.</li>
         <li><b>Partners</b> — integrators and OEMs in transit, utilities and manufacturing.</li>
