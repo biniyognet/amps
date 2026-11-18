@@ -393,7 +393,7 @@ def t_draft_pm_plan(db, user, site=None, asset_class=None):
 
 
 S, I, B = {"type": "string"}, {"type": "integer"}, {"type": "boolean"}
-_site = {"type": "string", "description": "site / line name, partial match, e.g. 'Hillcrest'"}
+_site = {"type": "string", "description": "site / line name, partial match, e.g. 'Eastern Grid'"}
 _cls = {"type": "string", "description": "asset class, partial match, e.g. 'transformer', 'isolator'"}
 
 TOOLS = {

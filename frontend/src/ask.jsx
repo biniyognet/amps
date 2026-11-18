@@ -8,9 +8,9 @@ import { API, useMe } from './api'
 const SUGGEST = [
   'Which site has the most overdue maintenance?',
   'Which assets keep failing?',
-  'What is the MTTR at Hillcrest?',
+  'What is the MTTR at Eastern Grid?',
   'Vital assets past their design life',
-  'Draft a maintenance plan for Hillcrest',
+  'Draft a maintenance plan for Eastern Grid',
   'কোন সাইটে সবচেয়ে বেশি ব্রেকডাউন?',
 ]
 
@@ -20,7 +20,7 @@ const TOOL_LABEL = {
   draft_pm_plan: 'maintenance plan',
 }
 
-// asset codes like HCS-CB-BAT-01 become links to the asset page
+// asset codes like EGS-CB-BAT-01 become links to the asset page
 const CODE_RE = /\b([A-Z]{2,5}(?:-[A-Z0-9]{1,6}){2,4})\b/g
 
 function inline(text, key) {
@@ -185,7 +185,7 @@ export default function AskAmps() {
           </div>
           <form className="ask-input" onSubmit={e => { e.preventDefault(); ask() }}>
             <input ref={input} value={q} onChange={e => setQ(e.target.value)} maxLength={500}
-              placeholder="e.g. Which pumps are overdue at Lakeside?" />
+              placeholder="e.g. Which pumps are overdue at City Water?" />
             <button disabled={busy || !q.trim()}>Ask</button>
           </form>
         </section>
