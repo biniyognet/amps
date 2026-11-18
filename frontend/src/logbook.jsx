@@ -340,8 +340,30 @@ function DateRuler({ value, onChange, days = 10 }) {
     return { dow: d.toLocaleDateString(undefined, { weekday: 'short' }), day: d.getDate() }
   }
   const inStrip = strip.includes(value)
+  // On a phone the strip scrolls sideways; keep the picked day (else Today,
+  // the last chip) in view instead of leaving it past the right edge.
+  const ref = useRef(null)
+  useEffect(() => {
+    const fit = () => {
+      const el = ref.current
+      const a = el && (el.querySelector('.ruler-day.active') || el.lastElementChild)
+      if (!a || el.scrollWidth <= el.clientWidth) return
+      if (a === el.lastElementChild) { el.scrollLeft = el.scrollWidth; return }
+      const box = el.getBoundingClientRect(), r = a.getBoundingClientRect()
+      if (r.right > box.right) el.scrollLeft += r.right - box.right + 2
+      else if (r.left < box.left) el.scrollLeft -= box.left - r.left + 2
+    }
+    fit()
+    // chips widen once the webfont lands, the strip narrows on rotate: re-fit then
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    for (const c of el.children) ro.observe(c)
+    return () => ro.disconnect()
+  }, [value])
   return (
-    <div className="date-ruler" role="tablist" aria-label="Log date">
+    <div className="date-ruler" ref={ref} role="tablist" aria-label="Log date">
       <input type="date" className={`ruler-pick${!inStrip && value ? ' active' : ''}`}
              value={value} max={t} onChange={(e) => e.target.value && onChange(e.target.value)}
              aria-label="Older date" />

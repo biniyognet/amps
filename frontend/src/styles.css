@@ -3009,6 +3009,10 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .lb-head .asset-actions { margin-left: auto; }
 }
 @media (max-width: 760px) {
+  /* the strip was flex 0 0 auto → wider than a phone, Today clipped off the edge;
+     let it shrink to the ribbon and scroll inside itself (DateRuler keeps the pick in view) */
+  .log-ribbon .date-ruler { flex: 1 1 auto; min-width: 0; max-width: 100%; scrollbar-width: none; }
+  .log-ribbon .date-ruler .ruler-day, .log-ribbon .ruler-pick { flex-shrink: 0; }
   .lb-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .lb-kpi { justify-content: space-between; }
   .lb-head { padding: 9px 10px 7px; gap: 8px; }
