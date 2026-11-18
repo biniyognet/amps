@@ -128,11 +128,13 @@ function ShowcaseDropdown() {
 
 /* the masthead: emblem + AMPS wordmark with its full form, and the
    organisation on a second line so it never drops out after sign-in */
+// navbar mark = the same file the favicon uses (bolt on neutral/demo builds)
 const Brand = () => (
   <a href="#/" className="brand">
     {/* the real Indian Railways emblem is for the live office deployment only —
        a public synthetic demo must not carry a national/government emblem */}
-    {OPERATOR && <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />}
+    {OPERATOR ? <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />
+              : <img className="brand-emblem brand-fav" src={`${import.meta.env.BASE_URL}${!LIVE || import.meta.env.VITE_AMPS_BRAND === 'neutral' ? 'amps-bolt.svg' : 'metro-logo.svg'}`} alt="" />}
     <span className="brand-lines">
       <span className="brand-l1">
         <span className="brand-name">AMPS</span>
@@ -3529,7 +3531,8 @@ function SlimTrend({ data }) {
   const P = { t: 18, b: 20, l: 4, r: 4 }
   const ih = Math.max(0, h - P.t - P.b)
   const slot = (w - P.l - P.r) / Math.max(data.length, 1)
-  const bw = Math.max(8, Math.min(26, slot * 0.34))
+  // bars butt up against each other (1.5 px seam) so the months read as one area
+  const bw = Math.max(4, slot - 1.5)
   const x = (i) => P.l + slot * (i + 0.5)
   const y = (v) => P.t + ih * (1 - v / max)
   return (
@@ -3551,8 +3554,9 @@ function SlimTrend({ data }) {
             const bh = Math.max(m.count ? 3 : 0, ih * (m.count / max))
             return (
               <g key={m.label}>
-                {m.count > 0 && <rect x={x(i) - bw / 2} y={y(0) - bh} width={bw} height={bh} rx={Math.min(5, bw / 2)}
+                {m.count > 0 && <rect x={x(i) - bw / 2} y={y(0) - bh} width={bw} height={bh}
                                       fill={last ? 'url(#st-g2)' : 'url(#st-g)'} />}
+                {m.count > 0 && <line x1={x(i) - bw / 2} x2={x(i) + bw / 2} y1={y(0) - bh + 0.75} y2={y(0) - bh + 0.75} className="st-cap" />}
                 <text x={x(i)} y={y(0) - bh - 6} textAnchor="middle" className={`st-val${last ? ' last' : ''}`}>{m.count}</text>
                 <text x={x(i)} y={h - 5} textAnchor="middle" className="st-cat">{m.label}</text>
               </g>
@@ -3722,7 +3726,7 @@ function LineDashboard({ go, initialLine = null }) {
   const fit = useDashFit(!(loading || schedLoading))
   useEffect(() => {
     const lq = initialLine ? `&line=${encodeURIComponent(initialLine)}` : ''
-    getJSON(`/api/logbook/failure-stats?days=180&months=6${lq}`).then(setStats).catch(() => {})
+    getJSON(`/api/logbook/failure-stats?days=180&months=12${lq}`).then(setStats).catch(() => {})
     getJSON(`/api/sync/status${initialLine ? `?line=${encodeURIComponent(initialLine)}` : ''}`).then(setSync).catch(() => setSync(null))
     // the sidebar feed stays live: latest entries + failures re-pulled every minute
     const pull = () => {
@@ -3935,7 +3939,7 @@ function LineDashboard({ go, initialLine = null }) {
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
         <span className="dash-clock" role="timer" aria-label="Current date and time">
-          <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
+          <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })}</span>
           <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
         </span>
         <div className="asset-actions">

@@ -3245,3 +3245,27 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 
 .df-top .df-sub { flex: 0 1 auto; min-width: 0; font-size: 10.5px; }
 .df-top .df-sub::before { content: '· '; }
+
+/* v56: hood = ONE line (ring · meter · counts · clock · actions), 12-month
+   failures as an area of touching bars, three equal bottom cards filling the column */
+.st-cap { stroke: #0078B4; stroke-width: 1.5; }
+@media screen and (min-width: 1100px) and (min-height: 560px) {
+  .dash-main .dash-hood { display: flex; align-items: center; gap: 0 10px; padding-right: 10px; }
+  .dash-main .dash-toolbar { display: contents; }
+  .dash-main .hstrip { order: 1; flex: 1 1 auto; min-width: 0; }
+  .dash-main .h-compl { flex: none; padding: 6px 4px 6px 12px; border-right: 0; }
+  .dash-main .h-txt { display: none; }
+  .dash-main .hstrip .h-meter { flex: 1; min-width: 0; padding: 6px 4px; }
+  .dash-main .hstrip .h-cl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .dash-main .dash-kpis { order: 2; flex-wrap: nowrap; white-space: nowrap; }
+  .dash-main .dash-kpis .dk { font-size: 11px; padding: 2px 7px; }
+  .dash-main .dash-clock { order: 3; margin-left: 0; }
+  .dash-main .dash-clock .dc-date { font-size: 11px; }
+  .dash-main .dash-clock .dc-time { font-size: 14px; }
+  .dash-main .dash-toolbar .asset-actions { order: 4; }
+  .dash-main .dash-toolbar .icon-btn { width: 28px; height: 28px; }
+  .dash-main .dash-grid3 { flex: 1 1 auto; min-height: 0; max-height: 470px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-main .dash-grid3 .breakup { flex: 1 1 auto; max-height: 330px; justify-content: space-evenly; }
+  .dash-main .slim-trend { max-height: none; min-height: 140px; }
+}
+.brand-emblem.brand-fav { width: 30px; height: 30px; }
