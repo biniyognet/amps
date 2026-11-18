@@ -3039,3 +3039,10 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .lb-c-tx { white-space: normal; }
   .lb-row { break-inside: avoid; }
 }
+
+/* t06 — "AI draft → approved by <name> at <time>" (job cards · planned rows) */
+.ai-ok { display: inline-block; margin-top: 3px; font-size: 11px; line-height: 1.35; padding: 1px 7px; border-radius: 99px;
+  color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); border: 1px solid color-mix(in srgb, var(--good) 28%, transparent); }
+.ai-ok i { font-style: normal; font-weight: 700; }
+.ai-ok b { font-weight: 600; }
+.pm-src:has(.ai-ok) { white-space: normal; overflow: visible; }

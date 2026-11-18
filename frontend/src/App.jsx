@@ -31,6 +31,7 @@ import { GuideView } from './guide.jsx'
 import SnapReport, { SnapPrint, rememberNext } from './snap.jsx'
 import { LettersView, LetterViewer } from './letters.jsx'
 import { PlannedView } from './planned.jsx'
+import { JobCardApproval } from './approval.jsx'
 
 const STATUS_LABEL = {
   in_service: 'In service',
@@ -4108,6 +4109,7 @@ function JobCardsView({ line = '' }) {
                   <td className="wrap-cell" data-l="Job card">
                     {ref ? <span className="lt-jc">{ref}</span> : <span className="dim">—</span>}
                     {jcNew && <div className="lt-head lt-sub" title={jcNew}>{jcNew}</div>}
+                    <JobCardApproval jc={jc} f={f} />
                     <JcScan jc={jc} rb={rb} canWrite={canWrite} />
                   </td>
                   {canWrite && (

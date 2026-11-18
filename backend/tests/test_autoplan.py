@@ -3,6 +3,7 @@
 # AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
 """Auto-plan: due PM → roster-sized week board → supervisor approval → plan rows."""
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -131,6 +132,8 @@ def test_apply_files_plan_rows_and_skips_planned_assets(env):
     with Session() as db:
         src = db.scalars(select(PMPlanned.source)).all()
     assert all(s.startswith("AMPS auto-plan · approved by") for s in src)
+    # t06: the stamp carries the approval time (IST HH:MM) the Planner badge shows
+    assert all(re.search(r"approved by \S+ \d\d \w{3} \d{4} \d\d:\d\d$", s) for s in src)
     again = _preview(c, capacity=10)
     assert _jobs(again) == [] and again["already_planned"] == 3
 

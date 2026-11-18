@@ -7,6 +7,7 @@
    log book already covers (sheet puller, manual entry) close themselves. */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { getJSON, useMe, encPath } from './api.js'
+import { PlanApproval, planApproval } from './approval.jsx'
 
 const API = import.meta.env.VITE_AMPS_API ?? ''
 const CYCLE_BADGE = { Weekly: 'W', Monthly: 'M', Quarterly: 'Q', 'Half-Yearly': 'HY', Yearly: 'Y', '5-Yearly': '5Y' }
@@ -616,7 +617,7 @@ export function PlannedView({ initialView = 'tl' }) {
                     <td>{r.system || '—'}</td>
                     <td><i className="cal-freq">{CYCLE_BADGE[r.cycle] || r.cycle}</i> {r.cycle}</td>
                     <td>{r.contractor || '—'}</td>
-                    <td className="pm-src" title={r.source || ''}>{r.source || '—'}</td>
+                    <td className="pm-src" title={r.source || ''}>{planApproval(r.source) ? <PlanApproval source={r.source} /> : (r.source || '—')}</td>
                     <td><StateChip s={r.state} />
                       {r.done_on && <small className="dim pm-sub">{fmt(r.done_on)}{r.closed_by === 'reconcile' ? ' · from log' : ''}
                         {' · '}<span className={`tl-t-${slipCls(slipOf(r))}`}>{slipTxt(slipOf(r))}</span></small>}</td>

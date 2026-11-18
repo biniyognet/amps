@@ -11,7 +11,7 @@ so the plan is done, rescheduled and reconciled like any other.
 """
 import urllib.error
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -239,7 +239,8 @@ def apply(body: ApplyIn, db: Session = Depends(get_db), user=Depends(current_wri
         raise HTTPException(422, "nothing to approve")
     if len(body.jobs) > 500:
         raise HTTPException(422, "too many jobs in one approval")
-    stamp = f"{SOURCE} · approved by {user.username} {date.today():%d %b %Y}"
+    now = datetime.utcnow() + timedelta(hours=5, minutes=30)     # IST, as snap stamps it
+    stamp = f"{SOURCE} · approved by {user.username} {now:%d %b %Y %H:%M}"
     rows = [r.model_copy(update={"source": stamp}) for r in body.jobs]
     res = _create(db, rows, user)
     db.commit()
