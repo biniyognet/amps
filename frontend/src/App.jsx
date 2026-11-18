@@ -30,6 +30,7 @@ import { DrawingsView, DrawingViewer, AssetDrawings } from './drawings.jsx'
 import { GuideView } from './guide.jsx'
 import SnapReport, { SnapPrint, rememberNext } from './snap.jsx'
 import { LettersView, LetterViewer } from './letters.jsx'
+import { PlannedView } from './planned.jsx'
 
 const STATUS_LABEL = {
   in_service: 'In service',
@@ -4286,6 +4287,7 @@ const NAV = LIVE ? [
   ['/', 'Dashboard'],
   ['/assets', 'Assets'],
   ['/log', 'Log book'],
+  ['/planner', 'Planner'],
   ['/failures', 'Failures'],
   ['/job-cards', 'Job cards'],
   ['/printables', 'More'],
@@ -4847,7 +4849,7 @@ export default function App() {
         : letterMatch ? (LIVE ? <NotYet /> : <ProposalLetter prId={letterMatch[1]} />)
         : csMatch ? (LIVE ? <NotYet /> : <Checksheet kind={csMatch[1]} a1={csMatch[2]} a2={csMatch[3]} />)
         : jcMatch ? (LIVE ? <NotYet /> : <JobCard jcId={jcMatch[1]} />)
-        : routePath === '/planner' ? (LIVE ? <NotYet /> : <Planner />)
+        : routePath === '/planner' ? (LIVE ? <PlannedView initialView={routeQuery.get('view')} /> : <Planner />)
         : routePath === '/roster' ? (LIVE ? <NotYet /> : <DutyRoster />)
         : routePath === '/log' ? <LogBook editId={routeQuery.get('edit')} focusDate={routeQuery.get('d')} initialResp={routeQuery.get('resp')} initialAsset={routeQuery.get('asset')} />
         /* legacy top-level /failures now redirects to the signed-in line's board */

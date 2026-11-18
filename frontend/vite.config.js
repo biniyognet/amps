@@ -19,7 +19,7 @@ const api = process.env.AMPS_DEV_API ?? 'http://localhost:8000'
 const LIVE = process.env.VITE_AMPS_DATA === 'live'
 const NEUTRAL = !LIVE || process.env.VITE_AMPS_BRAND === 'neutral'
 const ORG_UP = (process.env.VITE_AMPS_ORG || 'Demo Metro Line').toUpperCase()
-const DEMO_DROP = ['signature.png', 'ir-railways.png', 'ir-logo.png', 'ir-emblem.svg', 'metro-logo.svg']
+const DEMO_DROP = ['signature.png', 'ir-railways.png', 'ir-logo.png', 'ir-emblem.svg', 'metro-logo.svg', 'pitch-gm']
 const demoUnbrand = {
   name: 'amps-demo-unbrand',
   apply: 'build',
@@ -31,7 +31,7 @@ const demoUnbrand = {
   },
   writeBundle(opts) {
     if (!NEUTRAL) return
-    for (const f of DEMO_DROP) rmSync(resolve(opts.dir, f), { force: true })
+    for (const f of DEMO_DROP) rmSync(resolve(opts.dir, f), { force: true, recursive: true })
   },
 }
 

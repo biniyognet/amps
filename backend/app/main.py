@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (ai, assets, auth, checksheets, correspondence, drawings, failures,
-                     logbook, maintenance, qr, roster, snap, sync, tenders)
+                     logbook, maintenance, planned, qr, roster, snap, sync, tenders)
 from app.db import init_db
 
 
@@ -49,6 +49,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 app.include_router(assets.lines_router, prefix="/api/lines", tags=["assets"])
 app.include_router(maintenance.router, prefix="/api/maintenance", tags=["maintenance"])
+app.include_router(planned.router, prefix="/api/planned", tags=["planned"])
 app.include_router(qr.router, prefix="/api/qr", tags=["qr"])
 app.include_router(roster.router, prefix="/api/roster", tags=["roster"])
 app.include_router(logbook.router, prefix="/api/logbook", tags=["logbook"])

@@ -471,3 +471,34 @@ class Correspondence(Base):
     drafting_date: Mapped[date | None]
     drafting_by: Mapped[str | None] = mapped_column(String(200))
     at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+
+class PMPlanned(Base):
+    """Planned maintenance — one dated job a contractor (or the section) has
+    committed to, e.g. a row from a monthly schedule letter.
+
+    A plan, not a record: the record is the logbook MAINTENANCE entry. Marking a
+    row done files that entry (log_entry_id) and closes the plan; a matching
+    entry logged any other way (sheet puller, manual) closes it on reconcile.
+    status: planned | done | rescheduled | skipped.
+    """
+    __tablename__ = "pm_planned"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    line_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))
+    planned_date: Mapped[date] = mapped_column(index=True)
+    cycle: Mapped[str] = mapped_column(String(20))               # Monthly … 5-Yearly
+    task: Mapped[str | None] = mapped_column(Text)                # what the plan says is done
+    contractor: Mapped[str | None] = mapped_column(String(120))   # who does it (TVS AMC, Johnson…)
+    source: Mapped[str | None] = mapped_column(String(200))       # letter no. / file it came from
+    status: Mapped[str] = mapped_column(String(16), default="planned", index=True)
+    original_date: Mapped[date | None]                            # first planned date, once rescheduled
+    note: Mapped[str | None] = mapped_column(Text)                # reschedule / skip reason
+    log_entry_id: Mapped[int | None] = mapped_column(ForeignKey("log_entries.id"))
+    done_on: Mapped[date | None]
+    closed_by: Mapped[str | None] = mapped_column(String(120))    # user, or "reconcile"
+    created_by: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    asset: Mapped["Asset"] = relationship()

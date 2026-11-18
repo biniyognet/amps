@@ -15,7 +15,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-from app.api import ai, snap  # noqa: E402
+from app.api import ai, logbook, snap  # noqa: E402
 from app.db import SessionLocal, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import (Asset, AssetClass, Attachment, LogEntry, LogEntryType,  # noqa: E402
@@ -30,13 +30,21 @@ DRAFT = {"fault_type": "Overheating", "severity": "high", "likely_cause": "Loose
 
 @pytest.fixture(scope="module")
 def client():
+    # logbook may have been imported by an earlier test module, before AMPS_MEDIA_DIR was set
+    logbook.MEDIA_DIR = os.environ["AMPS_MEDIA_DIR"]
     init_db()
+    # get-or-create: another test module may already have bound the shared engine to its DB
     with SessionLocal() as db:
-        site = Location(name="Test Site", kind=LocationKind.SITE)
-        cls = AssetClass(name="Snap Test Panel")
-        db.add_all([site, cls]); db.flush()
+        site = db.scalar(select(Location).where(Location.name == "Snap Test Site"))
+        cls = db.scalar(select(AssetClass).where(AssetClass.name == "Snap Test Panel"))
+        if site is None:
+            site = Location(name="Snap Test Site", kind=LocationKind.SITE); db.add(site)
+        if cls is None:
+            cls = AssetClass(name="Snap Test Panel"); db.add(cls)
+        db.flush()
         for code in ("SNAP-01", "SNAP-02", "SNAP-03"):
-            db.add(Asset(code=code, name=f"Panel {code}", asset_class_id=cls.id, location_id=site.id))
+            if db.scalar(select(Asset).where(Asset.code == code)) is None:
+                db.add(Asset(code=code, name=f"Panel {code}", asset_class_id=cls.id, location_id=site.id))
         db.commit()
     with TestClient(app) as c:
         yield c

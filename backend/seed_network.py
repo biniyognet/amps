@@ -24,7 +24,7 @@ from sqlalchemy import select
 from app.db import SessionLocal, init_db
 from app.models import (
     Asset, AssetClass, AssetStatus, Criticality, Location, LocationKind,
-    LogEntry, LogEntryType, PMPlan, RosterEntry, RosterPattern, ShiftCode,
+    LogEntry, LogEntryType, PMPlan, PMPlanned, RosterEntry, RosterPattern, ShiftCode,
     User, UserRole,
 )
 
@@ -420,6 +420,62 @@ def seed():
                     c = codes[(wd + i * 2) % 7]
                     if c != "R":
                         db.add(RosterEntry(pattern=pat, user=u, weekday=wd, shift=ShiftCode(c)))
+
+        # ---- planned maintenance (the Planner timeline) ---------------------
+        # Last month → next month, two outside agencies per site: on-time and late
+        # completions, rescheduled jobs, overdue ones, today's and upcoming. Own RNG
+        # so the history above stays byte-identical.
+        prng = random.Random(1118)
+        lo = (TODAY.replace(day=1) - timedelta(days=1)).replace(day=1)
+        hi = (TODAY.replace(day=28) + timedelta(days=36)).replace(day=1) - timedelta(days=1)
+        late_p = {"exemplary": 0.12, "lagging": 0.45, "cluster": 0.25, "new": 0.3}
+        miss_p = {"exemplary": 0.03, "lagging": 0.2, "cluster": 0.1, "new": 0.15}
+        n_pm = 0
+        for li, (line, depot, _y, profile, _s) in enumerate(LINES):
+            agencies = [AGENCIES[(2 * li) % len(AGENCIES)], AGENCIES[(2 * li + 1) % len(AGENCIES)]]
+            pool = [t for t in all_assets if t[1] == line]
+            for k, (a, _l, si) in enumerate(prng.sample(pool, min(28, len(pool)))):
+                stn = STATIONS[line][si]
+                agency = prng.choice(agencies)
+                cycle = prng.choice(["Monthly", "Monthly", "Quarterly", "Half-Yearly"])
+                d = lo + timedelta(days=prng.randint(0, 27))
+                if k < 2:  # a couple due today on every site
+                    d = TODAY - timedelta(days=CYCLE_DAYS[cycle] * ((TODAY - lo).days // CYCLE_DAYS[cycle]))
+                while d <= hi:
+                    p = PMPlanned(asset_id=a.id, line_id=a.line_id, planned_date=d, cycle=cycle,
+                                  task=f"{cycle} PM of {a.code} as per checksheet",
+                                  contractor=agency, source=f"{depot}/PM/{d:%b-%Y}".upper(),
+                                  created_by="seed")
+                    r = prng.random()
+                    if d > TODAY:
+                        if r < 0.15:  # agency asked for a later date
+                            p.original_date = d - timedelta(days=prng.randint(2, 7))
+                            p.status, p.note = "rescheduled", "Shutdown window moved by the agency"
+                    elif d == TODAY:
+                        pass
+                    elif r < miss_p[profile]:
+                        pass  # overdue: still open
+                    else:
+                        if r < miss_p[profile] + 0.1:
+                            p.original_date = d - timedelta(days=prng.randint(3, 10))
+                            p.note = "Rescheduled: access permit not issued"
+                        late = prng.random() < late_p[profile]
+                        done = d + timedelta(days=prng.randint(1, 9) if late else 0)
+                        done = min(done, TODAY)
+                        e = LogEntry(at=_at(done, 1), log_date=done, shift=ShiftCode.NIGHT,
+                                     type=LogEntryType.MAINTENANCE, subtype=cycle, system=a.system,
+                                     station=stn, asset=a, line_id=a.line_id,
+                                     category=a.asset_class.name,
+                                     text=f"{cycle} maintenance of {a.code} carried out by {agency}.",
+                                     entered_by=prng.choice(crews[line]),
+                                     attended_by=agency)
+                        db.add(e)
+                        db.flush()
+                        p.status, p.done_on, p.log_entry_id, p.closed_by = "done", done, e.id, "seed"
+                    db.add(p)
+                    n_pm += 1
+                    d += timedelta(days=CYCLE_DAYS[cycle])
+        print(f"Planned maintenance: {n_pm} jobs.")
 
         db.commit()
         print(f"Seeded {len(LINES)} sites, {sum(len(s) for s in STATIONS.values())} areas, "
