@@ -139,8 +139,9 @@ const NCL_CSS = `
 .nd .rd-x { border: 0; background: none; padding: 0 0 0 4px; cursor: pointer; color: inherit; font: inherit; }
 .nd-f { display: flex; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border); }
 .ncl-tbl { table-layout: auto; width: 100%; }
-.ncl-tbl th:first-child, .ncl-tbl td:first-child { width: 45%; min-width: 320px; }
-.ncl-tbl td:first-child { white-space: pre-wrap; word-break: break-word; }
+.ncl-tbl th:first-child, .ncl-tbl td:first-child { width: 1%; text-align: right; }
+.ncl-tbl th:nth-child(2), .ncl-tbl td:nth-child(2) { width: 45%; min-width: 320px; }
+.ncl-tbl td:nth-child(2) { white-space: pre-wrap; word-break: break-word; }
 .ncl-ed { min-width: 300px; }
 `
 /* Edit a note from the Tenders page — opens as a right sidebar, same fields as the reader's notes bar */
@@ -214,7 +215,7 @@ function NoteChecklist({ issues, ql, can }) {
   const isV = (n) => n.status === 'verified'
   const nPend = base.filter((n) => !isV(n)).length
   const rows = base.filter((n) => (show === 'all' ? true : show === 'verified' ? isV(n) : !isV(n)))
-    .sort((x, y) => (isV(x) - isV(y)) || y.at.localeCompare(x.at))
+    .sort((x, y) => (isV(x) - isV(y)) || x.id - y.id)
   const put = async (id, body) => {
     try {
       const m = await send('PATCH', `/api/tenders/notes/${id}`, body)
@@ -243,10 +244,11 @@ function NoteChecklist({ issues, ql, can }) {
       ) : (
         <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
           <table className="jc-table corr-table ncl-tbl">
-            <thead><tr><th>Note</th><th>System</th><th>Assets</th><th>Issue</th><th>Page</th><th>By</th><th>Status</th><th /></tr></thead>
+            <thead><tr><th className="nw">Sl</th><th>Note</th><th>System</th><th>Assets</th><th>Issue</th><th>Page</th><th>By</th><th>Status</th><th /></tr></thead>
             <tbody>
-              {rows.map((n) => (
+              {rows.map((n, i) => (
                 <tr key={n.id}>
+                  <td data-l="Sl" className="nw dim">{i + 1}</td>
                   <td data-l="Note">
                     {n.title && <b>{n.title}</b>}{n.title && n.text && ' — '}{n.text}
                     {(n.tags || []).length > 0 && <div>{n.tags.map((t) => <span key={t} className="ch">#{t}</span>)}</div>}
@@ -1263,8 +1265,8 @@ export function ReaderView({ vol: v0, page: p0, q: q0 }) {
     <button type="button" className={`rd-it mk ${n.kind} ${n.vol === vol && n.page === page ? 'on' : ''}`} onClick={() => open(n.vol, n.page, q0)}>
       <span className="rd-top"><span className="rd-tag">{MKI[n.kind]} {n.title || KIND[n.kind].slice(2)}</span><span className="rd-pg">{n.vol} p{n.page}</span></span>
       {n.text && <div className="rd-sub">{n.text}</div>}
-      {(n.issue_id || (allMarks && !n.mine)) && <div className="rd-sub" style={{ fontSize: 11 }}>
-        {n.issue_id && <>↳ {issueName(n.issue_id)}</>}{allMarks && !n.mine && <> · {n.by}</>}</div>}
+      {(n.issue_id || n.by) && <div className="rd-sub" style={{ fontSize: 11 }}>
+        {n.issue_id && <>↳ {issueName(n.issue_id)}</>}{n.by && <>{n.issue_id ? ' · ' : ''}{n.by}</>}</div>}
     </button>
   )
 
