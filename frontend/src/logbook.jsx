@@ -1222,7 +1222,6 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     m.addEventListener('change', f)
     return () => m.removeEventListener('change', f)
   }, [])
-  const [kpi, setKpi] = useState({})   // the strip on top — each figure loads on its own
   const [apiOk, setApiOk] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -1358,28 +1357,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     }
   }
 
-  /* KPI strip: entries today, open failures, open job cards, PM done %. Each
-     figure comes from the endpoint that already owns it (so the strip can never
-     disagree with the failures / job-card / planner pages) and fails on its own
-     to "—" — a signed-out visitor still sees the figures the API makes public. */
-  const loadKpi = () => {
-    const put = (o) => setKpi((k) => ({ ...k, ...o }))
-    fetch(`${API}/api/logbook?log_date=${today()}&limit=1`)
-      .then((r) => (r.ok ? Number(r.headers.get('X-Total-Count')) : NaN))
-      .then((n) => put({ today: Number.isFinite(n) ? n : null })).catch(() => {})
-    fetch(`${API}/api/logbook/failure-stats`).then((r) => (r.ok ? r.json() : null))
-      .then((s) => s && put({ open: s.open + s.acknowledged, acked: s.acknowledged, jc: s.job_card }))
-      .catch(() => {})
-    fetch(`${API}/api/planned/summary`).then((r) => (r.ok ? r.json() : null))
-      .then((s) => {
-        if (!s) return
-        let done = 0, due = 0
-        s.contractors.forEach((c) => { done += c.done; due += c.planned - c.upcoming - c.today - c.skipped })
-        put({ pm: due > 0 ? Math.min(100, Math.round((100 * done) / due)) : null, pmDone: done, pmDue: due, pmMonth: s.month })
-      }).catch(() => {})
-  }
-  useEffect(() => { loadKpi() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
-  const reload = async () => { loadKpi(); await load() }
+  const reload = () => load()
 
   useEffect(() => { load() }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to, page])  // eslint-disable-line react-hooks/exhaustive-deps
   // any change of what we are looking at starts again at the first page
@@ -1671,32 +1649,9 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     )
   }
 
-  // the head pieces: one docked bar on wide screens (title · KPIs · day ruler ·
-  // filters · actions), the stacked strip + ledger head below 1100px
-  const kpiStrip = (
-    <div className="lb-kpis" role="list">
-      <button type="button" role="listitem" className="lb-kpi"
-              title={`Entries logged on ${fmtDate(today())} — open today`}
-              onClick={() => { setLogDate(today()); setAllDates(false); setSearch('') }}>
-        <b>{kpi.today ?? '—'}</b><span>{wide ? 'today' : 'entries today'}</span>
-      </button>
-      <button type="button" role="listitem" className={`lb-kpi k-fail${kpi.open ? ' hot' : ''}`}
-              title={kpi.open != null ? `Failures not yet rectified and with no job card (${kpi.acked} of them acknowledged) — show failures` : 'Open failures'}
-              onClick={() => { setFType('failure'); setAllDates(true) }}>
-        <b>{kpi.open ?? '—'}</b><span>{wide ? 'failures' : 'open failures'}</span>
-      </button>
-      <a role="listitem" className="lb-kpi k-jc" href="#/job-cards"
-         title="Failures on a job card, awaiting the fix — open the job-card board">
-        <b>{kpi.jc ?? '—'}</b><span>{wide ? 'job cards' : 'open job cards'}</span>
-      </a>
-      <a role="listitem" className="lb-kpi k-pm" href="#/planner"
-         title={kpi.pm != null ? `PM done ${kpi.pmDone} of ${kpi.pmDue} due · ${kpi.pmMonth} — open the planner` : 'PM done % (sign in to see the plan)'}>
-        <b>{kpi.pm != null ? `${kpi.pm}%` : '—'}</b><span>PM done{kpi.pmMonth && !wide ? ` · ${kpi.pmMonth}` : ''}</span>
-        {kpi.pm != null && <i className="lb-kpi-bar" style={{ '--p': `${kpi.pm}%` }} />}
-      </a>
-    </div>
-  )
-  const ruler = <DateRuler value={allDates ? '' : logDate} days={wide ? 4 : 7}
+  // the head pieces: one docked bar on wide screens (day ruler left · filters and
+  // actions right; the open counts live on their own tabs), the ledger head below 1100px
+  const ruler = <DateRuler value={allDates ? '' : logDate} days={7}
                            onChange={(d) => { setLogDate(d); setAllDates(false); setNewOpen(false) }} />
   const ledgerTitle = (
     <>
@@ -1791,16 +1746,12 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
       )}
 
       {wide ? (
-        <div className="log-ribbon lb-bar" ref={toolbarRef}>
-          <div className="lb-bar-t">{ledgerTitle}</div>
-          {kpiStrip}
+        <div className="asset-toolbar log-ribbon lb-bar" ref={toolbarRef}>
           {ruler}
-          {ledgerFilters}
-          {ledgerActions}
+          <div className="lb-bar-r">{ledgerFilters}{ledgerActions}</div>
         </div>
       ) : (
         <>
-          {kpiStrip}
           {/* the day ruler stays docked under the top bar: it picks the day for
               both reading and writing */}
           <div className="log-ribbon" ref={toolbarRef}>{ruler}</div>
