@@ -348,7 +348,7 @@ function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
   )
 }
 
-export function PlannedView({ initialView = 'list' }) {
+export function PlannedView({ initialView = 'tl' }) {
   const { canWrite } = useMe()
   const [cursor, setCursor] = useState(todayIso)
   const [span, setSpan] = useState('month')
@@ -356,7 +356,7 @@ export function PlannedView({ initialView = 'list' }) {
   const [sum, setSum] = useState(null)
   const [error, setError] = useState(null)
   const [tick, setTick] = useState(0)
-  const [view, setView] = useState(VIEWS.some(([k]) => k === initialView) ? initialView : 'list')
+  const [view, setView] = useState(VIEWS.some(([k]) => k === initialView) ? initialView : 'tl')
   const per = view === 'tl' ? span : 'month'      // list + calendar always show one month
   const [from, to] = spanRange(per, cursor)
   const month = from.slice(0, 7)
