@@ -3492,7 +3492,191 @@ function TagSheet() {
 // Sheet-sync card: last pull time + per-line imported / held counts. Signed-in
 // viewers also get the held rows themselves (source · date · code · why) so a
 // line's coordinator can fix their own sheet; anonymous viewers see counts only.
-function SyncCard({ sync }) {
+// Wide screens fit the dashboard to the viewport (no page scroll): the split's own
+// top offset (topbar + shell padding + any line header) is measured into --dash-top.
+function useDashFit(ready) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const root = document.documentElement
+    if (!ready) return
+    root.classList.add('dash-fit')
+    const set = () => { if (ref.current) root.style.setProperty('--dash-top', `${Math.round(ref.current.getBoundingClientRect().top + window.scrollY)}px`) }
+    set()
+    window.addEventListener('resize', set)
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set)
+    const tb = document.querySelector('.topbar'); if (ro && tb) ro.observe(tb)
+    return () => { root.classList.remove('dash-fit'); window.removeEventListener('resize', set); ro?.disconnect() }
+  }, [ready])
+  return ref
+}
+
+// Sidebar feed rolls up slowly like credits (same feel as the pitch page): holds
+// while the viewer reads (hover, focus, wheel, touch) or presses Pause, waits at
+// the end, then rewinds. Re-arms on every tab switch. Reduced motion starts paused.
+function useRoll(key) {
+  const ref = useRef(null)
+  const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const [paused, setPaused] = useState(!!calm)
+  const stop = useRef(paused); stop.current = paused
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.scrollTop = 0
+    const SPEED = 22   // px per second
+    let raf = 0, last = 0, pos = 0, hold = performance.now() + 2500, reading = false, atEnd = false
+    const wait = (ms) => { hold = Math.max(hold, performance.now() + ms) }
+    const tick = (t) => {
+      raf = requestAnimationFrame(tick)
+      const dt = last ? Math.min(t - last, 100) : 0; last = t
+      if (stop.current || reading || document.hidden || t < hold) { pos = el.scrollTop; return }
+      const end = el.scrollHeight - el.clientHeight
+      if (end <= 0) return
+      if (pos >= end - 1) {
+        if (!atEnd) { atEnd = true; hold = t + 4000; return }
+        atEnd = false; el.scrollTo({ top: 0, behavior: 'smooth' }); hold = t + 3000; return
+      }
+      pos = Math.min(end, pos + (SPEED * dt) / 1000); el.scrollTop = pos
+    }
+    raf = requestAnimationFrame(tick)
+    const on = (e) => { if (e.pointerType !== 'touch') reading = true }
+    const off = () => { reading = false; wait(1500) }
+    const nudge = () => wait(6000)
+    const ev = [['pointerenter', on], ['pointerleave', off], ['focusin', () => { reading = true }], ['focusout', off],
+      ['wheel', nudge], ['touchstart', nudge], ['keydown', nudge]]
+    ev.forEach(([k, f]) => el.addEventListener(k, f, { passive: true }))
+    return () => { cancelAnimationFrame(raf); ev.forEach(([k, f]) => el.removeEventListener(k, f)) }
+  }, [key])
+  return [ref, paused, setPaused]
+}
+
+// Slim failures-per-month chart: drawn at the box's own pixel size (no scaled
+// text), thin rounded bars on a soft gradient, the latest month in full accent.
+function SlimTrend({ data }) {
+  const box = useRef(null)
+  const [sz, setSz] = useState({ w: 0, h: 0 })
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    const set = () => setSz({ w: el.clientWidth, h: el.clientHeight })
+    set()
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set)
+    ro?.observe(el)
+    return () => ro?.disconnect()
+  }, [])
+  const { w, h } = sz
+  const max = Math.max(...data.map((m) => m.count), 1)
+  const P = { t: 18, b: 20, l: 4, r: 4 }
+  const ih = Math.max(0, h - P.t - P.b)
+  const slot = (w - P.l - P.r) / Math.max(data.length, 1)
+  const bw = Math.max(8, Math.min(26, slot * 0.34))
+  const x = (i) => P.l + slot * (i + 0.5)
+  const y = (v) => P.t + ih * (1 - v / max)
+  return (
+    <div className="slim-trend" ref={box}>
+      {w > 0 && h > 40 && (
+        <svg width={w} height={h} role="img" aria-label="Failures per month">
+          <defs>
+            <linearGradient id="st-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#60CCF0" /><stop offset="1" stopColor="#bfe6f7" stopOpacity=".55" />
+            </linearGradient>
+            <linearGradient id="st-g2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#0078B4" /><stop offset="1" stopColor="#60CCF0" />
+            </linearGradient>
+          </defs>
+          {[0.5, 1].map((f) => <line key={f} x1={P.l} x2={w - P.r} y1={y(max * f)} y2={y(max * f)} className="st-grid" />)}
+          <line x1={P.l} x2={w - P.r} y1={y(0) + 0.5} y2={y(0) + 0.5} className="st-axis" />
+          {data.map((m, i) => {
+            const last = i === data.length - 1
+            const bh = Math.max(m.count ? 3 : 0, ih * (m.count / max))
+            return (
+              <g key={m.label}>
+                {m.count > 0 && <rect x={x(i) - bw / 2} y={y(0) - bh} width={bw} height={bh} rx={Math.min(5, bw / 2)}
+                                      fill={last ? 'url(#st-g2)' : 'url(#st-g)'} />}
+                <text x={x(i)} y={y(0) - bh - 6} textAnchor="middle" className={`st-val${last ? ' last' : ''}`}>{m.count}</text>
+                <text x={x(i)} y={h - 5} textAnchor="middle" className="st-cat">{m.label}</text>
+              </g>
+            )
+          })}
+        </svg>
+      )}
+    </div>
+  )
+}
+
+// Right sidebar: one card, three tabs — the rolling logbook feed, failures in
+// colour by state, and the sheet-sync log — so the left 60% stays all charts.
+const FEED_TYPE = { failure: 'ft-fail', rectification: 'ft-rect', acknowledgement: 'ft-ack', job_card: 'ft-job', maintenance: 'ft-mnt' }
+const FAIL_STATE = { open: ['fs-open', 'Open'], acknowledged: ['fs-ack', 'Acknowledged'], job_card: ['fs-job', 'Job card'], resolved: ['fs-ok', 'Resolved'] }
+const feedWhen = (e) => {
+  const d = e.at ? new Date(e.at) : null
+  if (!d || Number.isNaN(d.getTime())) return e.log_date || ''
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+    : d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
+}
+function DashFeed({ groups, fails, sync, failHref }) {
+  const [tab, setTab] = useState('log')
+  const [roll, paused, setPaused] = useRoll(tab)
+  const openN = (fails || []).filter((f) => (f.state || 'open') === 'open').length
+  const liveN = (fails || []).filter((f) => f.state && f.state !== 'resolved' && f.state !== 'open').length
+  const held = sync ? Object.values(sync.lines || {}).reduce((n, s) => n + (s.held_count || 0), 0) : 0
+  const tabs = [
+    ['log', 'Recent logs', null],
+    ['fail', 'Failures', openN ? <b className="dt-n bad">{openN}</b> : liveN ? <b className="dt-n warn">{liveN}</b> : null],
+    ...(sync ? [['sync', 'Sync log', held ? <b className="dt-n warn">{held}</b> : <i className="dt-ok" aria-label="all imported" />]] : []),
+  ]
+  return (
+    <aside className="card dash-side" aria-label="Live feed">
+      <div className="ds-tabs" role="tablist">
+        {tabs.map(([k, label, badge]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={`ds-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
+            {label}{badge}
+          </button>
+        ))}
+        <span className="ds-live" title="Refreshed every minute"><i />live</span>
+        {tab !== 'sync' && <button type="button" className="ds-pause" onClick={() => setPaused((x) => !x)} aria-pressed={paused}
+                title={paused ? 'Resume rolling' : 'Hold the feed'}>{paused ? '▶' : '❚❚'}</button>}
+      </div>
+      <div className="ds-roll" ref={roll} role="tabpanel">
+        {tab === 'log' && (groups.length === 0 ? <p className="dim ds-empty">No entries yet.</p> : groups.slice(0, 40).map(({ key, e, n, codes }) => (
+          <a key={key} className={`df-row ${FEED_TYPE[e.type] || 'ft-gen'}`} href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
+             title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
+            <span className="df-top">
+              <span className="df-type">{(e.type || 'general').replace('_', ' ')}</span>
+              {n === 1 && e.asset_code && <span className="df-code">{e.asset_code}</span>}
+              {n > 1 && <span className="dr-x">×{n}</span>}
+              <span className="df-when">{feedWhen(e)}</span>
+            </span>
+            <span className="df-txt">{tidyLog(e.text)}</span>
+          </a>
+        )))}
+        {tab === 'fail' && (fails == null ? <p className="dim ds-empty">Sign in to see the failure log.</p>
+          : fails.length === 0 ? <p className="dim ds-empty">No failures logged. 👍</p>
+          : fails.map((f) => {
+            const [cls, label] = FAIL_STATE[f.state || 'open'] || FAIL_STATE.open
+            return (
+              <a key={f.id} className={`df-row df-fail ${cls}`} href={f.asset_code ? `#/asset/${encodeURIComponent(f.asset_code)}` : failHref} title={f.asset_name || f.asset_code || ''}>
+                <span className="df-top">
+                  <span className="df-state"><i />{label}</span>
+                  {f.asset_code && <span className="df-code">{f.asset_code}</span>}
+                  <span className="df-when">{feedWhen(f)}</span>
+                </span>
+                <span className="df-txt">{tidyLog(f.text)}</span>
+                {f.station && <span className="df-sub">{f.station}{f.system ? ` · ${f.system}` : ''}</span>}
+              </a>
+            )
+          }))}
+        {tab === 'sync' && sync && <SyncCard sync={sync} bare />}
+      </div>
+      <div className="ds-foot">
+        {tab === 'log' && <a className="crumb" href="#/log">Open the log book →</a>}
+        {tab === 'fail' && <a className="crumb" href={failHref}>Open the failures dashboard →</a>}
+      </div>
+    </aside>
+  )
+}
+
+function SyncCard({ sync, bare = false }) {
   const lines = Object.entries(sync.lines || {})
   const at = new Date(sync.at)
   const ago = Math.max(0, Math.round((Date.now() - at.getTime()) / 3600000))
@@ -3500,7 +3684,7 @@ function SyncCard({ sync }) {
   const canSee = lines.some(([, s]) => Array.isArray(s.held))
   const CAP = 30
   return (
-    <section className="card viz-card sync-card">
+    <section className={bare ? 'sync-card sync-bare' : 'card viz-card sync-card'}>
       <h2 className="viz-h">Sheet sync <span className="viz-note">last pulled {at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} · {ago < 1 ? 'just now' : ago < 48 ? `${ago} h ago` : `${Math.round(ago / 24)} d ago`}</span></h2>
       <div className="sync-lines">
         {lines.map(([ln, s]) => (
@@ -3543,11 +3727,20 @@ function LineDashboard({ go, initialLine = null }) {
   const [bkStn, setBkStn] = useState('')   // Overdue-breakup card: station filter ('' = all)
   const [now, setNow] = useState(() => new Date())   // live clock in the toolbar
   const [sync, setSync] = useState(null)   // last sheet pull: per-line imported / held rows
+  const [fails, setFails] = useState(null) // latest failures for the sidebar (null = not visible to this viewer)
+  const fit = useDashFit(!(loading || schedLoading))
   useEffect(() => {
     const lq = initialLine ? `&line=${encodeURIComponent(initialLine)}` : ''
     getJSON(`/api/logbook/failure-stats?days=180&months=6${lq}`).then(setStats).catch(() => {})
-    getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
     getJSON(`/api/sync/status${initialLine ? `?line=${encodeURIComponent(initialLine)}` : ''}`).then(setSync).catch(() => setSync(null))
+    // the sidebar feed stays live: latest entries + failures re-pulled every minute
+    const pull = () => {
+      getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
+      getJSON(`/api/logbook?entry_type=failure&limit=40${lq}`).then(setFails).catch(() => setFails(null))
+    }
+    pull()
+    const t = setInterval(pull, 60000)
+    return () => clearInterval(t)
   }, [initialLine])
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
   // Dock the hood beneath the sticky topbar like the register's toolbar: measure
@@ -3739,7 +3932,8 @@ function LineDashboard({ go, initialLine = null }) {
     a.click(); URL.revokeObjectURL(a.href)
   }
   return (
-    <>
+    <div className="dash-split" ref={fit}>
+      <div className="dash-main">
       <div className="card dash-hood">
       <div className="dash-toolbar">
         <h1 className="dash-title" title="Preventive-maintenance compliance & asset health">{line} · Maintenance Overview</h1>
@@ -3870,36 +4064,18 @@ function LineDashboard({ go, initialLine = null }) {
         <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
-      {/* recent logbook */}
-      <section className="card viz-card">
-        <h2 className="viz-h">Recent logbook <span className="viz-note">latest entries</span></h2>
-        {recent.length === 0 ? <p className="dim">No entries yet.</p> : (
-          <div className="dash-recent">
-            {recentGroups.slice(0, 7).map(({ key, e, n, codes }) => (
-              <a key={key} className="dr-row" href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
-                 title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
-                <span className={`chip ${e.type === 'failure' ? 'd-overdue' : ''}`}><span className="dot" />{e.type}</span>
-                <span className="dr-txt">{tidyLog(e.text).slice(0, 72)}{n === 1 && e.asset_code && <span className="dr-code">{e.asset_code}</span>}</span>
-                {n > 1 && <span className="dr-x">×{n}</span>}
-                <span className="dim dt dr-date">{e.log_date}</span>
-              </a>
-            ))}
-          </div>
-        )}
-        <p className="viz-insight"><a className="crumb" href="#/log">Open the log book →</a></p>
+      {/* failures per month — slim bars, the full width of the left column */}
+      <section className="card viz-card dash-trend">
+        <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
+          <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
+        {trend.length ? <SlimTrend data={trend} /> : <p className="dim">No failure data.</p>}
       </section>
-
-      {/* failures per month — last card */}
-      <section className="card viz-card">
-        <h2 className="viz-h">Failures / month <span className="viz-note">last 6</span></h2>
-        {trend.length ? <TrendChart data={trend} fit /> : <p className="dim">No failure data.</p>}
-        <p className="viz-insight"><a className="crumb" href={failHref}>Open the failures dashboard →</a></p>
-      </section>
-
-      {/* sheet sync — when the coordination sheets were last pulled, and which rows were held */}
-      {sync && <SyncCard sync={sync} />}
       </div>
-    </>
+      </div>
+
+      {/* right 40%: rolling logbook, failures by state, sheet-sync log */}
+      <DashFeed groups={recentGroups} fails={fails} sync={sync} failHref={failHref} />
+    </div>
   )
 }
 
