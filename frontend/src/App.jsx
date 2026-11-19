@@ -78,6 +78,15 @@ const FootSig = () => {
     ? <a href="#/about" className="foot-sig" aria-label="About AMPS"><SignatureMark /></a>
     : <SignatureMark />
 }
+/* the signed-in shell's footer line — also rendered under the checksheet sheet column */
+const ShellFoot = ({ className = '' }) => (
+  <footer className={`foot ${className}`.trim()}>
+    {LIVE
+      ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>
+      : <>Demonstration environment · synthetic data only · <AmpsLink />, MIT © 2026 </>}
+    <FootSig />
+  </footer>
+)
 
 /* Showcase dropdown — demo-only (amps.binihost.com). Points to the real
    deployments of AMPS so a demo visitor can see it running in the field.
@@ -208,6 +217,16 @@ function LiveDashboard({ go, initialLine = null }) {
   const [impResult, setImpResult] = useState(null)
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
+  // >= 1100 px a row opens the asset in a right-hand peek (70:30, like the log
+  // book); below that a row still goes to the full asset page
+  const [peek, setPeek] = useState(null)
+  const [regWide, setRegWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches)
+  useEffect(() => {
+    const m = window.matchMedia('(min-width: 1100px)')
+    const f = () => setRegWide(m.matches)
+    m.addEventListener('change', f)
+    return () => m.removeEventListener('change', f)
+  }, [])
   // printing renders the WHOLE filtered set (not just the on-screen page) so a
   // printout is never silently truncated to 150 rows; the effect prints after the
   // full table has painted, then restores the paged view.
@@ -343,6 +362,8 @@ function LiveDashboard({ go, initialLine = null }) {
   const pageRows = shown.slice(pageSafe * REG_PAGE, (pageSafe + 1) * REG_PAGE)
   // when printing, render every filtered row so the printout is complete
   const renderRows = printAll ? shown : pageRows
+  // the peek holds the picked asset while it stays in the filtered set, else the first row
+  const peekCode = peek && shown.some((a) => a.code === peek) ? peek : pageRows[0]?.code
   // SL (serial) numbering — absolute position in the filtered set, so a printout
   // of a paged view still numbers continuously
   const rowOffset = printAll ? 0 : pageSafe * REG_PAGE
@@ -595,6 +616,7 @@ function LiveDashboard({ go, initialLine = null }) {
           {shown.length === 0 ? (
             <div className="card"><p className="dim" style={{ margin: 0 }}>No assets match — clear the search or filters.</p></div>
           ) : (
+            <div className={`reg-split${regWide ? ' wide' : ''}`}>
             <div className="card tbl-wrap freeze-head reg-print">
               <table className="sortable reg-table">
                 <colgroup>
@@ -637,10 +659,11 @@ function LiveDashboard({ go, initialLine = null }) {
                     const ackHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=acknowledgement` : `#/asset/${encodeURIComponent(a.code)}`
                     const rectHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=rectification` : `#/asset/${encodeURIComponent(a.code)}`
                     return (
-                      <tr key={a.code} tabIndex={0}
-                          className={nOpen ? 'row-faulty' : nAck ? 'row-ack' : nJob ? 'row-job' : ''}
-                          onClick={() => go(`/asset/${encodeURIComponent(a.code)}`)}
-                          onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${encodeURIComponent(a.code)}`)}>
+                      <tr key={a.code} tabIndex={0} aria-selected={regWide ? a.code === peekCode : undefined}
+                          className={`${nOpen ? 'row-faulty' : nAck ? 'row-ack' : nJob ? 'row-job' : ''}${regWide && a.code === peekCode ? ' row-peek' : ''}`}
+                          onClick={() => regWide ? setPeek(a.code) : go(`/asset/${encodeURIComponent(a.code)}`)}
+                          onDoubleClick={() => go(`/asset/${encodeURIComponent(a.code)}`)}
+                          onKeyDown={(e) => e.key === 'Enter' && (regWide && a.code !== peekCode ? setPeek(a.code) : go(`/asset/${encodeURIComponent(a.code)}`))}>
                         <td className="sl-col">{rowOffset + i + 1}</td>
                         <td className="code" data-l="Code">{a.code}</td>
                         <td data-l="Asset">{a.name}
@@ -675,6 +698,13 @@ function LiveDashboard({ go, initialLine = null }) {
                   })}
                 </tbody>
               </table>
+            </div>
+            {regWide && (
+              <aside className="card reg-peek no-print" aria-label="Asset detail">
+                <div className="reg-peek-h">Asset detail<span>double-click a row for the full record</span></div>
+                {peekCode ? <AssetPeek key={peekCode} code={peekCode} /> : <p className="dim lb-pick">Pick an asset on the left.</p>}
+              </aside>
+            )}
             </div>
           )}
           {shown.length > REG_PAGE && (
@@ -1242,10 +1272,10 @@ function MaintenanceSchedule({ schedule }) {
         <ul className="sched-list">
           {rows.map((r) => (
             <li key={r.frequency} className={`sl-row sl-${r.state}`} title={SCHED_TIP[r.state]}>
-              <span className={`pmc ${cycStateClass(r.state)}`}>{(CYC_ABBR.find(([f]) => f === r.frequency) || [])[1] || r.frequency[0]}</span>
+              <span className={`pmc ${cycStateClass(r.state)}`} title={r.frequency}>{(CYC_ABBR.find(([f]) => f === r.frequency) || [])[1] || r.frequency[0]}</span>
               <b className="sl-freq">{r.frequency}</b>
               <span className={`sl-last dt${r.last_done ? '' : ' sl-empty'}`}>{r.last_done ? <>done {schedDay(r.last_done)}{r.via && <i className="sched-via"> via {r.via}</i>}</> : '—'}</span>
-              <span className="sl-why">{schedWhy(r)}</span>
+              <span className="sl-why" title={`${r.frequency} · ${schedWhy(r)}`}>{schedWhy(r)}</span>
               <span className={schedChip(r.state)}><span className="dot" />{SCHED_LABEL[r.state]}</span>
             </li>
           ))}
@@ -1444,6 +1474,89 @@ function AssetAudit({ code }) {
           {r.detail && <div className="findings">{r.detail}</div>}
         </div>
       ))}
+    </div>
+  )
+}
+
+/* The register's right-hand peek: the WHOLE asset record, laid out like the
+   phone page — pinned header (identity, badges, QR, actions), then every section
+   of the full page (facts, PM schedule, logbook groups, work orders, audit).
+   The full page stays one click away for editing and print. */
+function AssetPeek({ code }) {
+  const { asset: a, history, log, loading, error } = useLiveAsset(code)
+  const { schedule } = useAssetSchedule(code)
+  const { canWrite } = useMe()
+  if (loading) return <p className="dim lb-pick">Loading {code}…</p>
+  if (error || !a) return <p className="dim lb-pick">Could not load {code}.</p>
+  const accent = lineColor(a.line)
+  const maint = log.filter((e) => e.type === 'maintenance')
+  const href = `#/asset/${encodeURIComponent(a.code)}`
+  return (
+    <div className="rp" style={{ '--line-c': accent }}>
+      <div className="rp-head">
+        <div className="rp-top">
+          <div className="rp-id">
+            <span className="rp-code">{a.code}</span>
+            <b className="rp-name">{a.name}</b>
+            <span className="rp-sub">{a.cls}{a.sys ? ` · ${a.sys}` : ''}</span>
+            <span className="rp-loc"><span className="ln-dot" style={{ background: accent }} />{a.line ? `${a.line} · ` : ''}{a.location}</span>
+          </div>
+          <a className="rp-qr" href={href} title="The asset's QR tag: scan for its history">
+            <QR value={assetUrl(a.code)} size={84} />
+          </a>
+        </div>
+        <div className="rp-bar">
+          <span className={`status-pill s-${a.status}`}><span className="dot" />{STATUS_LABEL[a.status]}</span>
+          <span className={`crit-badge c-${a.criticality}`} title={`Criticality ${a.criticality}`}>Crit {a.criticality}</span>
+          {codalExceeded(a) && <span className="codal-badge" title="Exceeded service life"><span className="dot" />Past life</span>}
+          <span className="rp-acts">
+            <a className="btn sm" href={href} title="Open full record">Full record →</a>
+            <a className="btn ghost sm snap-cta" href={`#/snap/${encodeURIComponent(a.code)}`} title="Report a problem"
+               onClick={() => { if (!canWrite) rememberNext(`/snap/${encodeURIComponent(a.code)}`) }}>📷 Report</a>
+          </span>
+        </div>
+      </div>
+      <dl className="rp-facts">
+        {[
+          ['Location', a.locationDetail || a.location],
+          [W.Line, a.line || '—'],
+          ['System', a.sys || '—'],
+          ['Asset class', a.cls],
+          ['Make / model', a.makeModel || '—'],
+          ['Commissioned', a.commissionedOn || '—'],
+          ['Codal life', a.codalLifeYears != null ? `${a.codalLifeYears} years${codalExceeded(a) ? ` · exceeded ${codalExpiry(a).getFullYear()}` : ''}` : '—'],
+          ['Last serviced', maint.length ? maint[0].log_date : '—'],
+          ['Records', `${log.length} log · ${maint.length} maintenance`],
+        ].map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+        {a.description && <div className="rp-wide"><dt>Description</dt><dd>{a.description}</dd></div>}
+        {a.remarks && <div className="rp-wide"><dt>Remarks</dt><dd>{a.remarks}</dd></div>}
+      </dl>
+      <div className="rp-sect"><MaintenanceSchedule schedule={schedule} /></div>
+      {OPERATOR && <div className="rp-sect"><AssetDrawings code={a.code} location={a.location} /></div>}
+      <div className="rp-sect">
+        <AssetLogSections log={log} staff={canWrite} code={a.code} canWrite={canWrite} />
+      </div>
+      {history.length > 0 && (
+        <div className="rp-sect"><div className="sect">
+          <h3>Work-order history · {history.length}</h3>
+          {history.map((w) => (
+            <div className="wo" key={w.work_order_id}>
+              <div className="row1">
+                <span className="code">#{w.work_order_id}</span>
+                <span className="t">{w.title}</span>
+                <WoChip status={w.status} />
+              </div>
+              {w.findings && <div className="findings">{w.findings}</div>}
+              <div className="sub">
+                {w.type}
+                {w.done_by && <> · by <b>{w.done_by}</b></>}
+                {w.closed_at && <> · closed <span className="dt">{w.closed_at.slice(0, 10)}</span></>}
+              </div>
+            </div>
+          ))}
+        </div></div>
+      )}
+      {canWrite && <div className="rp-sect"><AssetAudit code={a.code} /></div>}
     </div>
   )
 }
@@ -1808,15 +1921,15 @@ function Ring({ pct, cls, size = 56, stroke = 6, na = false, label }) {
   )
 }
 
-function TrendChart({ data, compact, fit }) {
+function TrendChart({ data, compact, fit, slim }) {
   // compact (single-row analytics) uses a taller aspect so the bars fill the
   // card instead of hugging the top; the wide 2-col demo keeps the short aspect;
   // fit (dashboard card) is wide-and-short so the chart fills the card's width.
-  const W = 560, H = fit ? 250 : compact ? 320 : 170, PAD = { t: 18, r: 8, b: 24, l: 8 }
+  const W = slim ? 360 : 560, H = slim ? 132 : fit ? 250 : compact ? 320 : 170, PAD = { t: slim ? 16 : 18, r: 8, b: slim ? 20 : 24, l: 8 }
   const max = Math.max(...data.map((m) => m.count), 1)
   const iw = W - PAD.l - PAD.r
   const ih = H - PAD.t - PAD.b
-  const bw = Math.min(fit ? 46 : 34, (iw / data.length) * 0.5)
+  const bw = Math.min(slim ? 12 : fit ? 46 : 34, (iw / data.length) * 0.5)
   const x = (i) => PAD.l + (iw / data.length) * (i + 0.5)
   const y = (v) => PAD.t + ih * (1 - v / max)
   // ~4 round gridlines (one per unit drew 96 lines at a 96-failure month)
@@ -1832,9 +1945,9 @@ function TrendChart({ data, compact, fit }) {
           {m.count > 0 && (
             <>
               <rect x={x(i) - bw / 2} y={y(m.count)} width={bw} height={ih - (y(m.count) - PAD.t) + 0.5}
-                    rx={0} className="viz-bar-base" />
-              <rect x={x(i) - bw / 2} y={y(m.count)} width={bw} height={Math.min(8, ih * (m.count / max))}
-                    rx={4} className="viz-bar-cap" />
+                    rx={slim ? bw / 2 : 0} className="viz-bar-base" />
+              {!slim && <rect x={x(i) - bw / 2} y={y(m.count)} width={bw} height={Math.min(8, ih * (m.count / max))}
+                    rx={4} className="viz-bar-cap" />}
               <text x={x(i)} y={y(m.count) - 6} className="viz-val" textAnchor="middle">{m.count}</text>
             </>
           )}
@@ -1983,8 +2096,9 @@ function LiveFailures({ line = '' }) {
   const [state, setState] = usePersistedState('fail.state', 'open')   // tab: 'open' | 'resolved'
   const [period, setPeriod] = usePersistedState('fail.period', 0)
   const [showViz, setShowViz] = usePersistedState('fail.showViz', true)  // analytics charts, collapsible
+  const [fAge, setFAge] = useState([])   // open-age bar picks, same as the job cards board
   const [limit, setLimit] = useState(ROW_PAGE)
-  useEffect(() => setLimit(ROW_PAGE), [state, q, cls, period, line])
+  useEffect(() => setLimit(ROW_PAGE), [state, q, cls, period, line, fAge])
   const toolbarRef = useRef(null)
   useEffect(() => {
     const setVars = () => { const tb = document.querySelector('.topbar'); if (tb) document.documentElement.style.setProperty('--topbar-h', `${tb.offsetHeight}px`) }
@@ -2035,6 +2149,12 @@ function LiveFailures({ line = '' }) {
   const shown = state === 'open' ? openRows : state === 'acknowledged' ? ackRows
     : state === 'job_card' ? jobRows : resolvedRows
   const ageD = (d) => Math.max(0, Math.round((Date.now() - new Date(`${d}T00:00:00`)) / 86400000))
+  // not-yet-resolved failures by age = the chase list; same slim bar as the asset register + job cards
+  const BUCKETS = [['b1', '≤ 14 d', 0, 14, 'seg-ok'], ['b2', '15–30 d', 15, 30, 'seg-due'], ['b3', '31–90 d', 31, 90, 'seg-warm'], ['b4', '> 90 d', 91, Infinity, 'seg-od']]
+    .map(([k, lbl, lo, hi, cls]) => [k, lbl, lo, hi, cls, shown.filter((r) => r.state !== 'resolved' && ageD(r.log_date) >= lo && ageD(r.log_date) <= hi).length]).filter((b) => b[5] > 0)
+  const ageSum = BUCKETS.reduce((n, b) => n + b[5], 0) || 1
+  const inAge = (r) => !fAge.length || BUCKETS.some(([k, , lo, hi]) => fAge.includes(k) && ageD(r.log_date) >= lo && ageD(r.log_date) <= hi)
+  const view = state === 'resolved' ? shown : shown.filter(inAge)
   // a mean over a few multi-month outages reads as "1,730 h"; the median is what a typical failure costs
   const timed = rows.filter((r) => r.down_hours != null && (!since || r.log_date >= since)).map((r) => r.down_hours).sort((a, b) => a - b)
   const median = timed.length ? (timed[(timed.length - 1) >> 1] + timed[timed.length >> 1]) / 2 : null
@@ -2043,7 +2163,7 @@ function LiveFailures({ line = '' }) {
   const exportCsv = () => {
     const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
     const head = ['asset', 'class', 'occurred', 'restored', 'down_hours', 'state', 'team', 'fault_type', 'what_happened']
-    const body = shown.map((f) => [f.asset_code || '', f.category || '', f.log_date,
+    const body = view.map((f) => [f.asset_code || '', f.category || '', f.log_date,
       f.ended_at ? (f.ended_at.slice(11, 16) === '00:00' ? f.ended_at.slice(0, 10) : f.ended_at.slice(0, 16).replace('T', ' ')) : '',
       f.down_hours ?? '', !f.asset_code ? 'unlinked' : f.ended_at ? 'restored' : 'open',
       f.attended_by || f.entered_by || '', f.fault_type || '', tidyLog(f.text)].map(cell).join(','))
@@ -2053,21 +2173,36 @@ function LiveFailures({ line = '' }) {
     a.download = `amps-failures-${state}-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url)
   }
 
+  const TABS = [['open', 'Open', openRows, 'Nothing done yet'], ['acknowledged', 'Acknowledged', ackRows, 'Noted, not yet fixed'],
+    ['job_card', 'Job card', jobRows, 'Job card issued to an agency'], ['resolved', 'Resolved', resolvedRows, 'Rectified']]
   return (
     <>
-      <div className="asset-toolbar" ref={toolbarRef}>
+      <div className="asset-toolbar jc-toolbar" ref={toolbarRef}>
         {!anon && <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-               placeholder="Search failures — asset, fault, crew…" aria-label="Search failures" />}
+               placeholder="Search asset, fault, crew…" aria-label="Search failures" />}
         {!anon && (
-          <div className="asset-filter" role="tablist" aria-label="Failure state">
-            <button type="button" className={`btn preset ${state === 'open' ? 'active' : ''}${openRows.length ? ' has-od' : ''}`}
-                    onClick={() => setState('open')}>Open {openRows.length}</button>
-            <button type="button" className={`btn preset ${state === 'acknowledged' ? 'active' : ''}${ackRows.length ? ' has-ack' : ''}`}
-                    onClick={() => setState('acknowledged')}>Acknowledged {ackRows.length}</button>
-            <button type="button" className={`btn preset ${state === 'job_card' ? 'active' : ''}${jobRows.length ? ' has-job' : ''}`}
-                    onClick={() => setState('job_card')}>Job card {jobRows.length}</button>
-            <button type="button" className={`btn preset ${state === 'resolved' ? 'active' : ''}`}
-                    onClick={() => setState('resolved')}>Resolved {resolvedRows.length}</button>
+          <div className={`asset-kpis hstrip${fAge.length ? ' has-pick' : ''}${state !== 'resolved' && BUCKETS.length ? '' : ' fl-nometer'}`} role="group" aria-label="Failure state">
+            {TABS.map(([k, lbl, list, tip]) => (
+              <button key={k} type="button" aria-pressed={state === k} title={tip}
+                      className={`rk-stat${state === k ? ' on' : ''}${k === 'open' && list.length ? ' bad' : k === 'acknowledged' && list.length ? ' warn' : ''}`}
+                      onClick={() => { setState(k); setFAge([]) }}>
+                <span className="v">{list.length}</span><span className="k">{lbl}</span>
+              </button>
+            ))}
+            {state !== 'resolved' && BUCKETS.length > 0 && (
+              <div className="h-meter" aria-label="Failures in this tab by age">
+                {BUCKETS.map(([k, lbl, , , cls, n], i) => (
+                  <button key={k} type="button" aria-pressed={fAge.includes(k)}
+                          onClick={() => setFAge(fAge.includes(k) ? fAge.filter((x) => x !== k) : [...fAge, k])}
+                          className={`h-col ${cls}${n / ageSum < 0.1 ? ' nar' : ''}${fAge.includes(k) ? ' on' : ''}`}
+                          style={{ flex: `${n} 1 0`, '--i': i }} title={`${lbl}: ${n} · click to filter`}>
+                    <span className={`h-seg cc-seg ${cls}`} />
+                    <span className="h-cn">{n}</span>
+                    <span className="h-cl">{lbl}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} aria-label="Period">
@@ -2077,13 +2212,28 @@ function LiveFailures({ line = '' }) {
           <option value="">All classes</option>
           {stats.by_class.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
         </select>
-        {!anon && (q || cls) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setCls('') }}>Clear</button>}
-        {!anon && <span className="asset-count">{shown.length} shown</span>}
-        {anon && <span className="asset-count">Public summary · sign in for records</span>}
+        {!anon && (q || cls || fAge.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setCls(''); setFAge([]) }}>Clear</button>}
+        <div className="fl-sum fl-in" aria-label="Failure summary">
+          <span className="fl-s" title={`${stats.total} failures · ${periodLabel.toLowerCase()}`}><b>{stats.total}</b> failures</span>
+          <span className={`fl-s${stats.open ? ' bad' : ''}`}><b>{stats.open}</b> open</span>
+          <span className="fl-s" title={stats.measured ? `${stats.downtime_hours} h in total · ${stats.measured} timed` : 'no clock times recorded'}>
+            <b>{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</b> downtime</span>
+          {median != null && !anon
+            ? <span className="fl-s" title={`typical (median) restore · mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><b>{fmtHrs(median)}</b> restore</span>
+            : <span className="fl-s"><b>{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</b> MTTR</span>}
+          <span className={`fl-s${stats.unlinked ? ' warn' : ''}`} title="Failures not yet linked to an asset"><b>{stats.unlinked}</b> unlinked</span>
+        </div>
+        <span className="asset-count fl-count" title={line || undefined}>{anon ? 'Public summary' : `${view.length} shown`}</span>
+        <div className="asset-actions">
+          <button type="button" className={`icon-btn${showViz ? ' on' : ''}`} aria-pressed={showViz} onClick={() => setShowViz((v) => !v)}
+                  title={showViz ? 'Hide analytics' : 'Show analytics · trend, by class, fault types, repeat offenders'} aria-label="Analytics">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2.5 13.5h11M4.5 11V8M8 11V4.5M11.5 11V6.5" /></svg>
+          </button>
         {!anon && (
-          <div className="asset-actions">
+          <>
             <button type="button" className="icon-btn" title="Download the failures in view (CSV)"
-                    aria-label="Download failures" onClick={exportCsv} disabled={!shown.length}>
+                    aria-label="Download failures" onClick={exportCsv} disabled={!view.length}>
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
             </button>
@@ -2091,38 +2241,16 @@ function LiveFailures({ line = '' }) {
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
             </button>
-          </div>
+          </>
         )}
+        </div>
       </div>
-
-      <div className="kpis kpis-slim">
-        <div className="tile"><div className="v">{stats.total}</div>
-          <div className="k">Failures — {periodLabel.toLowerCase()}</div></div>
-        <div className={stats.open ? 'tile alert' : 'tile'}><div className="v">{stats.open}</div>
-          <div className="k">Open breakdowns</div></div>
-        <div className="tile" title={stats.measured ? `${stats.downtime_hours} h in total` : ''}><div className="v">{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</div>
-          <div className="k">Downtime{stats.measured ? ` · ${stats.measured} timed` : ' — none timed'}</div></div>
-        {median != null && !anon ? (
-          <div className="tile" title={`mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><div className="v">{fmtHrs(median)}</div>
-            <div className="k">Typical restore · median{stats.mttr_hours != null ? ` (mean ${fmtHrs(stats.mttr_hours)})` : ''}</div></div>
-        ) : (
-          <div className="tile"><div className="v">{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</div>
-            <div className="k">{stats.mttr_hours != null ? `MTTR · ${stats.measured} of ${stats.closed}` : 'MTTR — needs clock times'}</div></div>
-        )}
-        <div className={stats.unlinked ? 'tile warn' : 'tile'}><div className="v">{stats.unlinked}</div>
-          <div className="k">Unlinked records</div></div>
-      </div>
-
-      <button type="button" className="viz-toggle" onClick={() => setShowViz((v) => !v)} aria-expanded={showViz}>
-        <span className={`chev${showViz ? ' open' : ''}`}>▸</span> Analytics
-        <span className="dim">· trend, by class, fault types, repeat offenders</span>
-      </button>
 
       {showViz && (
-        <div className="viz-grid2 viz-compact">
+        <div className="viz-grid2 viz-compact fl-viz">
           <section className="card viz-card">
             <h2 className="viz-h">Failures per month <span className="viz-note">last {months} months</span></h2>
-            <TrendChart data={trend} compact />
+            <TrendChart data={trend} slim />
             <p className="viz-insight">
               {dir === 'down' && <>Improving — {last3} in the last 3 months vs {prev3} in the previous 3.</>}
               {dir === 'up' && <>Worsening — {last3} in the last 3 months vs {prev3} in the previous 3.</>}
@@ -2163,55 +2291,53 @@ function LiveFailures({ line = '' }) {
         </p></div>
       ) : (
       <>
-      <h2 className="fail-log-h">{{ open: 'Open failures', acknowledged: 'Acknowledged failures', job_card: 'Job card issued', resolved: 'Resolved failures' }[state]} <span className="dim" style={{ fontWeight: 400, fontSize: 15 }}>· {shown.length}</span></h2>
+      {view.length === 0 ? (
+        <div className="card fl-empty"><p className="dim" style={{ margin: 0 }}>{state === 'open' ? 'No open failures — nothing waiting. 👍' : 'Nothing matches this filter.'}</p></div>
+      ) : (
       <div className="card tbl-wrap">
-        <table className="jc-table fit-card">
-          {/* percentage widths so every column fits the card (no h-scroll);
-              the Fault column flexes into the remaining width */}
+        <table className="jc-table fit-card jc-slim fl-slim">
+          {/* percentage widths: fits the card at any width; Fault flexes into the remainder */}
           <colgroup>
-            <col style={{ width: '12%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
-            <col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '12%' }} />
-            <col />{canWrite && <col style={{ width: '9%' }} />}
+            <col style={{ width: '9%' }} /><col style={{ width: '17%' }} /><col />
+            <col style={{ width: '13%' }} /><col style={{ width: '11%' }} /><col style={{ width: '8%' }} />
+            {canWrite && <col style={{ width: '10%' }} />}
           </colgroup>
-          <thead><tr><th>Asset</th><th>Class</th><th>Occurred</th><th>Restored</th><th>{state === 'resolved' ? 'Down' : 'Down / age'}</th><th>State</th><th>Team</th><th>Fault → what happened</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
+          <thead><tr><th>{state === 'resolved' ? 'State' : 'Pending'}</th><th>Asset</th><th>Fault → what happened</th><th>Team</th>
+            <th>Occurred</th><th>Down</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
           <tbody>
-            {shown.slice(0, limit).map((f) => (
-              <tr key={f.id} tabIndex={0}
-                  onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
-                  onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
-                <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                <td className="dim" data-l="Class">{f.category || '—'}</td>
-                <td className="dim dt" data-l="Occurred">{f.log_date}</td>
-                {/* midnight means no clock time was recorded — show the date alone
-                    rather than an invented 00:00 (same rule as the log book) */}
-                <td className="dim dt" data-l="Restored">{f.ended_at
-                  ? (f.ended_at.slice(11, 16) === '00:00'
-                      ? f.ended_at.slice(0, 10)
-                      : f.ended_at.slice(0, 16).replace('T', ' '))
-                  : '—'}</td>
-                <td className="dt" data-l="Down">{f.down_hours != null
-                  ? <span title={`${f.down_hours} h`}>{fmtHrs(f.down_hours)}</span>
-                  : !f.ended_at && f.state !== 'resolved'
-                    ? <span className={`jc-age${ageCls(ageD(f.log_date))}`} title={`open for ${ageD(f.log_date)} days`}>{ageD(f.log_date)}d</span>
-                    : '—'}</td>
-                <td data-l="State">{!f.asset_code
-                  ? <span className="chip"><span className="dot" />Unlinked</span>
-                  : <span className={`chip ${FAIL_STATE_CHIP[f.state] || 'd-overdue'}`}><span className="dot" />{FAIL_STATE_LABEL[f.state] || 'open'}</span>}</td>
-                <td className="dim" data-l="Team">{f.attended_by || f.entered_by || '—'}</td>
-                <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} /></td>
+            {view.slice(0, limit).map((f) => {
+              const age = ageD(f.log_date), done = f.state === 'resolved' || !!f.ended_at
+              const go = () => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)
+              // midnight means no clock time was recorded — show the date alone (same rule as the log book)
+              const rest = f.ended_at ? (f.ended_at.slice(11, 16) === '00:00' ? f.ended_at.slice(0, 10) : f.ended_at.slice(0, 16).replace('T', ' ')) : ''
+              return (
+              <tr key={f.id} tabIndex={0} className={`jc-row fl-${f.asset_code ? f.state : 'unlinked'}${done ? '' : ageCls(age)}`}
+                  onClick={go} onKeyDown={(e) => e.key === 'Enter' && go()}>
+                <td data-l={done ? 'State' : 'Pending'}>{done
+                  ? <span className="jc-pill jc-closed" title={`Restored${rest ? ` ${rest}` : ''}`}>Restored</span>
+                  : <span className={`jc-age${ageCls(age)}`} title={`${FAIL_STATE_LABEL[f.state] || 'open'} · ${age} days`}>{age}d</span>}</td>
+                <td data-l="Asset">{f.asset_code
+                  ? <span className="code jc-code">{f.asset_code}</span>
+                  : <span className="jc-pill fl-unl">Unlinked</span>}
+                  {f.category && <div className="lt-sub">{f.category}</div>}</td>
+                <td data-l="Fault"><div className="jc-fault"><LogText text={f.text} ft={f.fault_type} /></div></td>
+                <td data-l="Team">{f.attended_by || f.entered_by || '—'}</td>
+                <td className="dt" data-l="Occurred">{f.log_date}<div className="lt-sub">{rest ? `→ ${rest}` : `→ ${FAIL_STATE_LABEL[f.state] || 'open'}`}</div></td>
+                <td className="dt" data-l="Down">{f.down_hours != null ? <span title={`${f.down_hours} h`}>{fmtHrs(f.down_hours)}</span> : <span className="dim">—</span>}</td>
                 {canWrite && (
-                  <td className="td-edit" data-l="Edit">
+                  <td className="td-edit" data-l="Edit" onClick={(e) => e.stopPropagation()}>
                     <EditLink id={f.id} date={f.log_date}
                               label={f.ended_at ? 'Edit in log book' : 'Resolve / link in log book'} />
                   </td>
                 )}
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
-        {shown.length === 0 && <p className="dim" style={{ padding: '1rem' }}>Nothing matches this filter.</p>}
-        <MoreRows shown={Math.min(limit, shown.length)} total={shown.length} setLimit={setLimit} />
+        <MoreRows shown={Math.min(limit, view.length)} total={view.length} setLimit={setLimit} />
       </div>
+      )}
       </>
       )}
     </>
@@ -2689,22 +2815,6 @@ function Printables({ initial = 'qr', fmtId = '' }) {
   return tab === 'qr' ? <TagSheet /> : <ChecksheetFormats initialId={fmtId} />
 }
 
-/* the shared title row of the printables — same page-head as Letters / Job cards,
-   with a QR ⇄ Checksheets switch (and any page actions) docked on the right */
-function PrintHead({ tab, title, children }) {
-  return (
-    <div className="page-head no-print">
-      <h1>{title}</h1>
-      <div className="asset-filter ph-actions" role="tablist" aria-label="Printables">
-        {children}
-        {children && <span className="crit-sep" aria-hidden="true" />}
-        <a className={`btn preset ${tab === 'qr' ? 'active' : ''}`} href="#/printables?t=qr">QR tags</a>
-        <a className={`btn preset ${tab === 'checksheets' ? 'active' : ''}`} href="#/printables?t=checksheets">Checksheets</a>
-      </div>
-    </div>
-  )
-}
-
 /* the Printables nav item: a dropdown submenu instead of a page-level tab bar */
 function PrintablesNav({ active }) {
   const [open, setOpen] = useState(false)
@@ -2738,6 +2848,12 @@ function PrintablesNav({ active }) {
           <a className="sc-item" role="menuitem" href="#/printables?t=checksheets" onClick={() => go('checksheets')}>
             <span className="sc-name">Checksheets</span><span className="sc-sub">maintenance checksheet formats — print & manage</span>
           </a>
+          {!OPERATOR && <>
+            <div className="sc-divider" />
+            <a className="sc-item" role="menuitem" href="https://metro.binihost.com" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
+              <span className="sc-name">Metro AMPS<span className="sc-live">● LIVE</span></span><span className="sc-sub">in service · Kolkata Metro power-supply ↗</span>
+            </a>
+          </>}
         </div>
       )}
     </span>
@@ -2776,31 +2892,33 @@ function ChecksheetFormats({ initialId = '' }) {
   if (formats === null) return <p className="dim">Loading checksheet formats…</p>
   const published = formats.filter((f) => f.status === 'published' || !f.status)
   const pending = formats.filter((f) => f.status === 'pending').length
+  // print ⇄ manage, docked at the end of the library toolbar (writers only)
+  const modeSwitch = canWrite && (
+    <div className="asset-kpis hstrip cs-mode" role="group" aria-label="Checksheet mode">
+      <button type="button" className={`rk-stat${mode === 'print' ? ' on' : ''}`} aria-pressed={mode === 'print'}
+              onClick={() => { setEditing(null); setMode('print') }}><span className="k">Print blanks</span></button>
+      <button type="button" className={`rk-stat${mode === 'manage' ? ' on' : ''}${pending ? ' bad' : ''}`} aria-pressed={mode === 'manage'}
+              title={pending ? `${pending} format${pending === 1 ? '' : 's'} awaiting approval` : 'Create, revise and approve formats'}
+              onClick={() => { setEditing(null); setMode('manage') }}>{pending ? <span className="v">{pending}</span> : null}<span className="k">Manage</span></button>
+    </div>
+  )
 
   return (
     <div>
-      <PrintHead tab="checksheets" title="Checksheets">
-        {canWrite && <>
-          <button type="button" className={`btn preset ${mode === 'print' ? 'active' : ''}`} onClick={() => { setEditing(null); setMode('print') }}>Print blanks</button>
-          <button type="button" className={`btn preset${mode === 'manage' ? ' active' : ''}${pending ? ' has-od' : ''}`} onClick={() => { setEditing(null); setMode('manage') }}>
-            Manage formats{pending ? ` · ${pending} pending` : ''}
-          </button>
-        </>}
-      </PrintHead>
       {err && <div className="card offline-note no-print">{err}</div>}
       {editing ? (
         <ChecksheetEditor initial={editing} formats={formats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} setErr={setErr} />
       ) : mode === 'manage' && canWrite ? (
-        <ChecksheetManage formats={formats} isApprover={isApprover} onEdit={setEditing} reload={load} setErr={setErr} />
+        <ChecksheetManage formats={formats} isApprover={isApprover} onEdit={setEditing} reload={load} setErr={setErr} modeSwitch={modeSwitch} />
       ) : (
-        <ChecksheetPrint published={published} initialId={initialId} />
+        <ChecksheetPrint published={published} initialId={initialId} modeSwitch={modeSwitch} />
       )}
     </div>
   )
 }
 
 /* the library filter bar: search · system chips · cycle. Shared by print & manage. */
-function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, children }) {
+function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, modeSwitch, children }) {
   const systems = Object.entries(formats.reduce((m, f) => { const s = csSystem(f); m[s] = (m[s] || 0) + 1; return m }, {}))
     .sort(([a], [b]) => a.localeCompare(b))
   const cycles = [...new Set(formats.flatMap((f) => f.slots?.length ? [f.frequency || 'Log sheet'] : f.frequencies || []))]
@@ -2831,6 +2949,7 @@ function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, childr
       {(q || sys || cyc) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSys(''); setCyc('') }}>Clear</button>}
       <span className="asset-count">{shown} of {formats.length}</span>
       {children}
+      {modeSwitch}
     </div>
   )
 }
@@ -2844,7 +2963,7 @@ function csMatches(f, { q, sys, cyc }) {
 }
 
 /* the print-ready blank picker + A4 sheet */
-function ChecksheetPrint({ published, initialId }) {
+function ChecksheetPrint({ published, initialId, modeSwitch }) {
   const [q, setQ] = useState('')
   const [sys, setSys] = usePersistedState('cs.system', '')
   const [cyc, setCyc] = useState('')
@@ -2866,9 +2985,14 @@ function ChecksheetPrint({ published, initialId }) {
   const bySys = shown.reduce((m, f) => { (m[csSystem(f)] = m[csSystem(f)] || []).push(f); return m }, {})
   const sheets = Array.from({ length: Math.min(Math.max(copies, 1), 20) }, (_, i) => i)
   const isLog = fmt?.slots?.length > 0
+  useEffect(() => {   // the picker is a full-height rail; the footer moves under the sheet column
+    const root = document.documentElement
+    root.classList.add('cs-rail')
+    return () => root.classList.remove('cs-rail')
+  }, [])
   return (
     <div>
-      <CsFilterBar formats={published} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={shown.length} />
+      <CsFilterBar formats={published} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={shown.length} modeSwitch={modeSwitch} />
       <div className="cs-formats">
         <aside className="cs-picker no-print card">
           {shown.length === 0 ? <p className="dim" style={{ margin: 4 }}>No format matches.</p> : (
@@ -2925,9 +3049,12 @@ function ChecksheetPrint({ published, initialId }) {
                   <button className="btn" type="button" onClick={() => window.print()}>Print</button>
                 </div>
               </div>
-              {sheets.map((i) => <ChecksheetSheet key={i} fmt={fmt} printFreq={printFreq} layout={layout} />)}
+              <div className="cs-sheets">
+                {sheets.map((i) => <ChecksheetSheet key={i} fmt={fmt} printFreq={printFreq} layout={layout} />)}
+              </div>
             </>
           ) : <div className="card"><p className="dim" style={{ margin: 0 }}>{published.length ? 'Pick a format.' : 'No published checksheet formats yet.'}</p></div>}
+          <ShellFoot className="cs-foot no-print" />
         </div>
       </div>
     </div>
@@ -3191,7 +3318,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
 }
 
 /* the governance surface: list every format by status, act on it */
-function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr }) {
+function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr, modeSwitch }) {
   const [histFor, setHistFor] = useState(null)
   const act = async (id, path, body) => {
     setErr('')
@@ -3221,7 +3348,7 @@ function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr }) {
   const STAT_TABS = [['', 'All', formats.length], ['pending', 'Pending', counts.pending || 0], ['draft', 'Draft', counts.draft || 0], ['published', 'Published', counts.published || 0]]
   return (
     <div>
-      <CsFilterBar formats={formats} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={rows.length}>
+      <CsFilterBar formats={formats} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={rows.length} modeSwitch={modeSwitch}>
         <div className="asset-kpis hstrip cs-stat" role="group" aria-label="Status filter">
           {STAT_TABS.filter(([k]) => k !== 'pending' || counts.pending).map(([k, lbl, v]) => (
             <button key={k} type="button" className={`rk-stat${fStatus === k ? ' on' : ''}${k === 'pending' && counts.pending ? ' bad' : ''}`}
@@ -3439,7 +3566,6 @@ function TagSheet() {
   if (all.length === 0) return <div className="card"><p className="dim" style={{ margin: 0 }}>No assets in the register yet — tags appear as assets are added.</p></div>
   return (
     <>
-      <PrintHead tab="qr" title="QR asset tags" />
       <div className="asset-toolbar" ref={toolbarRef}>
         <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="Search code, asset, class or location…" aria-label="Search assets" />
@@ -3460,7 +3586,9 @@ function TagSheet() {
           {statuses.map((s) => <option key={s} value={s}>{STATUS_LABEL[s] || s}</option>)}
         </select>
         {(q || fSystem || fClass || fLocation || fStatus) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFSystem(''); setFClass(''); setFLocation(''); setFStatus('') }}>Clear</button>}
-        <span className="asset-count" title="One tag per asset — scanning opens the asset's live record. Filter to the set you need, then print.">{shown.length} tag{shown.length === 1 ? '' : 's'}</span>
+        {shown.length > TAG_CAP
+          ? <span className="asset-count tags-cap" title={`Showing the first ${TAG_CAP} of ${shown.length} — refine the filter to reach the rest, then print.`}>{TAG_CAP} of {shown.length} tags</span>
+          : <span className="asset-count" title="One tag per asset — scanning opens the asset's live record. Filter to the set you need, then print.">{shown.length} tag{shown.length === 1 ? '' : 's'}</span>}
         <div className="asset-actions">
           <button type="button" className="icon-btn" title="Print these tags" aria-label="Print tags" onClick={() => window.print()}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -3468,8 +3596,6 @@ function TagSheet() {
           </button>
         </div>
       </div>
-      {shown.length > TAG_CAP && <p className="dim tags-note no-print" style={{ margin: '0 0 12px' }}>
-        <b>Showing the first {TAG_CAP}</b> of {shown.length} — refine the filter to reach the rest.</p>}
       {shown.length === 0
         ? <div className="card"><p className="dim" style={{ margin: 0 }}>No assets match — adjust the filters.</p></div>
         : (
@@ -3709,6 +3835,7 @@ function SyncCard({ sync, bare = false }) {
 }
 
 function LineDashboard({ go, initialLine = null }) {
+  useEffect(() => { keepSite(initialLine || '') }, [initialLine])
   const { assets: allAssets, sched, openFail, loading, schedLoading } = useLiveAssets()
   // initialLine scopes the whole overview to one line — used for the public,
   // no-login per-line dashboard reached from the landing (officers view without
@@ -3729,9 +3856,15 @@ function LineDashboard({ go, initialLine = null }) {
     getJSON(`/api/logbook/failure-stats?days=180&months=12${lq}`).then(setStats).catch(() => {})
     getJSON(`/api/sync/status${initialLine ? `?line=${encodeURIComponent(initialLine)}` : ''}`).then(setSync).catch(() => setSync(null))
     // the sidebar feed stays live: latest entries + failures re-pulled every minute
+    // the whole-estate feed needs a sign-in; a signed-out visitor gets every
+    // site's own feed (open per site) merged newest-first instead
+    const merged = (q, n) => getJSON('/api/lines')
+      .then((ls) => Promise.all(ls.map((l) => getJSON(`/api/logbook?${q}&line=${encodeURIComponent(l.name)}`).catch(() => []))))
+      .then((all) => all.flat().sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, n))
+    const feed = (q, n) => getJSON(`/api/logbook?${q}${lq}`).catch((e) => (lq ? Promise.reject(e) : merged(q, n)))
     const pull = () => {
-      getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
-      getJSON(`/api/logbook?entry_type=failure&limit=40${lq}`).then(setFails).catch(() => setFails(null))
+      feed('limit=120', 120).then(setRecent).catch(() => {})
+      feed('entry_type=failure&limit=40', 40).then(setFails).catch(() => setFails(null))
     }
     pull()
     const t = setInterval(pull, 60000)
@@ -3938,6 +4071,12 @@ function LineDashboard({ go, initialLine = null }) {
           <a className={`dk${openF ? ' dk-bad' : ''}`} href={failHref} title="Failures open, acknowledged or on a job card"><b>{openF}</b> open failures</a>
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
+        {!me?.line && (
+          <span className="dash-site" style={{ '--line-c': initialLine ? lineColor(initialLine) : 'var(--accent)' }}
+                title={initialLine ? `${W.Line} dashboard` : `All ${W.lines} · combined`}>
+            <SitePicker current={initialLine || ''} />
+          </span>
+        )}
         <span className="dash-clock" role="timer" aria-label="Current date and time">
           <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
           <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
@@ -3965,13 +4104,15 @@ function LineDashboard({ go, initialLine = null }) {
           <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
             <span className="h-pk">PM compliance</span>
-            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule{bucket.grace > 0 && <> · <b>{bucket.grace.toLocaleString()}</b> awaited</>} · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
           </div>
         </div>
         {meter(segs, 'PM compliance breakdown')}
       </section>
       </div>
 
+      {/* A/B/C criticality rows + failures/month side by side; the two overdue cards below */}
+      <div className="dash-abc">
       {critRows.length > 0 && (
         <section className="card crit-card" aria-label="PM status by criticality">
           {critRows.map((r) => (
@@ -3991,7 +4132,15 @@ function LineDashboard({ go, initialLine = null }) {
         </section>
       )}
 
-      <div className="dash-grid3">
+      {/* failures per month — slim bars */}
+      <section className="card viz-card dash-trend">
+        <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
+          <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
+        {trend.length ? <SlimTrend data={trend} /> : <p className="dim">No failure data.</p>}
+      </section>
+      </div>
+
+      <div className="dash-grid3 dash-od2">
       {/* overdue breakup by cycle */}
       <section className="card viz-card">
         <div className="viz-head-row">
@@ -4058,12 +4207,6 @@ function LineDashboard({ go, initialLine = null }) {
         <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
-      {/* failures per month — slim bars */}
-      <section className="card viz-card dash-trend">
-        <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
-          <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
-        {trend.length ? <SlimTrend data={trend} /> : <p className="dim">No failure data.</p>}
-      </section>
       </div>
       </div>
 
@@ -4118,12 +4261,13 @@ function JobCardsView({ line = '' }) {
   const [tab, setTab] = useState('open')   // open | closed | penalty | all
   const [q, setQ] = useState('')
   const [fAgency, setFAgency] = useState([])   // multi-select "Issued to" filter
+  const [fAge, setFAge] = useState([])         // open-by-age bucket filter (b1..b4)
   const [openCol, setOpenCol] = useState(null)
   const [jcAdd, setJcAdd] = useState(null)     // null | 'single' | 'bulk'
   const [sort, setSort] = useState('recent')   // newest raised first — a just-raised card lands on top
   const [assets, setAssets] = useState([])
   const [limit, setLimit] = useState(ROW_PAGE)
-  useEffect(() => setLimit(ROW_PAGE), [tab, q, fAgency, sort, line])
+  useEffect(() => setLimit(ROW_PAGE), [tab, q, fAgency, fAge, sort, line])
   const load = () => {
     const lq = line ? `&line=${encodeURIComponent(line)}` : ''
     getJSON(`/api/logbook?entry_type=failure&limit=5000${lq}`)
@@ -4167,36 +4311,51 @@ function JobCardsView({ line = '' }) {
   const line_ = me?.line || ''
   const STL = { open: ['jc-open', 'Open'], closed: ['jc-closed', 'Closed'], penalty: ['jc-penalty', 'Penalty'] }
   const STT = { open: 'Open — awaiting close-out', closed: 'Closed by agency', penalty: 'Penalty — we fixed it (agency default)' }
-  // open-card ageing buckets, the chase list at a glance
-  const BUCKETS = [['≤ 14 d', 0, 14, ''], ['15–30 d', 15, 30, ''], ['31–90 d', 31, 90, ' warm'], ['> 90 d', 91, Infinity, ' hot']]
+  // open-card ageing buckets = the chase list; same slim bar as the asset register, a click filters
+  const BUCKETS = [['b1', '≤ 14 d', 0, 14, 'seg-ok'], ['b2', '15–30 d', 15, 30, 'seg-due'], ['b3', '31–90 d', 31, 90, 'seg-warm'], ['b4', '> 90 d', 91, Infinity, 'seg-od']]
+    .map(([k, lbl, lo, hi, cls]) => [k, lbl, lo, hi, cls, open.filter((c) => c.age >= lo && c.age <= hi).length]).filter((b) => b[5] > 0)
+  const inAge = (c) => !fAge.length || BUCKETS.some(([k, , lo, hi]) => fAge.includes(k) && c.status === 'open' && c.age >= lo && c.age <= hi)
+  const view = shown.filter(inAge)
+  const ageSum = BUCKETS.reduce((n, b) => n + b[5], 0) || 1
   const issuer = (v) => (v && v !== 'unknown' && !v.endsWith('-import') && v !== '' ? v : '')
   const printAll = () => { setLimit(Infinity); setTimeout(() => window.print(), 300) }
   return (
     <>
-      <div className="page-head"><h1>Job cards {line_ && <span className="dim">· {line_}</span>}</h1></div>
-      <p className="dim" style={{ marginTop: -6 }}>Job cards raised to an agency/department, tracked from issue to close-out.</p>
-
-      <div className="kpis dash-kpis" style={{ marginBottom: 14 }}>
-        <div className={`tile${open.length ? ' alert' : ''}`}><div className="v">{open.length}</div><div className="k">Open</div><div className="note">awaiting close-out</div></div>
-        <div className={`tile${penalty.length ? ' warn' : ''}`}><div className="v">{penalty.length}</div><div className="k">Penalty</div><div className="note">we fixed — agency default</div></div>
-        <div className="tile ok"><div className="v">{closed.length}</div><div className="k">Closed by agency</div><div className="note">fulfilled</div></div>
-        <div className="tile"><div className="v">{avgTurn != null ? `${avgTurn}d` : '—'}</div><div className="k">Avg turnaround</div><div className="note">raised → closed</div></div>
-      </div>
-
-      <div className="asset-toolbar">
+      <div className="asset-toolbar jc-toolbar">
         <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-               placeholder="Search asset, fault, agency, detail…" aria-label="Search job cards" />
-        <div className="asset-filter" role="tablist" aria-label="Job card status">
+               placeholder="Search asset, fault, agency…" aria-label="Search job cards" />
+        {/* status tabs + open-by-age bar, the asset register's slim strip; avg turnaround closes it */}
+        <div className={`asset-kpis hstrip${fAge.length ? ' has-pick' : ''}`} role="group" aria-label="Job card status">
           {TABS.map(([k, lbl, list]) => (
-            <button key={k} type="button" className={`btn preset ${tab === k ? 'active' : ''}${k === 'open' && open.length ? ' has-od' : ''}`}
-                    onClick={() => setTab(k)}>{lbl} {list.length}</button>
+            <button key={k} type="button" aria-pressed={tab === k}
+                    className={`rk-stat${tab === k ? ' on' : ''}${k === 'open' && list.length ? ' bad' : k === 'penalty' && list.length ? ' warn' : ''}`}
+                    title={k === 'all' ? 'Every job card' : STT[k]} onClick={() => { setTab(k); if (k !== 'open' && k !== 'all') setFAge([]) }}>
+              <span className="v">{list.length}</span><span className="k">{lbl}</span>
+            </button>
           ))}
+          {BUCKETS.length > 0 && (tab === 'open' || tab === 'all') && (
+            <div className="h-meter" aria-label="Open job cards by age">
+              {BUCKETS.map(([k, lbl, , , cls, n], i) => (
+                <button key={k} type="button" aria-pressed={fAge.includes(k)}
+                        onClick={() => setFAge(fAge.includes(k) ? fAge.filter((x) => x !== k) : [...fAge, k])}
+                        className={`h-col ${cls}${n / ageSum < 0.1 ? ' nar' : ''}${fAge.includes(k) ? ' on' : ''}`}
+                        style={{ flex: `${n} 1 0`, '--i': i }} title={`Open ${lbl}: ${n} · click to filter`}>
+                  <span className={`h-seg cc-seg ${cls}`} />
+                  <span className="h-cn">{n}</span>
+                  <span className="h-cl">{lbl}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="rk-stat jc-turn" title="Average days from raised to closed">
+            <span className="v">{avgTurn != null ? `${avgTurn}d` : '—'}</span><span className="k">avg turnaround</span>
+          </span>
         </div>
         <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort job cards" title="Sort">
           {Object.entries(SORTS).map(([k, [lbl]]) => <option key={k} value={k}>{lbl}</option>)}
         </select>
-        {(q || fAgency.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]) }}>Clear</button>}
-        <span className="asset-count">{shown.length} shown</span>
+        {(q || fAgency.length > 0 || fAge.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]); setFAge([]) }}>Clear</button>}
+        <span className="asset-count">{view.length} shown{line_ && ` · ${line_}`}</span>
         <div className="asset-actions">
           {canWrite && (
             <button type="button" className={`icon-btn${jcAdd === 'single' ? ' on' : ''}`} title="Raise a job card"
@@ -4211,7 +4370,7 @@ function JobCardsView({ line = '' }) {
             </button>
           )}
           <button type="button" className="icon-btn" title="Download these job cards (CSV)" aria-label="Download job cards"
-                  onClick={() => exportJobCards(shown)}>
+                  onClick={() => exportJobCards(view)}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
           </button>
           <button type="button" className="icon-btn" title="Print these job cards" aria-label="Print job cards" onClick={printAll}>
@@ -4220,34 +4379,23 @@ function JobCardsView({ line = '' }) {
         </div>
       </div>
 
-      {open.length > 0 && (tab === 'open' || tab === 'all') && (
-        <div className="jc-buckets" aria-label="Open job cards by age">
-          <span className="dim">Open by age</span>
-          {BUCKETS.map(([lbl, lo, hi, cls]) => (
-            <span key={lbl} className={`jc-age${cls}`}>{lbl} · {open.filter((c) => c.age >= lo && c.age <= hi).length}</span>
-          ))}
-        </div>
-      )}
-
       {canWrite && jcAdd && (
         <JobCardEntry assets={assets} systems={systems} defaultDate={new Date().toISOString().slice(0, 10)}
                       bulk={jcAdd === 'bulk'} onClose={() => setJcAdd(null)} onDone={() => { setJcAdd(null); load() }} />
       )}
 
-      {shown.length === 0 ? (
+      {view.length === 0 ? (
         <div className="card"><p className="dim" style={{ margin: 0 }}>{tab === 'open' ? 'No open job cards — nothing to chase. 👍' : 'None in this view.'}</p></div>
       ) : (
         <div className="card tbl-wrap">
-          <table className="jc-table fit-card">
-            {/* percentage widths so all columns fit the card at any width (no
-                1024px min-width / h-scroll); Detail flexes into the remainder */}
+          <table className="jc-table fit-card jc-slim">
+            {/* percentage widths: fits the card at any width; Fault flexes into the remainder */}
             <colgroup>
-              <col style={{ width: '5%' }} /><col style={{ width: '6%' }} />
-              <col style={{ width: '10%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col />
-              <col style={{ width: '9%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
-              {canWrite && <col style={{ width: '9%' }} />}
+              <col style={{ width: '9%' }} /><col style={{ width: '16%' }} /><col />
+              <col style={{ width: '13%' }} /><col style={{ width: '10%' }} /><col style={{ width: '14%' }} />
+              {canWrite && <col style={{ width: '11%' }} />}
             </colgroup>
-            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>{W.Station}</th><th>Location</th><th>Fault</th>
+            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Status'}</th><th>Asset</th><th>Fault</th>
               <th className={fAgency.length ? 'th-filtered' : ''}>Issued to
                 <ColFilter open={openCol === 'ag'} onToggle={() => setOpenCol(openCol === 'ag' ? null : 'ag')}
                            onClose={() => setOpenCol(null)} values={fAgency}
@@ -4256,37 +4404,40 @@ function JobCardsView({ line = '' }) {
               </th>
               <th>Raised</th><th>Job card</th>{canWrite && <th aria-label="Action"></th>}</tr></thead>
             <tbody>
-              {shown.slice(0, limit).map(({ f, jc, rb, status, age }) => {
+              {view.slice(0, limit).map(({ f, jc, rb, status, age }) => {
                 const fp = parseLog(f.text, f.fault_type), jp = parseLog(jc.text)
                 const ref = (jp.meta.find(([k]) => k === 'jc') || fp.meta.find(([k]) => k === 'jc'))?.[1]
                 // the card text is normally the failure text again — show it only when it says something new
                 const jcNew = jp.head && normTxt(jp.head) !== normTxt(fp.head) ? jp.head : ''
                 const by = issuer(jc.entered_by)
+                const where = [f.station || jc.station, f.category].filter(Boolean).join(' · ')
+                const go = () => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)
                 return (
-                <tr key={f.id} tabIndex={0}
-                    onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
-                  <td data-l={status === 'open' ? 'Pending' : 'Turnaround'}><span className={`jc-age${status === 'open' ? ageCls(age) : ''}`}
-                      title={status === 'open' ? `open for ${age} days` : `closed in ${age} days`}>{age}d</span></td>
-                  <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`} title={STT[status]}>{STL[status][1]}</span></td>
-                  <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                  <td className="dim nobreak" data-l={W.Station}>{f.station || jc.station || '—'}</td>
-                  <td className="dim" data-l="Location">{f.category || '—'}</td>
-                  <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></td>
-                  <td className="dim" data-l="Issued to">{jc.attended_by || '—'}
+                <tr key={f.id} tabIndex={0} className={`jc-row ${STL[status][0]}${status === 'open' ? ageCls(age) : ''}`}
+                    onClick={go} onKeyDown={(e) => e.key === 'Enter' && go()}>
+                  <td data-l={status === 'open' ? 'Pending' : 'Status'}>
+                    {status === 'open'
+                      ? <span className={`jc-age${ageCls(age)}`} title={`${STT.open} · ${age} days`}>{age}d</span>
+                      : <span className={`jc-pill ${STL[status][0]}`} title={`${STT[status]} · in ${age} days`}>{STL[status][1]} · {age}d</span>}
+                  </td>
+                  <td data-l="Asset"><span className="code jc-code">{f.asset_code || '—'}</span>
+                    {where && <div className="lt-sub">{where}</div>}</td>
+                  <td data-l="Fault"><div className="jc-fault" title={fp.head || f.text}><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></div></td>
+                  <td data-l="Issued to">{jc.attended_by || '—'}
                     {by && by !== jc.attended_by && <div className="lt-sub">by {by}</div>}</td>
-                  <td className="dim dt" data-l="Raised → closed">{jc.log_date}<div className="lt-sub">{rb ? `→ ${rb.log_date}` : '→ open'}</div></td>
-                  <td className="wrap-cell" data-l="Job card">
-                    {ref ? <span className="lt-jc">{ref}</span> : <span className="dim">—</span>}
-                    {jcNew && <div className="lt-head lt-sub" title={jcNew}>{jcNew}</div>}
-                    <JobCardApproval jc={jc} f={f} />
+                  <td className="dt" data-l="Raised → closed">{jc.log_date}<div className="lt-sub">{rb ? `→ ${rb.log_date}` : '→ open'}</div></td>
+                  <td data-l="Job card" onClick={(e) => e.stopPropagation()}>
+                    <div className="jc-ref">
+                      {ref ? <span className="lt-jc" title={jcNew || undefined}>{ref}</span> : jcNew ? <span className="dim jc-new" title={jcNew}>{jcNew}</span> : <span className="dim">—</span>}
+                      <JobCardApproval jc={jc} f={f} />
+                    </div>
                     <JcScan jc={jc} rb={rb} canWrite={canWrite} />
                   </td>
                   {canWrite && (
                     <td className="td-edit" data-l="Action" onClick={(e) => e.stopPropagation()}>
                       {status === 'open'
-                        ? <><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`} title="Rectify / close this job card">✓ Close</a>
-                            <a className="mini-btn muted" href={`#/log?d=${jc.log_date}&edit=${jc.id}`}>Edit</a></>
+                        ? <span className="jc-acts"><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`} title="Rectify / close this job card">✓ Close</a>
+                            <a className="mini-btn muted" href={`#/log?d=${jc.log_date}&edit=${jc.id}`}>Edit</a></span>
                         : <EditLink id={jc.id} date={jc.log_date} label="Edit / open" />}
                     </td>
                   )}
@@ -4295,7 +4446,7 @@ function JobCardsView({ line = '' }) {
               })}
             </tbody>
           </table>
-          <MoreRows shown={Math.min(limit, shown.length)} total={shown.length} setLimit={setLimit} />
+          <MoreRows shown={Math.min(limit, view.length)} total={view.length} setLimit={setLimit} />
         </div>
       )}
     </>
@@ -4619,14 +4770,218 @@ function useNetworkGlance() {
   return { perLine, openByLine, net, loading, failReady: fail !== null }
 }
 
-function Landing() {
-  const lines = useLines()
-  const { perLine, openByLine, net, loading, failReady } = useNetworkGlance()
-  const locations = lines ? lines.reduce((a, l) => a + l.stations, 0) : 0
-  const nf = (v) => (v == null ? '—' : v.toLocaleString())
-  const kpi = (v, k, cls) => (
-    <div className={`land-kpi${cls ? ' ' + cls : ''}`}><div className="v">{v}</div><div className="k">{k}</div></div>
+/* Public demo only: the first screen leads with the problem, then the AI fix.
+   The clip is a real 30 s run on this demo (gemini-2.5-flash read the photo),
+   muted and looping; every claim here can be opened live from this page. */
+const SNAP_DEMO = 'MTD-CEN-HSC-01'
+function AiHero() {
+  const pitch = `${import.meta.env.BASE_URL}pitch/`
+  const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
+  return (
+    <section className="ai-hero" aria-label="Snap & Report with Gemini">
+      <div className="ai-hero-copy">
+        <div className="ai-hero-kick">The problem</div>
+        <h2 className="ai-hero-hook">A failure nobody logs comes back as downtime.</h2>
+        <p className="ai-hero-why">A breaker trips, it is reset, nothing is written down, and the same fault returns.
+          AMPS makes the record the quickest thing to do.</p>
+        <div className="ai-hero-kick fix">The AI fix · Snap &amp; Report</div>
+        <ol className="ai-steps">
+          <li><b>Scan</b> the QR tag on the asset</li>
+          <li><b>Snap</b> a photo, add a rough note</li>
+          <li><b>Gemini drafts</b> the failure report and job card; a person checks and submits</li>
+        </ol>
+        <div className="ai-hero-cta">
+          <a className="btn" href={`#/snap/${SNAP_DEMO}`}>Open Snap &amp; Report →</a>
+          <a className="ai-hero-link" href="#/guide">Pitch deck</a>
+        </div>
+        <ul className="ai-more">
+          <li><button type="button" onClick={() => ask('Which assets are overdue for maintenance?')}><b>✦ Ask AMPS</b></button>
+            plain-language questions; Gemini picks from 6 tools over the live records (English, हिन्दी, বাংলা)</li>
+          <li><b>AI maintenance plans</b> Gemini drafts the PM plan, a supervisor approves it before anything is saved</li>
+        </ul>
+      </div>
+      <figure className="ai-hero-clip">
+        <video src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
+               autoPlay muted loop playsInline preload="metadata" controls
+               aria-label="30 second run: scan, photo, Gemini draft, job card, planner" />
+        <figcaption>A real run on this demo · gemini-2.5-flash · 30 s · synthetic data. Submitting needs a sign-in.</figcaption>
+      </figure>
+    </section>
   )
+}
+
+/* Public demo landing: a full-screen hero over the real 30 s Snap run, then
+   the three steps. The operator build keeps its own branded landing. */
+const LxIcon = ({ d }) => (
+  <svg className="lx-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor"
+       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>)
+const CAPS = [
+  ['#/assets', 'Asset register', 'Every panel, pump and breaker with its QR tag, codal life and history.', 'M4 6h16M4 12h16M4 18h10'],
+  ['#/planner', 'PM planner', 'Schedules by cycle, what is due this week and what is already overdue.', 'M4 5h16v15H4zM4 9h16M9 3v4M15 3v4'],
+  ['#/failures', 'Failure log', 'Every breakdown with cause, downtime and MTTR, per site and per asset.', 'M12 4l9 16H3zM12 10v4M12 17v.5'],
+  ['#/job-cards', 'Job cards', 'Raised from a failure or a PM, closed with the work done and parts used.', 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h3'],
+  ['#/log', 'Shift log book', 'The daily register of work done, readings and handovers, searchable.', 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM9 9h6M9 13h6'],
+  ['#/printables', 'QR tags & printables', 'Print tag sheets and checklists straight from the register.', 'M7 8V3h10v5M5 8h14v8h-2v4H7v-4H5zM9 14h6'],
+]
+function GemStar({ size = 16 }) {
+  return (
+    <svg className="gem-star" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#4285F4" /><stop offset=".55" stopColor="#9B72CB" /><stop offset="1" stopColor="#D96570" /></linearGradient></defs>
+      <path fill="url(#gemg)" d="M12 1.5c.6 5.4 4.1 9.4 10.5 10.5-6.4 1.1-9.9 5.1-10.5 10.5C11.4 17.1 7.9 13.1 1.5 12 7.9 10.9 11.4 6.9 12 1.5z" />
+    </svg>
+  )
+}
+
+// what Gemini actually does in this build (backend: api/snap.py, api/ai.py, api/autoplan.py)
+const GEM_CAPS = [
+  ['Vision', 'Reads the fault photo itself: burn marks, a tripped relay, a leaking seal.'],
+  ['Structured output', 'Answers to a fixed schema, so the report and job card fields fill in directly.'],
+  ['Function calling', 'Chooses from 6 read-only tools over the live register, PM schedule and failure log.'],
+  ['Multilingual', 'Notes and questions in English, हिन्दी or বাংলা; answers in the same language.'],
+]
+
+function Landing() {
+  if (OPERATOR) return <OperatorLanding />
+  const lines = useLines()
+  const pitch = `${import.meta.env.BASE_URL}pitch/`
+  const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
+  const { net, loading } = useNetworkGlance()
+  const nf = (v) => (v == null || loading ? '—' : v.toLocaleString())
+  const stats = [
+    [lines ? lines.length : '—', W.lines, ''],
+    [nf(net.assets), 'assets on record', ''],
+    [nf(net.open), 'open failures', net.open ? 'bad' : ''],
+    [nf(net.overdue), 'PM overdue', net.overdue ? 'bad' : ''],
+    [nf(net.dueSoon), 'due in 7 days', net.dueSoon ? 'warn' : ''],
+  ]
+  return (
+    <div className="lx">
+      <header className="lx-bar">
+        <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
+        <nav className="lx-nav">
+          <a href="#/guide">Pitch</a>
+          <a href={dashHref()}>Dashboard</a>
+          <a className="lx-signin" href="#/login">Sign in</a>
+        </nav>
+      </header>
+      <section className="lx-hero" aria-label="AMPS">
+        <div className="lx-main">
+        <div className="lx-copy">
+          <div className="lx-tags">
+            <span className="lx-live"><i />Live demo · synthetic data</span>
+            <span className="lx-gem"><GemStar size={14} />Built on Google Gemini</span>
+          </div>
+          <h1>A failure nobody logs comes back as downtime.</h1>
+          <p>Scan the tag, snap the fault, and Google Gemini drafts the report and job card. A person checks and submits.
+            Every {W.line}'s maintenance on one record.</p>
+          <div className="lx-cta">
+            <a className="lx-btn pri" href={dashHref()}>Open the dashboard →</a>
+            <a className="lx-btn" href={`#/snap/${SNAP_DEMO}`}>Try Snap &amp; Report</a>
+          </div>
+        </div>
+        <figure className="lx-stage">
+          <div className="lx-win">
+            <video className="lx-vid" src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
+                   autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
+          </div>
+          <figcaption className="lx-cap">A real run on this demo · gemini-2.5-flash · 30 s</figcaption>
+        </figure>
+        </div>
+        <div className="lx-rib"><Ribbon lines={lines} /></div>
+      </section>
+      <section className="lx-stats" aria-label="Live numbers">
+        <div className="lx-wrap">
+          <span className="lx-kick">Live from this demo</span>
+          <dl>
+            {stats.map(([v, l, c]) => <div key={l} className={c}><dt>{l}</dt><dd>{v}</dd></div>)}
+          </dl>
+        </div>
+      </section>
+      <section className="lx-sec lx-light" aria-labelledby="lx-how">
+        <div className="lx-wrap">
+          <header className="lx-head">
+            <span className="lx-kick">How it works</span>
+            <h2 id="lx-how">From the fault on the floor to a job card, in under a minute</h2>
+            <p>No app to install. The fitter's phone camera is the whole kit.</p>
+          </header>
+          <ol className="lx-steps">
+            <li><LxIcon d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2M18 14v2M14 18h2v2M20 18v2" />
+              <b>Scan</b><span>The QR tag on the asset opens its full record: plan, history, open failures. No sign-in.</span></li>
+            <li><LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+              <b>Snap</b><span>A photo and a rough note, typed or spoken, in English, हिन्दी or বাংলা.</span></li>
+            <li><LxIcon d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
+              <b>Gemini drafts</b><span>The failure report and job card come back filled in. A person checks and submits.</span></li>
+          </ol>
+          <a className="lx-link" href={`#/snap/${SNAP_DEMO}`}>Try it on HSCB Panel 1 →</a>
+        </div>
+      </section>
+      <section className="lx-sec lx-dark" aria-labelledby="lx-ai">
+        <div className="lx-wrap">
+          <header className="lx-head">
+            <span className="lx-kick lx-kick-gem"><GemStar size={14} />Built on Google AI</span>
+            <h2 id="lx-ai">Google Gemini does the paperwork. People make the calls.</h2>
+            <p>Every answer is looked up in the register, PM schedule and failure log. Nothing is saved until someone approves it.</p>
+          </header>
+          <div className="lx-cards">
+            <a className="lx-card" href={`#/snap/${SNAP_DEMO}`}>
+              <LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+              <b>Snap &amp; Report</b><span>Photo plus note in, a drafted failure report and job card out, marked AI-drafted.</span><em>Open Snap →</em></a>
+            <button type="button" className="lx-card" onClick={() => ask('Which assets are overdue for maintenance?')}>
+              <LxIcon d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5" />
+              <b>Ask AMPS</b><span>Plain-language questions over the live records, with the sources it looked up shown.</span><em>Ask a question →</em></button>
+            <a className="lx-card" href="#/guide">
+              <LxIcon d="M5 3h10l4 4v14H5zM9 11h6M9 15h6M9 7h3" />
+              <b>AI maintenance plans</b><span>Gemini drafts the PM plan for a {W.line}; a supervisor approves each change.</span><em>See how →</em></a>
+          </div>
+          <ol className="lx-flow" aria-label="How a Snap travels">
+            <li><small>Phone</small><b>Photo + rough note</b></li>
+            <li className="gem"><small><GemStar size={12} /> Google AI</small><b>gemini-2.5-flash</b></li>
+            <li><small>Schema JSON</small><b>Report + job card</b></li>
+            <li><small>Person</small><b>Checks and submits</b></li>
+          </ol>
+          <dl className="lx-gcaps">
+            {GEM_CAPS.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}
+          </dl>
+        </div>
+      </section>
+      <section className="lx-sec lx-light" aria-labelledby="lx-cap">
+        <div className="lx-wrap">
+          <header className="lx-head">
+            <span className="lx-kick">One record per asset</span>
+            <h2 id="lx-cap">Everything maintenance needs, in one place</h2>
+          </header>
+          <div className="lx-grid">
+            {CAPS.map(([href, t, d, ic]) => (
+              <a key={href} href={href}><LxIcon d={ic} /><b>{t}</b><span>{d}</span></a>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="lx-band" aria-label="Get started">
+        <div className="lx-wrap">
+          <div><h2>See every {W.line} at a glance</h2><p>Open the live demo. Synthetic data, nothing to set up.</p></div>
+          <div className="lx-cta">
+            <a className="lx-btn pri" href={dashHref()}>Open the dashboard →</a>
+            <a className="lx-btn" href="#/guide">Read the pitch</a>
+          </div>
+        </div>
+      </section>
+      <footer className="lx-foot">
+        <div className="lx-wrap">
+          <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS</a>
+          <nav aria-label="Footer">
+            <a href={dashHref()}>Dashboard</a><a href="#/sites">{W.Network}</a><a href="#/guide">Pitch</a><a href="#/about">About</a><a href="#/login">Sign in</a>
+          </nav>
+          <small><AmpsLink /> · MIT © 2026 <SignatureMark /></small>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+function OperatorLanding() {
+  const lines = useLines()
   return (
     <div className="gate land">
       <div className="land-wrap">
@@ -4639,94 +4994,68 @@ function Landing() {
             <h1 className="gate-title">{ORG}</h1>
             <p className="gate-sub">Asset Maintenance &amp; Preventive Scheduling — every {W.line} at a glance</p>
           </div>
-          <a className="btn gate-signin-btn" href="#/login">Sign in</a>
+          <span className="land-acts">
+            <a className="btn ghost land-dash-btn" href={dashHref()}>{W.Lines} dashboard →</a>
+            <a className="btn gate-signin-btn" href="#/login">Sign in</a>
+          </span>
         </header>
         <Ribbon lines={lines} />
-
-        <div className="land-body">
-          <div className="land-tiles">
-            {lines === null ? <p className="gate-dim">Loading…</p> : lines.length === 0 ? (
-              <p className="gate-dim">No lines registered yet — the administrator adds them with the first assets.</p>
-            ) : lines.map((l) => {
-              const p = perLine[l.name] || {}
-              const open = openByLine[l.name] || 0
-              const ready = failReady && !loading
-              // mini compliance bar segments (only non-zero) — same colours as
-              // the LineDashboard hood: on-schedule / due-soon / overdue / awaiting
-              const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['grace', p.grace || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
-                .filter(([, n]) => n > 0)
-              const segTot = segs.reduce((s, [, n]) => s + n, 0) || 1
-              // a line can be onboarded (assets present) yet carry no PM schedule
-              // yet — no plans, no logs. That's "schedule pending", NOT all-clear.
-              const scheduled = (p.ok || 0) + (p.dueSoon || 0) + (p.grace || 0) + (p.overdue || 0) + (p.never || 0)
-              const pending = ready && (p.assets || l.assets) > 0 && scheduled === 0
-              const clear = ready && scheduled > 0 && !open && !p.overdue && !p.exceeded
-              return (
-                <a key={l.name} className={`land-tile${l.initiator ? ' initiator' : ''}`}
-                   href={`#/line/${encodeURIComponent(l.name)}`}
-                   style={{ '--line-c': lineColor(l.name) }}>
-                  {l.initiator && <Alpona />}
-                  <div className="lt-head">
-                    <span className="gate-line-dot" />
-                    <span className="land-tile-name">{l.name}
-                      {l.initiator && <span className="gate-initiator-chip">সূচনা · initiator</span>}
-                    </span>
-                    {p.compliance != null && (
-                      <span className={`lt-compl ${p.compliance >= 90 ? 'good' : p.compliance >= 70 ? 'warn' : 'bad'}`}>
-                        {p.compliance}%<small>compliance</small>
-                      </span>
-                    )}
-                  </div>
-                  <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations
-                    {(() => {
-                      // freshness: days since the line's latest logbook entry (amber > 7 d, red > 30 d)
-                      if (!l.last_entry) return <span className="lt-fresh bad">no entries yet</span>
-                      const d = Math.max(0, Math.round((Date.now() - new Date(l.last_entry + 'T00:00:00').getTime()) / 86400000))
-                      return <span className={`lt-fresh ${d > 30 ? 'bad' : d > 7 ? 'warn' : 'ok'}`} title={`last logbook entry ${l.last_entry}`}>
-                        last entry {d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} d ago`}</span>
-                    })()}
-                  </span>
-                  {ready && segTot > 1 && (
-                    <span className="lt-bar" aria-hidden="true">
-                      {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'grace' ? 'grace' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
-                    </span>
-                  )}
-                  {pending && (
-                    <span className="lt-bar pending" aria-hidden="true"><span className="lt-seg seg-pending" style={{ flexGrow: 1 }} /></span>
-                  )}
-                  <div className="lt-foot">
-                    <span className="lt-stats">
-                      {ready ? (pending ? <span className="lt-stat dim">schedule pending</span> : <>
-                        <span className="lt-stat od"><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
-                        <span className="lt-stat"><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
-                        {p.grace ? <span className="lt-stat"><b>{p.grace.toLocaleString()}</b> records awaited</span> : null}
-                        {open ? <span className="lt-stat al"><b>{open}</b> open</span> : null}
-                        {clear && <span className="land-hchip ok">All clear</span>}
-                      </>) : <span className="lt-stat dim">loading…</span>}
-                    </span>
-                    <span className="land-tile-go">View →</span>
-                  </div>
-                </a>
-              )
-            })}
-          </div>
-
-          {/* right rail: the network-wide figures, tucked over the train art so
-              the right side reads as a balanced "at a glance" panel */}
-          <aside className="land-glance">
-            <div className="land-glance-h">{W.Network} at a glance</div>
-            <div className="land-kpis">
-              {kpi(lines ? lines.length : '—', W.Lines)}
-              {kpi(loading ? '—' : nf(net.assets), 'Assets')}
-              {kpi(nf(locations), 'Locations')}
-              {kpi(net.open == null ? '—' : nf(net.open), 'Open failures', net.open ? 'alert' : '')}
-              {kpi(loading ? '—' : nf(net.overdue), 'PM overdue', net.overdue ? 'warn' : '')}
-              {kpi(loading ? '—' : nf(net.exceeded), 'Exceeded life', net.exceeded ? 'warn' : '')}
-            </div>
-          </aside>
-        </div>
         <div className="gate-foot"><AmpsLink /> · MIT © 2026 <SignatureMark /></div>
       </div>
+    </div>
+  )
+}
+
+/* Every site as a tile (compliance, freshness, PM bar, counts) — the estate
+   overview the site bar's back chevron opens. Click a tile = that site's dashboard. */
+function SiteTiles({ lines, g }) {
+  const { perLine, openByLine, loading, failReady } = g
+  if (lines === null) return <p className="gate-dim">Loading…</p>
+  if (!lines.length) return <p className="gate-dim">No {W.lines} registered yet — the administrator adds them with the first assets.</p>
+  const ready = failReady && !loading
+  return (
+    <div className="est-tiles">
+      {lines.map((l) => {
+        const p = perLine[l.name] || {}
+        const open = openByLine[l.name] || 0
+        const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['grace', p.grace || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
+          .filter(([, n]) => n > 0)
+        const scheduled = segs.reduce((a, [, n]) => a + n, 0)
+        const pending = ready && (p.assets || l.assets) > 0 && scheduled === 0
+        const days = l.last_entry ? Math.max(0, Math.round((Date.now() - new Date(l.last_entry + 'T00:00:00').getTime()) / 86400000)) : null
+        const fresh = days == null ? 'no entries yet' : days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} d ago`
+        const pc = p.compliance
+        return (
+          <a key={l.name} className="est-tile" href={`#/line/${encodeURIComponent(l.name)}`}
+             onClick={() => keepSite(l.name)} style={{ '--line-c': lineColor(l.name) }}>
+            <div className="et-top">
+              <span className="et-name">{l.name}</span>
+              {ready && pc != null && (
+                <span className={`et-pct ${pc >= 90 ? 'good' : pc >= 70 ? 'warn' : 'bad'}`} title="PM compliance">{pc}<small>%</small></span>
+              )}
+            </div>
+            <div className="et-sub">
+              {l.assets.toLocaleString()} assets · {l.stations} {W.stations}
+              <span className={`et-fresh ${days == null || days > 30 ? 'bad' : days > 7 ? 'warn' : ''}`}
+                    title={l.last_entry ? `last logbook entry ${l.last_entry}` : ''}>● {fresh}</span>
+              {l.initiator && <span className="et-chip">initiator</span>}
+            </div>
+            <span className={`lt-bar et-bar${pending || !ready ? ' pending' : ''}`} aria-hidden="true">
+              {ready && !pending
+                ? segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c}`} style={{ flexGrow: n }} />)
+                : <span className="lt-seg seg-pending" style={{ flexGrow: 1 }} />}
+            </span>
+            <div className="et-stats">
+              {!ready ? <span className="dim">loading…</span> : pending ? <span className="dim">schedule pending</span> : <>
+                <span className={p.overdue ? 'od' : ''}><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
+                <span><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
+                <span className={open ? 'od' : ''}><b>{open}</b> open</span>
+              </>}
+              <span className="et-go" aria-hidden="true">→</span>
+            </div>
+          </a>
+        )
+      })}
     </div>
   )
 }
@@ -4748,6 +5077,73 @@ function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/* Site switcher for viewers who see every site (no own line): a back chevron to
+   the whole estate plus a dropdown of the sites — lives in the totals row. */
+const SITE_KEY = 'amps.site'
+const lastSite = () => { try { return localStorage.getItem(SITE_KEY) || '' } catch { return '' } }
+const keepSite = (v) => { try { localStorage.setItem(SITE_KEY, v || '') } catch { /* private mode */ } }
+/* where "the dashboard" opens: the last site picked, else every site */
+const dashHref = () => (lastSite() ? `#/line/${encodeURIComponent(lastSite())}` : '#/dash')
+
+const NetIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <circle cx="8" cy="3.2" r="1.7" /><circle cx="3.2" cy="12.4" r="1.7" /><circle cx="12.8" cy="12.4" r="1.7" />
+    <path d="M7.2 4.7 4 10.9M8.8 4.7l3.2 6.2M4.9 12.4h6.2" /></svg>
+)
+
+/* Site switcher: the network icon opens the network view (every site's stats);
+   the dropdown picks one site, or "All sites" = the combined dashboard. */
+function SitePicker({ current = '', estate = false }) {
+  const lines = useLines()
+  const pick = (v) => { keepSite(v); location.hash = v ? `#/line/${encodeURIComponent(v)}` : '#/dash' }
+  return (
+    <span className="site-pick">
+      <a className={`sp-back sp-net${estate ? ' on' : ''}`} href="#/sites"
+         title={`${W.Network} view · every ${W.line}`} aria-label={`${W.Network} view`}><NetIcon /></a>
+      <span className="sp-sel" style={{ '--line-c': current ? lineColor(current) : 'var(--accent)' }}>
+        <span className="sp-dot" />
+        <select value={estate ? '__net' : current} onChange={(e) => pick(e.target.value)} aria-label={W.Line}>
+          {estate && <option value="__net" disabled hidden>{W.Network} view</option>}
+          <option value="">All {W.lines}{lines ? ` · ${lines.length}` : ''}</option>
+          {(lines || []).map((l) => <option key={l.name} value={l.name}>{l.name}</option>)}
+        </select>
+      </span>
+    </span>
+  )
+}
+
+/* #/sites — the network view: every site's stats, one slim tile each.
+   Click a tile = that site's dashboard. */
+function EstateView() {
+  const lines = useLines()
+  const g = useNetworkGlance()
+  const { net, loading } = g
+  const nf = (v) => (v == null || loading ? '—' : v.toLocaleString())
+  const kpis = [
+    [lines ? lines.length : '—', W.lines, ''],
+    [nf(net.assets), 'assets in service', ''],
+    [net.open == null ? '—' : net.open.toLocaleString(), 'open failures', net.open ? 'bad' : ''],
+    [nf(net.overdue), 'PM overdue', net.overdue ? 'bad' : ''],
+    [nf(net.dueSoon), 'due soon', net.dueSoon ? 'warn' : ''],
+    [nf(net.exceeded), 'past codal life', net.exceeded ? 'warn' : ''],
+  ]
+  return (
+    <main className="estate">
+      <header className="est-head">
+        <div className="est-title">
+          <span className="est-kick"><NetIcon /> {W.Network} view</span>
+          <h1>Every {W.line}, at a glance</h1>
+        </div>
+        <SitePicker estate />
+      </header>
+      <div className="est-kpis">
+        {kpis.map(([v, l, c]) => <div key={l} className={`est-kpi ${c}`}><b>{v}</b><span>{l}</span></div>)}
+      </div>
+      <SiteTiles lines={lines} g={g} />
+    </main>
   )
 }
 
@@ -4773,11 +5169,6 @@ function LineNav({ line, active, showAllLines }) {
   const enc = encodeURIComponent(line)
   return (
     <span className="line-nav">
-      {showAllLines && (
-        <a className="ln-btn ln-back" href="#/" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
-        </a>
-      )}
       <a href={`#/line/${enc}`} className={`ln-btn${active === 'dash' ? ' active' : ''}`}>Dashboard</a>
       <a href={`#/line/${enc}/assets`} className={`ln-btn${active === 'assets' ? ' active' : ''}`}>Assets</a>
       <a href={`#/line/${enc}/failures`} className={`ln-btn${active === 'failures' ? ' active' : ''}`}>Failures</a>
@@ -4799,6 +5190,12 @@ function FailuresRedirect({ me }) {
     if (to) location.replace(`#/line/${encodeURIComponent(to)}/failures`)
   }, [me, lines])
   return <p className="dim">Opening the failures board…</p>
+}
+
+/* signed-in home with a remembered site: reopen it */
+function Redirect({ to }) {
+  useEffect(() => { location.replace(to) }, [to])
+  return null
 }
 
 function ChangePasswordModal({ onClose }) {
@@ -4903,6 +5300,26 @@ export default function App() {
     sync()
     return () => { mo.disconnect(); ro?.disconnect(); if (raf) cancelAnimationFrame(raf) }
   }, [])
+  // A sticky peek is pushed up as its split runs out (near the footer), taking its
+  // frozen header off-screen. Shrink it to the room left instead, so the header
+  // stays docked and the peek body scrolls inside.
+  useEffect(() => {
+    let raf = 0
+    const fit = () => {
+      raf = 0
+      document.querySelectorAll('.reg-split.wide > .reg-peek').forEach((p) => {
+        const top = parseFloat(getComputedStyle(p).top) || 0
+        const room = p.parentElement.getBoundingClientRect().bottom - top
+        p.style.maxHeight = `${Math.max(120, Math.min(innerHeight - top - 12, room))}px`
+      })
+    }
+    const on = () => { if (!raf) raf = requestAnimationFrame(fit) }
+    addEventListener('scroll', on, { passive: true }); addEventListener('resize', on)
+    const mo = new MutationObserver(on)
+    mo.observe(document.body, { childList: true, subtree: true })
+    fit()
+    return () => { removeEventListener('scroll', on); removeEventListener('resize', on); mo.disconnect(); if (raf) cancelAnimationFrame(raf) }
+  }, [])
   const go = (r) => { location.hash = r }
   const authOn = LIVE && me?.auth_enabled
   const signedIn = authOn && me.username !== 'viewer'
@@ -4935,7 +5352,7 @@ export default function App() {
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && routePath !== '/sites' && routePath !== '/dash' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
@@ -4955,7 +5372,7 @@ export default function App() {
           <nav className="nav">
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href="#/" className={!navLine ? 'active' : ''}>{W.Lines}</a>}
+              : <a href={dashHref()} className={routePath === '/sites' || routePath === '/dash' || lineMatch ? 'active' : ''}>Dashboard</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
@@ -4963,6 +5380,8 @@ export default function App() {
           </nav>
         </header>
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
+          : routePath === '/sites' ? <EstateView />
+          : routePath === '/dash' ? <LineDashboard go={(r) => { location.hash = r }} />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
           : snapMatch ? <SnapReport code={safeDecode(snapMatch[1])} />
@@ -5040,16 +5459,13 @@ export default function App() {
         : routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
         : routePath === '/about' ? <AboutPage />
         : routePath === '/assets' ? (LIVE ? <LiveDashboard go={go} /> : <Dashboard go={go} />)
-        : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}
+        : routePath === '/sites' && LIVE ? <EstateView />
+        : routePath === '/dash' && LIVE ? <LineDashboard go={go} />
+        : (LIVE ? (lastSite() && !me?.line ? <Redirect to={dashHref()} /> : <LineDashboard go={go} />) : <Dashboard go={go} />)}
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
       {LIVE && !OPERATOR && <AskAmps />}
-      <footer className="foot">
-        {LIVE
-          ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>
-          : <>Demonstration environment · synthetic data only · <AmpsLink />, MIT © 2026 </>}
-        <FootSig />
-      </footer>
+      <ShellFoot />
     </div>
     </>
   )
