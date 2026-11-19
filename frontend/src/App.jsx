@@ -3965,13 +3965,15 @@ function LineDashboard({ go, initialLine = null }) {
           <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
             <span className="h-pk">PM compliance</span>
-            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule{bucket.grace > 0 && <> · <b>{bucket.grace.toLocaleString()}</b> awaited</>} · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
           </div>
         </div>
         {meter(segs, 'PM compliance breakdown')}
       </section>
       </div>
 
+      {/* A/B/C criticality rows + failures/month side by side; the two overdue cards below */}
+      <div className="dash-abc">
       {critRows.length > 0 && (
         <section className="card crit-card" aria-label="PM status by criticality">
           {critRows.map((r) => (
@@ -3991,7 +3993,15 @@ function LineDashboard({ go, initialLine = null }) {
         </section>
       )}
 
-      <div className="dash-grid3">
+      {/* failures per month — slim bars */}
+      <section className="card viz-card dash-trend">
+        <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
+          <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
+        {trend.length ? <SlimTrend data={trend} /> : <p className="dim">No failure data.</p>}
+      </section>
+      </div>
+
+      <div className="dash-grid3 dash-od2">
       {/* overdue breakup by cycle */}
       <section className="card viz-card">
         <div className="viz-head-row">
@@ -4058,12 +4068,6 @@ function LineDashboard({ go, initialLine = null }) {
         <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
-      {/* failures per month — slim bars */}
-      <section className="card viz-card dash-trend">
-        <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
-          <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
-        {trend.length ? <SlimTrend data={trend} /> : <p className="dim">No failure data.</p>}
-      </section>
       </div>
       </div>
 
