@@ -3468,37 +3468,39 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 
 /* ---- public landing: split hero, copy left, whole video framed right ---- */
 .lx { position: relative; z-index: 0; background: var(--bg); }
-.lx-hero { position: relative; display: flex; flex-direction: column; overflow: hidden; color: #fff; isolation: isolate;
-  background: radial-gradient(900px 520px at 78% 45%, rgba(96,204,240,.16), transparent 70%), linear-gradient(160deg, #0B2A3F 0%, #06161F 100%); }
-.lx-main { flex: 1; display: grid; grid-template-columns: minmax(300px, 5fr) 8fr; align-items: center; gap: clamp(24px, 4vw, 72px);
+.lx-hero { position: relative; min-height: 100svh; display: flex; flex-direction: column; overflow: hidden; color: #0B2A3F; isolation: isolate;
+  background: radial-gradient(900px 560px at 76% 48%, #FFFFFF 0%, transparent 70%), #F6FAFD; }
+.lx-main { flex: 1; display: grid; grid-template-columns: minmax(300px, 4fr) 9fr; align-items: center; gap: clamp(24px, 4vw, 72px);
   padding: clamp(12px, 3vh, 40px) clamp(16px, 4vw, 64px) clamp(20px, 4vh, 48px); }
 .lx-stage { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; }
-.lx-win { border-radius: 14px; overflow: hidden; background: #fff; aspect-ratio: 16 / 9; width: min(100%, calc(70vh * 16 / 9));
-  box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 30px 80px -20px rgba(0,0,0,.6), 0 0 120px -30px rgba(96,204,240,.35); }
+.lx-win { border-radius: 14px; overflow: hidden; background: #F6FAFD; aspect-ratio: 16 / 9; width: min(100%, calc(76svh * 16 / 9));
+  box-shadow: 0 0 0 1px rgba(11,42,63,.06), 0 24px 60px -28px rgba(11,42,63,.28); }
 .lx-vid { display: block; width: 100%; height: 100%; object-fit: contain; }
-.lx-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px clamp(16px, 4vw, 64px); }
+.lx-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px clamp(16px, 4vw, 64px);
+  background: #0B2A3F; box-shadow: 0 1px 0 rgba(255,255,255,.06), 0 8px 24px -16px rgba(11,42,63,.6); }
 .lx-brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-weight: 800; font-size: 18px; letter-spacing: .04em; }
 .lx-brand img { width: 28px; height: 28px; }
 .lx-brand span { font-weight: 500; font-size: 13px; letter-spacing: .02em; color: rgba(255,255,255,.65); padding-left: 10px; border-left: 1px solid rgba(255,255,255,.3); }
 .lx-nav { display: flex; align-items: center; gap: 4px; }
 .lx-nav a { color: rgba(255,255,255,.82); text-decoration: none; font-size: 14px; font-weight: 550; padding: 7px 14px; border-radius: 99px; transition: background .15s, color .15s; }
 .lx-nav a:hover { color: #fff; background: rgba(255,255,255,.1); }
-.lx-nav .lx-signin { border: 1px solid rgba(255,255,255,.4); color: #fff; }
+.lx-nav .lx-signin { background: #60CCF0; color: #0B2A3F; font-weight: 650; margin-left: 6px; }
+.lx-nav .lx-signin:hover { background: #8BDCF5; color: #0B2A3F; }
 .lx-copy { display: flex; flex-direction: column; justify-content: center; gap: 18px; max-width: 540px; }
 .lx-live { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 12px; font-weight: 600; letter-spacing: .08em;
-  text-transform: uppercase; color: rgba(255,255,255,.85); padding: 5px 12px; border-radius: 99px; background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); }
-.lx-live i { width: 7px; height: 7px; border-radius: 50%; background: #3BD67F; box-shadow: 0 0 0 0 rgba(59,214,127,.6); animation: lxPulse 2s infinite; }
+  text-transform: uppercase; color: #245B7A; padding: 5px 12px; border-radius: 99px; background: #fff;
+  border: 1px solid #D6E4EE; }
+.lx-live i { width: 7px; height: 7px; border-radius: 50%; background: #1F9D55; box-shadow: 0 0 0 0 rgba(59,214,127,.6); animation: lxPulse 2s infinite; }
 @keyframes lxPulse { 70% { box-shadow: 0 0 0 7px rgba(59,214,127,0) } 100% { box-shadow: 0 0 0 0 rgba(59,214,127,0) } }
 .lx-copy h1 { margin: 0; font-size: clamp(30px, 3.3vw, 52px); line-height: 1.04; font-weight: 700; letter-spacing: -.03em; text-wrap: balance; }
-.lx-copy p { margin: 0; font-size: clamp(14px, 1.1vw, 17px); line-height: 1.55; color: rgba(255,255,255,.78); max-width: 52ch; }
+.lx-copy p { margin: 0; font-size: clamp(14px, 1.1vw, 17px); line-height: 1.55; color: #46627A; max-width: 52ch; }
 .lx-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
 .lx-btn { display: inline-flex; align-items: center; padding: 13px 22px; border-radius: 10px; font-size: 15px; font-weight: 650; text-decoration: none;
-  color: #fff; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.06); backdrop-filter: blur(6px); transition: background .15s, transform .15s; }
-.lx-btn:hover { background: rgba(255,255,255,.16); color: #fff; transform: translateY(-1px); }
-.lx-btn.pri { background: #60CCF0; border-color: #60CCF0; color: #0B2A3F; }
-.lx-btn.pri:hover { background: #8BDcF5; color: #0B2A3F; }
-.lx-cap { font-size: 11px; letter-spacing: .04em; color: rgba(255,255,255,.6); text-align: right; }
+  color: #0B2A3F; border: 1px solid #B9CEDC; background: #fff; transition: background .15s, border-color .15s, transform .15s; }
+.lx-btn:hover { border-color: #0B2A3F; color: #0B2A3F; transform: translateY(-1px); }
+.lx-btn.pri { background: #0B2A3F; border-color: #0B2A3F; color: #fff; }
+.lx-btn.pri:hover { background: #15405E; color: #fff; }
+.lx-cap { align-self: flex-start; font-size: 11px; letter-spacing: .04em; color: #6B8496; }
 .lx-rib { padding: 0 clamp(16px, 4vw, 64px) 18px; }
 .lx-rib .metro-ribbon { opacity: .9; }
 .lx-steps { display: grid; grid-template-columns: 3fr 2fr; gap: clamp(20px, 3vw, 48px); padding: clamp(32px, 5vw, 72px) clamp(16px, 4vw, 64px);
@@ -3517,6 +3519,7 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 @media (max-width: 860px) { .lx-steps { grid-template-columns: 1fr; } }
 /* narrow screens: framed video on top, copy below it */
 @media (max-width: 900px) {
+  .lx-hero { min-height: auto; }
   .lx-main { grid-template-columns: 1fr; gap: 24px; }
   .lx-stage { order: -1; align-items: stretch; } .lx-win { width: 100%; border-radius: 10px; }
   .lx-copy { max-width: none; } .lx-cap { text-align: left; }
