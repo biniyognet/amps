@@ -5208,6 +5208,8 @@ function Redirect({ to }) {
 
 /* signed-in user: one round badge in the topbar; name, password and sign-out
    live in its menu so the nav keeps its room */
+/* public demo shares one admin login: password changes are locked (gateway 403 too) */
+const PW_LOCKED = import.meta.env.VITE_AMPS_PW_LOCK === '1'
 function AccountMenu({ me, onPassword }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -5229,8 +5231,8 @@ function AccountMenu({ me, onPassword }) {
             <span className="sc-sub">{me.line || 'All lines'}{me.role ? ` · ${String(me.role).replace(/_/g, ' ')}` : ''}</span>
           </div>
           <div className="sc-divider" />
-          <button type="button" className="sc-item" role="menuitem" onClick={() => { setOpen(false); onPassword() }}>
-            <span className="sc-name">Change password</span></button>
+          {!PW_LOCKED && <button type="button" className="sc-item" role="menuitem" onClick={() => { setOpen(false); onPassword() }}>
+            <span className="sc-name">Change password</span></button>}
           <button type="button" className="sc-item" role="menuitem" onClick={apiLogout}>
             <span className="sc-name">Sign out</span></button>
         </div>
