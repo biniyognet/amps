@@ -1262,10 +1262,10 @@ function MaintenanceSchedule({ schedule }) {
         <ul className="sched-list">
           {rows.map((r) => (
             <li key={r.frequency} className={`sl-row sl-${r.state}`} title={SCHED_TIP[r.state]}>
-              <span className={`pmc ${cycStateClass(r.state)}`}>{(CYC_ABBR.find(([f]) => f === r.frequency) || [])[1] || r.frequency[0]}</span>
+              <span className={`pmc ${cycStateClass(r.state)}`} title={r.frequency}>{(CYC_ABBR.find(([f]) => f === r.frequency) || [])[1] || r.frequency[0]}</span>
               <b className="sl-freq">{r.frequency}</b>
               <span className={`sl-last dt${r.last_done ? '' : ' sl-empty'}`}>{r.last_done ? <>done {schedDay(r.last_done)}{r.via && <i className="sched-via"> via {r.via}</i>}</> : '—'}</span>
-              <span className="sl-why">{schedWhy(r)}</span>
+              <span className="sl-why" title={`${r.frequency} · ${schedWhy(r)}`}>{schedWhy(r)}</span>
               <span className={schedChip(r.state)}><span className="dot" />{SCHED_LABEL[r.state]}</span>
             </li>
           ))}
@@ -1495,15 +1495,15 @@ function AssetPeek({ code }) {
             <QR value={assetUrl(a.code)} size={84} />
           </a>
         </div>
-        <div className="rp-badges">
+        <div className="rp-bar">
           <span className={`status-pill s-${a.status}`}><span className="dot" />{STATUS_LABEL[a.status]}</span>
-          <span className={`crit-badge c-${a.criticality}`} title="Criticality">Criticality {a.criticality}</span>
-          {codalExceeded(a) && <span className="codal-badge"><span className="dot" />Exceeded service life</span>}
-        </div>
-        <div className="rp-acts">
-          <a className="btn sm" href={href}>Open full record →</a>
-          <a className="btn ghost sm snap-cta" href={`#/snap/${encodeURIComponent(a.code)}`}
-             onClick={() => { if (!canWrite) rememberNext(`/snap/${encodeURIComponent(a.code)}`) }}>📷 Report a problem</a>
+          <span className={`crit-badge c-${a.criticality}`} title={`Criticality ${a.criticality}`}>Crit {a.criticality}</span>
+          {codalExceeded(a) && <span className="codal-badge" title="Exceeded service life"><span className="dot" />Past life</span>}
+          <span className="rp-acts">
+            <a className="btn sm" href={href} title="Open full record">Full record →</a>
+            <a className="btn ghost sm snap-cta" href={`#/snap/${encodeURIComponent(a.code)}`} title="Report a problem"
+               onClick={() => { if (!canWrite) rememberNext(`/snap/${encodeURIComponent(a.code)}`) }}>📷 Report</a>
+          </span>
         </div>
       </div>
       <dl className="rp-facts">
