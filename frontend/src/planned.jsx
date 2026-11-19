@@ -159,7 +159,7 @@ function ImportCsv({ onDone }) {
   )
 }
 
-function Calendar({ month, rows, onPick, canWrite }) {
+function Calendar({ month, rows, onPick, peekId }) {
   const [y, m] = month.split('-').map(Number)
   const first = new Date(y, m - 1, 1)
   const startPad = (first.getDay() + 6) % 7 // Monday-first
@@ -177,9 +177,9 @@ function Calendar({ month, rows, onPick, canWrite }) {
           <div key={d} className={`cal-cell${thisMonth && d === now.getDate() ? ' today' : ''}`}>
             <span className="cal-day dt">{d}</span>
             {(byDay[d] || []).map((r) => (
-              <button key={r.id} type="button" className={`cal-item pm-ci pm-${r.state}`}
+              <button key={r.id} type="button" className={`cal-item pm-ci pm-${r.state}${r.id === peekId ? ' sel' : ''}`}
                       title={`${r.asset_code} — ${r.asset_name || ''} · ${r.cycle} · ${STATE_LABEL[r.state]}${r.contractor ? ` · ${r.contractor}` : ''}`}
-                      onClick={() => (OPEN(r) && canWrite ? onPick(r) : (location.hash = `#/asset/${encPath(r.asset_code)}`))}>
+                      onClick={() => onPick(r)}>
                 <i className="cal-freq">{CYCLE_BADGE[r.cycle] || r.cycle}</i> <b>{r.asset_code}</b>
               </button>
             ))}
@@ -191,31 +191,110 @@ function Calendar({ month, rows, onPick, canWrite }) {
 }
 
 /* Per contractor over the rows on screen: planned, done on time, done late
-   (with the average slip) and still overdue. Skipped rows are left out. */
-function SlipSummary({ rows }) {
+   (with the average slip), still overdue and still open. Skipped rows are left
+   out. Click one to filter the page to that contractor; click again to clear. */
+function tallyContractors(rows) {
   const by = new Map()
   for (const r of rows) {
     if (r.state === 'skipped') continue
     const k = r.contractor || 'No contractor'
-    const c = by.get(k) || { k, planned: 0, onTime: 0, late: 0, lateDays: 0, overdue: 0 }
+    const c = by.get(k) || { k, key: r.contractor || '', planned: 0, onTime: 0, late: 0, lateDays: 0, overdue: 0, open: 0 }
     c.planned++
     const s = slipOf(r)
     if (s !== null) { if (s > 0) { c.late++; c.lateDays += s } else c.onTime++ }
     else if (r.state === 'overdue') c.overdue++
+    else c.open++
     by.set(k, c)
   }
-  if (!by.size) return null
-  return (
+  return [...by.values()].sort((a, b) => b.overdue - a.overdue || b.planned - a.planned)
+}
+
+function Contractors({ rows, pick, setPick, board }) {
+  const list = tallyContractors(rows)
+  if (!list.length) return board ? <p className="dim lb-pick">Nothing planned in this period.</p> : null
+  const toggle = (c) => c.key && setPick(pick === c.key ? '' : c.key)
+  if (!board) return (
     <div className="pm-sum">
-      {[...by.values()].sort((a, b) => b.planned - a.planned).map((c) => (
-        <div key={c.k} className="pm-sum-c tl-sum">
+      {list.map((c) => (
+        <button key={c.k} type="button" className={`pm-sum-c${pick && pick === c.key ? ' on' : ''}`} onClick={() => toggle(c)}>
           <b>{c.k}</b>
-          <span><b className="dt">{c.planned}</b> planned</span>
-          <span className="tl-t-ok">{c.onTime} on time</span>
-          {c.late > 0 && <span className="tl-t-warn">{c.late} late · avg +{(c.lateDays / c.late).toFixed(1)} d</span>}
+          <span><b className="dt">{c.onTime + c.late}</b>/{c.planned} done</span>
           {c.overdue > 0 && <span className="pc-red">{c.overdue} overdue</span>}
-        </div>
+        </button>
       ))}
+    </div>
+  )
+  return (
+    <div className="pm-cb">
+      {list.map((c) => {
+        const w = (n) => `${(n / c.planned) * 100}%`
+        const done = c.onTime + c.late
+        return (
+          <button key={c.k} type="button" className={`pm-cb-r${pick && pick === c.key ? ' on' : ''}`} onClick={() => toggle(c)}
+                  aria-pressed={!!pick && pick === c.key} title={c.key ? (pick === c.key ? 'Show all contractors' : `Show only ${c.k}`) : ''}>
+            <span className="pm-cb-t"><b>{c.k}</b><span className="dt">{done}/{c.planned}</span></span>
+            <span className="pm-cb-bar" aria-hidden="true">
+              <i className="ok" style={{ width: w(c.onTime) }} /><i className="warn" style={{ width: w(c.late) }} />
+              <i className="bad" style={{ width: w(c.overdue) }} />
+            </span>
+            <span className="pm-cb-n">
+              <span className="tl-t-ok">{c.onTime} on time</span>
+              {c.late > 0 && <span className="tl-t-warn">{c.late} late · avg +{(c.lateDays / c.late).toFixed(1)} d</span>}
+              {c.overdue > 0 && <span className="pc-red">{c.overdue} overdue</span>}
+              {c.open > 0 && <span className="dim">{c.open} open</span>}
+            </span>
+          </button>
+        )
+      })}
+      <p className="pm-cb-key dim"><i className="ok" /> on time <i className="warn" /> late <i className="bad" /> overdue · rest open.
+        Pick a job on the left for its detail.</p>
+    </div>
+  )
+}
+
+/* The picked job: what was promised, by whom, what happened — and the three
+   things a supervisor does with it (mark done, move it, skip it). */
+function PlanPeek({ r, canWrite, onDone, onSkip, onMove }) {
+  const s = slipOf(r)
+  const href = `#/asset/${encPath(r.asset_code)}`
+  const today = todayIso()
+  return (
+    <div className={`rp pm-peek pm-p-${r.state}`}>
+      <div className="rp-head">
+        <div className="rp-id">
+          <span className="rp-code">{r.asset_code}</span>
+          <b className="rp-name">{r.asset_name || r.asset_code}</b>
+          <span className="rp-sub">{[r.station, r.location_detail].filter(Boolean).join(' · ') || '—'}</span>
+        </div>
+        <div className="rp-bar">
+          <StateChip s={r.state} />
+          <span className="pm-cyc"><i className="cal-freq">{CYCLE_BADGE[r.cycle] || r.cycle}</i> {r.cycle}</span>
+          <span className="rp-acts"><a className="btn ghost sm" href={href}>Asset →</a></span>
+        </div>
+      </div>
+      <dl className="rp-facts">
+        <div><dt>Planned</dt><dd>
+          {canWrite && OPEN(r)
+            ? <input type="date" className="pm-date pm-peek-date" value={r.planned_date} min={today} onChange={(e) => onMove(r, e.target.value)} title="Reschedule" />
+            : <span className="dt">{fmt(r.planned_date)}</span>}
+        </dd></div>
+        <div><dt>{r.done_on ? 'Done' : 'Originally'}</dt><dd className="dt">
+          {r.done_on ? <>{fmt(r.done_on)} <span className={`tl-t-${slipCls(s)}`}>{slipTxt(s)}</span></> : r.original_date ? fmt(r.original_date) : '—'}
+        </dd></div>
+        <div><dt>Contractor</dt><dd>{r.contractor || '—'}</dd></div>
+        <div><dt>System</dt><dd>{r.system || '—'}</dd></div>
+        {r.task && <div className="rp-wide"><dt>Task</dt><dd>{r.task}</dd></div>}
+        <div className="rp-wide"><dt>Source</dt><dd>{planApproval(r.source) ? <PlanApproval source={r.source} /> : (r.source || '—')}</dd></div>
+        {r.closed_by === 'reconcile' && <div className="rp-wide"><dt>Closed by</dt><dd>a log-book entry for this asset</dd></div>}
+      </dl>
+      <div className="pm-peek-acts">
+        {r.log_entry_id ? <a className="btn sm" href={`#/log?d=${r.done_on}`}>Open log entry ↗</a>
+          : canWrite && OPEN(r) && r.state !== 'upcoming' ? <button className="btn sm" type="button" onClick={() => onDone(r)}>Mark done…</button>
+          : r.state === 'upcoming' ? <span className="dim">Can be marked done from {fmt(r.planned_date)}.</span> : null}
+        {canWrite && (OPEN(r) || r.state === 'skipped') && (
+          <button className="btn ghost sm" type="button" onClick={() => onSkip(r)}>{r.state === 'skipped' ? 'Reopen' : 'Skip'}</button>)}
+        {canWrite && OPEN(r) && <span className="dim pm-peek-hint">Change the date to reschedule, or drag the pin on the timeline.</span>}
+      </div>
     </div>
   )
 }
@@ -225,7 +304,7 @@ function SlipSummary({ rows }) {
    the bar between them is the slip (green on time, amber ≤3 d, red later).
    An overdue row's bar runs on to today. Drag an open pin to reschedule (not
    into the past — late work is logged with its real date via Done). */
-function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
+function Timeline({ span, from, to, rows, canWrite, onPick, onMove, peekId }) {
   const n = diffDays(from, to) + 1
   const today = todayIso()
   const x = (d) => `${((Math.min(Math.max(diffDays(from, d), 0), n - 1) + 0.5) / n) * 100}%`
@@ -292,7 +371,8 @@ function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
         <div className="tl-head">
           <div className="tl-lbl dim">{assetCount} asset{assetCount === 1 ? '' : 's'}</div>
           <div className="tl-scale">
-            {ticks.map((t) => <span key={t.key} className={`tl-tick${t.sun ? ' sun' : ''}`} style={{ left: `${t.at}%`, width: `${t.w}%` }}>{t.label}</span>)}
+            {ticks.map((t) => <span key={t.key} className={`tl-tick${t.sun ? ' sun' : ''}${t.key === today ? ' now' : ''}`} style={{ left: `${t.at}%`, width: `${t.w}%` }}>{t.label}</span>)}
+            {today >= from && today <= to && <span className="tl-now-lbl" style={{ left: x(today) }}>Today</span>}
           </div>
         </div>
         <div className="tl-body">
@@ -304,7 +384,7 @@ function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
             <Fragment key={stn}>
               <div className="tl-grp"><b>{stn}</b> <span className="dim">· {list.length}</span></div>
               {list.map((a) => (
-                <div className="tl-row" key={a.id}>
+                <div className={`tl-row${a.rows.some((r) => r.id === peekId) ? ' sel' : ''}`} key={a.id}>
                   <div className="tl-lbl" title={a.name || ''}>
                     <a href={`#/asset/${encPath(a.code)}`} className="code">{a.code}</a>
                     {a.name && <small className="dim"> {a.name}</small>}
@@ -328,7 +408,7 @@ function Timeline({ span, from, to, rows, canWrite, onPick, onMove }) {
                           {r.original_date && r.original_date !== plan && <span className="tl-ghost" style={{ left: x(r.original_date) }} />}
                           {r.done_on && <span className={`tl-dot tl-${slipCls(s)}`} style={{ left: x(r.done_on) }} />}
                           <button type="button" title={tip} style={{ left: x(plan) }}
-                                  className={`tl-pin pm-${r.state}${canWrite && OPEN(r) ? ' movable' : ''}${dragging ? ' drag' : ''}`}
+                                  className={`tl-pin pm-${r.state}${canWrite && OPEN(r) ? ' movable' : ''}${dragging ? ' drag' : ''}${r.id === peekId ? ' sel' : ''}`}
                                   onPointerDown={(e) => down(e, r)} onPointerMove={(e) => move(e, r)}
                                   onPointerUp={() => up(r)} onPointerCancel={() => setDrag(null)}
                                   onClick={(e) => { if (e.detail === 0) onPick(r) }}>
@@ -444,7 +524,6 @@ export function PlannedView({ initialView = 'tl' }) {
   const [cursor, setCursor] = useState(todayIso)
   const [span, setSpan] = useState('month')
   const [rows, setRows] = useState(null)
-  const [sum, setSum] = useState(null)
   const [error, setError] = useState(null)
   const [tick, setTick] = useState(0)
   const [view, setView] = useState(VIEWS.some(([k]) => k === initialView) ? initialView : 'tl')
@@ -461,12 +540,20 @@ export function PlannedView({ initialView = 'tl' }) {
   const [modal, setModal] = useState(null)
   const [msg, setMsg] = useState('')
   const [auto, setAuto] = useState(false)
+  const [peekId, setPeekId] = useState(null)
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches)
   useEffect(() => {
-    setRows(null)
-    Promise.all([getJSON(`/api/planned?date_from=${from}&date_to=${to}`),
-                 per === 'month' ? getJSON(`/api/planned/summary?month=${month}`) : null])
-      .then(([r, s]) => { setRows(r); setSum(s); setError(null) })
-      .catch((e) => setError(String(e)))
+    const mq = window.matchMedia('(min-width: 1100px)')
+    const on = () => setWide(mq.matches)
+    mq.addEventListener?.('change', on)
+    return () => mq.removeEventListener?.('change', on)
+  }, [])
+  useEffect(() => {
+    let live = true
+    getJSON(`/api/planned?date_from=${from}&date_to=${to}`)
+      .then((r) => { if (live) { setRows(r); setError(null) } })
+      .catch((e) => live && setError(String(e)))
+    return () => { live = false }
   }, [from, to, tick])
   const tally = (k) => {
     const c = new Map()
@@ -479,12 +566,13 @@ export function PlannedView({ initialView = 'tl' }) {
     const d = D(from)
     setCursor(per === 'week' ? addDays(from, 7 * k)
       : per === 'year' ? `${d.getFullYear() + k}-01-01` : iso(new Date(d.getFullYear(), d.getMonth() + k, 1)))
-    setSel(new Set())
+    setSel(new Set()); setRows(null); setPeekId(null)
   }
   const ql = q.trim().toLowerCase()
-  const pre = (rows || []).filter((r) => (!system || r.system === system) && (!station || r.station === station)
-    && (!contractor || r.contractor === contractor) && (!cycle || r.cycle === cycle)
+  const preC = (rows || []).filter((r) => (!system || r.system === system) && (!station || r.station === station)
+    && (!cycle || r.cycle === cycle)
     && (!ql || [r.asset_code, r.asset_name, r.task, r.source, r.location_detail].some((v) => (v || '').toLowerCase().includes(ql))))
+  const pre = contractor ? preC.filter((r) => r.contractor === contractor) : preC   // the board keeps every contractor
   const n = { all: pre.length, overdue: 0, today: 0, upcoming: 0, done: 0, skipped: 0 }
   for (const r of pre) n[r.state]++
   const shown = pre.filter((r) => state === 'all' || r.state === state)
@@ -506,53 +594,67 @@ export function PlannedView({ initialView = 'tl' }) {
   const monthName = D(from).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
   const periodName = per === 'year' ? from.slice(0, 4)
     : per === 'week' ? `${fmt(from)} – ${fmt(to)} ${to.slice(0, 4)}` : monthName
-  const pick = (r) => (r.log_entry_id ? (location.hash = `#/log?d=${r.done_on}`)
+  const peek = peekId && shown.find((r) => r.id === peekId)
+  const pick = (r) => (wide ? setPeekId(peekId === r.id ? null : r.id) : r.log_entry_id ? (location.hash = `#/log?d=${r.done_on}`)
     : !(canWrite && OPEN(r)) ? (location.hash = `#/asset/${encPath(r.asset_code)}`)
     : r.state === 'upcoming' ? setMsg(`${r.asset_code} is planned for ${fmt(r.planned_date)} — it can be marked done from that day.`)
     : setModal([r]))
+  const goView = (k) => { if (k !== view) { setView(k); if ((k === 'tl' ? span : 'month') !== per) setRows(null) } }
+  const goSpan = (k) => { if (k !== span) { setSpan(k); setRows(null) } }
+  const body = rows === null ? <div className="card"><p className="dim" style={{ margin: 0 }}>Loading schedule…</p></div>
+    : view === 'cal' ? <Calendar month={month} rows={shown} onPick={pick} peekId={wide ? peekId : null} />
+    : view === 'tl' ? <Timeline span={per} from={from} to={to} rows={shown} canWrite={canWrite} onPick={pick} onMove={resched} peekId={wide ? peekId : null} />
+    : shown.length === 0 ? (
+      <div className="card"><p className="dim" style={{ margin: 0 }}>
+        {rows.length === 0 ? `Nothing planned for ${periodName}. Import a contractor schedule (CSV) to start.` : 'No planned maintenance in this view.'}
+      </p></div>
+    ) : (
+      <div className="card tbl-wrap">
+        <table className="jc-table pm-table">
+          <thead>
+            <tr>
+              {canWrite && <th className="pm-ck"><input type="checkbox" aria-label="Select all due"
+                checked={allTick.length > 0 && allTick.every((r) => sel.has(r.id))}
+                onChange={(e) => setSel(e.target.checked ? new Set(allTick.map((r) => r.id)) : new Set())} /></th>}
+              <th>Date</th><th>Asset</th><th>Station</th><th className="pm-c-sys">System</th><th>Cycle</th><th>Contractor</th><th className="pm-c-src">Source</th><th>State</th><th />
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((r) => (
+              <tr key={r.id} className={`pm-row pm-${r.state}${wide && r.id === peekId ? ' row-peek' : ''}`}
+                  onClick={(e) => { if (wide && !e.target.closest('input, button, a, select, label')) pick(r) }}>
+                {canWrite && <td className="pm-ck">{doneable(r) && <input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.asset_code}`} />}</td>}
+                <td className="dt">
+                  {canWrite && OPEN(r)
+                    ? <input type="date" className="pm-date" value={r.planned_date} onChange={(e) => resched(r, e.target.value)} title="Reschedule" />
+                    : fmt(r.planned_date)}
+                  {r.original_date && <small className="dim" title="Originally planned"> was {fmt(r.original_date)}</small>}
+                </td>
+                <td><a href={`#/asset/${encPath(r.asset_code)}`} className="code">{r.asset_code}</a>
+                  {r.asset_name && <small className="dim pm-sub">{r.asset_name}</small>}</td>
+                <td>{r.station || '—'}{r.location_detail && <small className="dim pm-sub">{r.location_detail}</small>}</td>
+                <td className="pm-c-sys">{r.system || '—'}</td>
+                <td><i className="cal-freq">{CYCLE_BADGE[r.cycle] || r.cycle}</i> {r.cycle}</td>
+                <td>{r.contractor || '—'}</td>
+                <td className="pm-src pm-c-src" title={r.source || ''}>{planApproval(r.source) ? <PlanApproval source={r.source} /> : (r.source || '—')}</td>
+                <td><StateChip s={r.state} />
+                  {r.done_on && <small className="dim pm-sub">{fmt(r.done_on)}{r.closed_by === 'reconcile' ? ' · from log' : ''}
+                    {' · '}<span className={`tl-t-${slipCls(slipOf(r))}`}>{slipTxt(slipOf(r))}</span></small>}</td>
+                <td className="pm-act">
+                  {r.log_entry_id ? <a className="mini-btn" href={`#/log?d=${r.done_on}`}>Log ↗</a>
+                    : canWrite && doneable(r) ? <button className="mini-btn ok" type="button" onClick={() => setModal([r])}>Done</button>
+                    : null}
+                  {canWrite && (OPEN(r) || r.state === 'skipped') && (
+                    <button className="mini-btn muted" type="button" onClick={() => skip(r)}>{r.state === 'skipped' ? 'Reopen' : 'Skip'}</button>)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
   return (
     <>
-      <div className="plan-bar">
-        <h1 style={{ margin: 0 }}>Planned maintenance</h1>
-        <div className="plan-nav">
-          {canWrite && !auto && <button className="btn sm" type="button" onClick={() => setAuto(true)}>Auto-plan week</button>}
-          <button className="pbtn" onClick={() => shift(-1)} aria-label={`Previous ${per}`}>←</button>
-          <span className="plan-month dt">{periodName}</span>
-          <button className="pbtn" onClick={() => shift(1)} aria-label={`Next ${per}`}>→</button>
-          {cursor !== todayIso() && <button className="btn ghost sm" type="button" onClick={() => setCursor(todayIso())}>Today</button>}
-          <span className="pm-views" role="group" aria-label="View">
-            {VIEWS.map(([k, l]) => (
-              <button key={k} type="button" className={`btn ghost sm${view === k ? ' on' : ''}`} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>
-            ))}
-          </span>
-          {view === 'tl' && (
-            <span className="pm-views" role="group" aria-label="Span">
-              {SPANS.map(([k, l]) => (
-                <button key={k} type="button" className={`btn ghost sm${span === k ? ' on' : ''}`} aria-pressed={span === k} onClick={() => setSpan(k)}>{l}</button>
-              ))}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {auto && <AutoPlan onClose={() => setAuto(false)}
-        onApproved={(text, wk) => { setAuto(false); setView('tl'); setSpan('week'); setCursor(wk); finish(text) }} />}
-
-      {view === 'tl' ? rows && <SlipSummary rows={pre} />
-        : sum && sum.contractors.length > 0 && (
-        <div className="pm-sum">
-          {sum.contractors.map((c) => (
-            <button key={c.contractor} type="button" className={`pm-sum-c${contractor === c.contractor ? ' on' : ''}`}
-                    onClick={() => setContractor(contractor === c.contractor ? '' : c.contractor)}>
-              <b>{c.contractor}</b>
-              <span><b className="dt">{c.done}</b>/{c.planned} done</span>
-              {c.overdue > 0 && <span className="pc-red">{c.overdue} overdue</span>}
-              {c.compliance !== null && <span className="pm-pct">{c.compliance}%</span>}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="asset-toolbar pm-toolbar">
         <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="Search asset, task, letter…" aria-label="Search planned maintenance" />
@@ -564,16 +666,35 @@ export function PlannedView({ initialView = 'tl' }) {
             </button>
           ))}
         </div>
+        <span className="pm-period" role="group" aria-label="Period">
+          <button className="pm-step" type="button" onClick={() => shift(-1)} aria-label={`Previous ${per}`}>‹</button>
+          <button className="pm-pname dt" type="button" onClick={() => { setCursor(todayIso()); setRows(null) }}
+                  title={cursor !== todayIso() ? 'Back to today' : periodName}>{periodName}</button>
+          <button className="pm-step" type="button" onClick={() => shift(1)} aria-label={`Next ${per}`}>›</button>
+        </span>
+        <span className="pm-seg" role="group" aria-label="View">
+          {VIEWS.map(([k, l]) => <button key={k} type="button" className={view === k ? 'on' : ''} aria-pressed={view === k} onClick={() => goView(k)}>{l}</button>)}
+        </span>
+        {view === 'tl' && (
+          <span className="pm-seg" role="group" aria-label="Span">
+            {SPANS.map(([k, l]) => <button key={k} type="button" className={span === k ? 'on' : ''} aria-pressed={span === k} onClick={() => goSpan(k)}>{l}</button>)}
+          </span>
+        )}
         <Pick label="System" value={system} set={setSystem} opts={opts.system} />
         <Pick label="Station" value={station} set={setStation} opts={opts.station} />
         <Pick label="Contractor" value={contractor} set={setContractor} opts={opts.contractor} />
         <Pick label="Cycle" value={cycle} set={setCycle} opts={opts.cycle} />
         {filtered && (
           <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSystem(''); setStation(''); setContractor(''); setCycle(''); setState('all') }}>Clear</button>)}
-        {canWrite && <ImportCsv onDone={finish} />}
         <span className="asset-count">{shown.length} shown</span>
+        {canWrite && <span className="pm-tools">
+          {!auto && <button className="btn sm" type="button" onClick={() => setAuto(true)}>Auto-plan week</button>}
+          <ImportCsv onDone={finish} />
+        </span>}
       </div>
 
+      {auto && <AutoPlan onClose={() => setAuto(false)}
+        onApproved={(text, wk) => { setAuto(false); setView('tl'); setSpan('week'); setCursor(wk); finish(text) }} />}
       {msg && <p className="pm-msg">{msg} <button className="mini-btn" type="button" onClick={() => setMsg('')}>✕</button></p>}
       {canWrite && picked.length > 0 && (
         <div className="pm-bulk">
@@ -583,60 +704,24 @@ export function PlannedView({ initialView = 'tl' }) {
         </div>
       )}
 
-      {rows === null ? <p className="dim">Loading schedule…</p>
-        : view === 'cal' ? <Calendar month={month} rows={shown} canWrite={canWrite} onPick={pick} />
-        : view === 'tl' ? <Timeline span={per} from={from} to={to} rows={shown} canWrite={canWrite} onPick={pick} onMove={resched} />
-        : shown.length === 0 ? (
-          <div className="card"><p className="dim" style={{ margin: 0 }}>
-            {rows.length === 0 ? `Nothing planned for ${periodName}. Import a contractor schedule (CSV) to start.` : 'No planned maintenance in this view.'}
-          </p></div>
-        ) : (
-          <div className="card tbl-wrap">
-            <table className="jc-table pm-table">
-              <thead>
-                <tr>
-                  {canWrite && <th className="pm-ck"><input type="checkbox" aria-label="Select all due"
-                    checked={allTick.length > 0 && allTick.every((r) => sel.has(r.id))}
-                    onChange={(e) => setSel(e.target.checked ? new Set(allTick.map((r) => r.id)) : new Set())} /></th>}
-                  <th>Date</th><th>Asset</th><th>Station</th><th>System</th><th>Cycle</th><th>Contractor</th><th>Source</th><th>State</th><th />
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((r) => (
-                  <tr key={r.id} className={`pm-row pm-${r.state}`}>
-                    {canWrite && <td className="pm-ck">{doneable(r) && <input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.asset_code}`} />}</td>}
-                    <td className="dt">
-                      {canWrite && OPEN(r)
-                        ? <input type="date" className="pm-date" value={r.planned_date} onChange={(e) => resched(r, e.target.value)} title="Reschedule" />
-                        : fmt(r.planned_date)}
-                      {r.original_date && <small className="dim" title="Originally planned"> was {fmt(r.original_date)}</small>}
-                    </td>
-                    <td><a href={`#/asset/${encPath(r.asset_code)}`} className="code">{r.asset_code}</a>
-                      {r.asset_name && <small className="dim pm-sub">{r.asset_name}</small>}</td>
-                    <td>{r.station || '—'}{r.location_detail && <small className="dim pm-sub">{r.location_detail}</small>}</td>
-                    <td>{r.system || '—'}</td>
-                    <td><i className="cal-freq">{CYCLE_BADGE[r.cycle] || r.cycle}</i> {r.cycle}</td>
-                    <td>{r.contractor || '—'}</td>
-                    <td className="pm-src" title={r.source || ''}>{planApproval(r.source) ? <PlanApproval source={r.source} /> : (r.source || '—')}</td>
-                    <td><StateChip s={r.state} />
-                      {r.done_on && <small className="dim pm-sub">{fmt(r.done_on)}{r.closed_by === 'reconcile' ? ' · from log' : ''}
-                        {' · '}<span className={`tl-t-${slipCls(slipOf(r))}`}>{slipTxt(slipOf(r))}</span></small>}</td>
-                    <td className="pm-act">
-                      {r.log_entry_id ? <a className="mini-btn" href={`#/log?d=${r.done_on}`}>Log ↗</a>
-                        : canWrite && doneable(r) ? <button className="mini-btn ok" type="button" onClick={() => setModal([r])}>Done</button>
-                        : null}
-                      {canWrite && (OPEN(r) || r.state === 'skipped') && (
-                        <button className="mini-btn muted" type="button" onClick={() => skip(r)}>{r.state === 'skipped' ? 'Reopen' : 'Skip'}</button>)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {wide ? (
+        <div className="reg-split wide pm-split">
+          {body}
+          <aside className="card reg-peek no-print" aria-label={peek ? 'Planned job' : 'Contractors'}>
+            <div className="reg-peek-h">{peek ? 'Planned job' : `Contractors · ${periodName}`}
+              <span>{peek ? <button type="button" className="pm-peek-x" onClick={() => setPeekId(null)}>✕ contractors</button>
+                : contractor ? <button type="button" className="pm-peek-x" onClick={() => setContractor('')}>show all</button> : 'click to filter'}</span>
+            </div>
+            {peek ? <PlanPeek r={peek} canWrite={canWrite} onDone={(r) => setModal([r])} onSkip={skip} onMove={resched} />
+              : rows === null ? <p className="dim lb-pick">Loading…</p>
+              : <Contractors rows={preC} pick={contractor} setPick={setContractor} board />}
+          </aside>
+        </div>
+      ) : <>{rows && <Contractors rows={preC} pick={contractor} setPick={setContractor} />}{body}</>}
+
       <p className="roadmap">{view === 'tl'
         ? <>Pin = planned date (○ = the date first promised) · ● = the day it was actually logged · the bar between is the slip:
-          green on time, amber up to 3 days late, red later or still overdue. Drag an open pin to reschedule; click it to mark done.</>
+          green on time, amber up to 3 days late, red later or still overdue. Drag an open pin to reschedule; click it for the job.</>
         : <>Red = overdue and not yet logged · amber = due today · blue = upcoming. Late work: Done takes the actual date, and the slip is kept against the original plan.</>}
         {' '}Done files a MAINTENANCE entry in the log book under your name;
         an entry for the same asset in the same month (same cycle or longer) closes the plan by itself.</p>

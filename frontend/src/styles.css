@@ -3767,3 +3767,97 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
   .cs-sheetbar .cs-sheetbar-ctl select, .cs-sheetbar .cs-sheetbar-ctl input { width: 100%; height: 30px; }
   .cs-sheetbar .cs-sheetbar-ctl .btn { width: 100%; height: 34px; margin-top: 2px; }
 }
+
+/* ---- planner v92 (Arup 11-19): the unified signature — no page title, one docked
+   toolbar (search · state strip · period · view/span · filters · tools), then ONE boxed
+   pane: the schedule on the left, a right peek that shows the contractor board until a
+   job is picked, then the job with Done / reschedule / skip. Timeline date row docks
+   on the thead line; rows are denser; today is labelled. ---- */
+.pm-period { display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: 8px; background: #fff; height: 30px; flex: 0 0 auto; }
+.pm-step { font: inherit; font-size: 16px; line-height: 1; width: 26px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
+.pm-step:hover { color: var(--accent); }
+.pm-pname { font: inherit; font-size: 12.5px; font-weight: 650; min-width: 112px; padding: 0 6px; border: 0; border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border); background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.pm-pname:hover { color: var(--accent); }
+.pm-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; background: #fff; overflow: hidden; height: 30px; flex: 0 0 auto; }
+.pm-seg button { font: inherit; font-size: 12px; padding: 0 9px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
+.pm-seg button + button { border-left: 1px solid var(--border); }
+.pm-seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.pm-tools { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.pm-toolbar .asset-kpis { flex: 0 0 auto; }
+.pm-table a.code { white-space: nowrap; }
+.pm-split > .reg-peek { background: var(--surface, #fff); }
+.cal-item.pm-ci.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+.tl-pin.sel { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent); z-index: 4; }
+.tl-row.sel, .tl-row.sel .tl-lbl { background: color-mix(in srgb, var(--accent-soft) 70%, #fff); }
+.tl-row.sel .tl-lbl { box-shadow: inset 3px 0 0 var(--accent); }
+.tl-tick.now { color: var(--accent); font-weight: 700; }
+.tl-now-lbl { position: absolute; bottom: 1px; transform: translateX(-50%); z-index: 2; font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: #fff; background: var(--accent); border-radius: 3px; padding: 0 4px; line-height: 12px; pointer-events: none; }
+.tl-scale { overflow: visible; }
+/* contractor board in the peek */
+.pm-cb { display: flex; flex-direction: column; }
+.pm-cb-r { display: flex; flex-direction: column; gap: 5px; text-align: left; font: inherit; font-size: 12px; padding: 10px 14px; border: 0;
+  border-bottom: 1px solid var(--border); background: transparent; color: var(--ink-2); cursor: pointer; }
+.pm-cb-r:hover { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.pm-cb-r.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.pm-cb-t { display: flex; gap: 8px; align-items: baseline; }
+.pm-cb-t b { color: var(--ink); font-size: 13px; }
+.pm-cb-t .dt { margin-left: auto; font-weight: 650; color: var(--ink); }
+.pm-cb-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--border) 70%, transparent); }
+.pm-cb-bar i, .pm-cb-key i { display: block; height: 100%; }
+.pm-cb-bar .ok, .pm-cb-key .ok { background: var(--good); }
+.pm-cb-bar .warn, .pm-cb-key .warn { background: var(--warning); }
+.pm-cb-bar .bad, .pm-cb-key .bad { background: var(--critical); }
+.pm-cb-n { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; }
+.pm-cb-key { margin: 0; padding: 10px 14px 14px; font-size: 11px; line-height: 1.6; }
+.pm-cb-key i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: -1px; margin-left: 4px; }
+.pm-cb-key i:first-child { margin-left: 0; }
+/* the picked job */
+.pm-peek .rp-head { box-shadow: inset 3px 0 0 var(--accent), 0 1px 0 var(--border); }
+.pm-peek.pm-p-overdue .rp-head { box-shadow: inset 3px 0 0 var(--critical), 0 1px 0 var(--border); }
+.pm-peek.pm-p-today .rp-head { box-shadow: inset 3px 0 0 #e0a010, 0 1px 0 var(--border); }
+.pm-peek.pm-p-done .rp-head { box-shadow: inset 3px 0 0 var(--good), 0 1px 0 var(--border); }
+.pm-cyc { font-size: 11.5px; color: var(--ink-2); }
+.pm-peek-date { font-size: 12.5px; border-color: var(--border); background: #fff; padding: 2px 4px; }
+.pm-peek-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; font-size: 12px; }
+.pm-peek-hint { flex-basis: 100%; font-size: 11px; }
+.pm-peek-x { font: inherit; font-size: 9.5px; border: 0; background: transparent; color: var(--accent); cursor: pointer; padding: 0; }
+.pm-peek-x:hover { text-decoration: underline; }
+@media screen and (min-width: 1100px) {
+  .pm-split > .card:first-child { min-width: 0; margin: 0; border: 0; border-right: 1px solid var(--border); border-radius: 10px 0 0 10px; background: transparent; box-shadow: none; }
+  .pm-split > .card:first-child:only-child { border-right: 0; }
+  .pm-split > .card.tbl-wrap, .pm-split > .card.tl { overflow: visible; }
+  /* timeline: fit the column (no sideways scroll), date row docks on the thead line */
+  .pm-split .tl-in { min-width: 0 !important; }
+  .pm-split .tl-head { top: calc(var(--topbar-h, 78px) + var(--toolbar-h, 52px) - 5px); background: #f1eeea; border-radius: 10px 0 0 0;
+    box-shadow: inset 0 -1px 0 var(--border); border-bottom: 0; }
+  .pm-split .tl-head .tl-lbl { background: #f1eeea; border-radius: 10px 0 0 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .pm-split .tl-scale { height: 29px; }
+  .pm-split .card.tl { --tl-lbl: 230px; }
+  .pm-split .tl-lbl { padding: 3px 10px; }
+  .pm-split .tl-track { min-height: 25px; }
+  .pm-split .tl-pin { height: 18px; line-height: 16px; min-width: 20px; }
+  .pm-split .tl-grp { padding: 7px 10px 3px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3);
+    background: color-mix(in srgb, var(--bg) 60%, transparent); width: auto; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+  .pm-split .tl-grp b { color: var(--ink-2); }
+  /* list: thead docks like the register; System + Source move to the peek */
+  .pm-split .pm-table { min-width: 0; }
+  .pm-split .pm-table thead th { position: sticky; top: calc(var(--topbar-h, 78px) + var(--toolbar-h, 52px) - 5px); z-index: 15;
+    background: #f1eeea; box-shadow: inset 0 -1px 0 var(--border); }
+  .pm-split .pm-c-sys, .pm-split .pm-c-src { display: none; }
+  .pm-split .pm-row { cursor: pointer; }
+  .pm-split .pm-row.row-peek td { background: var(--accent-soft); }
+  .pm-split .pm-row.row-peek td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  /* calendar: header docks too */
+  .pm-split .cal-head { position: sticky; top: calc(var(--topbar-h, 78px) + var(--toolbar-h, 52px) - 5px); z-index: 5; background: #f1eeea;
+    border-radius: 10px 0 0 0; border-bottom: 0; box-shadow: inset 0 -1px 0 var(--border); }
+  .pm-split .cal-head div { padding: 7px 6px; }
+}
+@media screen and (max-width: 760px) {
+  .pm-tools { margin-left: 0; }
+  .pm-toolbar .asset-kpis { flex: 1 1 100%; }
+  .pm-sum { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .pm-sum-c { flex: 0 0 auto; white-space: nowrap; }
+  .pm-period, .pm-seg { height: 32px; }
+}
