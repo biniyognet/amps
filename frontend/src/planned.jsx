@@ -6,7 +6,7 @@
    the signed-in user; "Done ×N" does the same for every ticked row. Rows the
    log book already covers (sheet puller, manual entry) close themselves. */
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { getJSON, useMe, encPath } from './api.js'
+import { getJSON, useMe, encPath, OPERATOR } from './api.js'
 import { PlanApproval, planApproval } from './approval.jsx'
 
 const API = import.meta.env.VITE_AMPS_API ?? ''
@@ -688,7 +688,7 @@ export function PlannedView({ initialView = 'tl' }) {
           <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSystem(''); setStation(''); setContractor(''); setCycle(''); setState('all') }}>Clear</button>)}
         <span className="asset-count">{shown.length} shown</span>
         {canWrite && <span className="pm-tools">
-          {!auto && <button className="btn sm" type="button" onClick={() => setAuto(true)}>Auto-plan week</button>}
+          {!auto && !OPERATOR && <button className="btn sm" type="button" onClick={() => setAuto(true)}>Auto-plan week</button>}
           <ImportCsv onDone={finish} />
         </span>}
       </div>
