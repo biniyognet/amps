@@ -6,7 +6,7 @@
 ## 1. Checklist
 
 ### Setup (MSI laptop)
-- [ ] Free disk space on C: (target ≥ 25 GB)
+- [x] Free disk space on C: (target ≥ 25 GB) — done 20 Nov, ~161 GB free
 - [ ] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026
 - [ ] Antigravity IDE: open this folder (`C:\Arups_Wokspace\amps`)
 - [ ] Install extension **Google Cloud Data Agent Kit** (Extensions → search) 
