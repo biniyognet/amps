@@ -5394,8 +5394,7 @@ export default function App() {
     )
   }
 
-  const navLine = lineMatch ? decodeURIComponent(lineMatch[1])
-    : lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : (signedIn && me.line) || null
+  const navLine = failLine || (lineMatch ? decodeURIComponent(lineMatch[1]) : null) || (lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : null) || (signedIn && me.line) || null
   return (
     <>{siteArt}
     <div className="shell" style={navLine ? { '--nav-c': lineColor(navLine) } : undefined}>

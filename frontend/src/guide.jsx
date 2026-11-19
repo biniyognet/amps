@@ -328,20 +328,8 @@ export function GuideView({ section }) {
   if (!OPERATOR) return <Brief />
   const s = PAGES[section] ? section : 'coordinator'
   const Page = PAGES[s]
-  const [group, label] = (() => { for (const [h, items] of SECTIONS) for (const [id, l] of items) if (id === s) return [h, l]; return ['', ''] })()
   return (
     <>
-    <div className="asset-toolbar pg-dock gd-dock no-print">
-      <h1 className="dash-title">Guide</h1>
-      <span className="dash-crumb">{group} › {label}</span>
-      <span className="pd-sp" />
-      <div className="asset-actions">
-        <button type="button" className="icon-btn" title="Print this page" aria-label="Print this page" onClick={() => window.print()}>
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
-        </button>
-      </div>
-    </div>
     <div className="gd">
       <aside className="gd-side">
         {SECTIONS.map(([head, items]) => (
