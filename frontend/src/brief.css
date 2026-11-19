@@ -1,0 +1,92 @@
+/* The brief sits inside the AMPS app, which is light-only: take the app's own
+   tokens (styles.css :root) so the page reads as one surface, never a dark card. */
+.brief{--paper:var(--card-bg,rgba(255,255,255,.55));--ink:#0B2A3F;--mute:#4B5F6D;--rule:#DDE7EE;--signal:#0078B4;--teal:#0F7FA8;--card:#fff;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--paper);
+  -webkit-backdrop-filter:saturate(1.2) blur(6px);backdrop-filter:saturate(1.2) blur(6px);
+  border:1px solid var(--rule);border-radius:16px;max-width:920px;margin:0 auto;
+  padding:40px 32px 64px;line-height:1.6;font-size:16.5px;color-scheme:light}
+.brief h1{font-family:Fraunces,Georgia,serif;font-weight:650;font-size:44px;line-height:1.1;margin:8px 0 14px;letter-spacing:-.01em}
+.brief h2{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:24px;margin:44px 0 10px;padding-top:14px;border-top:1px solid var(--rule)}
+.brief h2 span{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--signal);margin-right:12px;vertical-align:3px}
+.br-kick,.br-note,.br-foot{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em;color:var(--mute)}
+.br-kick{color:var(--signal)}
+.br-dek{font-size:19px;color:var(--mute);margin:0 0 24px}
+.br-delta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0 8px}
+.br-delta div{border:1px solid var(--rule);border-left:3px solid var(--signal);background:var(--card);padding:14px 16px;border-radius:12px}
+.br-delta b{display:block;font-family:Fraunces,serif;font-size:32px;font-weight:650}
+.br-delta span{font-size:14px;color:var(--mute)}
+.brief ul{padding-left:20px}.brief li{margin:6px 0}
+.br-cmp{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0}
+.br-cmp th,.br-cmp td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+.br-cmp th{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em;color:var(--mute)}
+.br-cmp td:first-child{font-weight:600;white-space:nowrap}
+.br-cmp td:last-child{color:var(--teal)}
+.br-foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--rule)}
+/* embedded deck: 16:9 stage showing the PDF deck pages */
+.br-deck{margin:12px 0 0;container-type:inline-size}
+.br-stage{aspect-ratio:16/9;border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:#fff;color:#16191d;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.br-deck:fullscreen{background:radial-gradient(900px 600px at 85% 10%,rgba(20,163,174,.14),transparent 60%),linear-gradient(135deg,#F7F8F4,#EAF2EF);display:flex;flex-direction:column;justify-content:center;padding:2vh 2vw}
+.br-deck:fullscreen .br-stage{max-height:90vh;margin:0 auto;width:min(100%,160vh)}
+.br-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mute)}
+.br-ctl button{font:inherit;border:1px solid var(--rule);background:var(--card);color:var(--ink);padding:5px 12px;border-radius:8px;cursor:pointer}
+.br-ctl button:disabled{opacity:.4;cursor:default}
+.br-dots{display:flex;gap:5px;flex:1;justify-content:center}
+.br-dots i{width:7px;height:7px;border-radius:50%;background:var(--rule);cursor:pointer}.br-dots i.on{background:var(--signal)}
+.br-deck:fullscreen .br-ctl{color:#5b6168;justify-content:center}
+@media (max-width:640px){.brief{padding:24px 16px 48px;font-size:16px}.brief h1{font-size:30px}
+  .br-delta{grid-template-columns:1fr}.br-delta b{font-size:26px}.br-cmp{font-size:13px}.br-cmp td:first-child{white-space:normal}
+  .br-dots{display:none}}
+@media print{.br-deck{display:none}}
+/* keep the app's global heading styles out of the brief */
+.brief h1,.brief h2{text-transform:none;letter-spacing:normal;color:inherit}
+.brief h2{letter-spacing:-.005em}
+.br-stage img{display:block;width:100%;height:100%;object-fit:contain}
+.br-pdf{margin-left:auto;color:var(--ink);border:1px solid var(--rule);background:var(--card);padding:5px 12px;border-radius:8px;text-decoration:none}
+.br-try{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0 0}
+.br-try a{display:block;border:1px solid var(--rule);background:var(--card);padding:12px 14px;border-radius:12px;text-decoration:none;color:var(--ink)}
+.br-try a:hover{border-color:var(--accent-line,#60CCF0);background:var(--accent-soft,#F0F9FE)}
+.br-try b{display:block;font-family:Fraunces,serif;font-weight:500;font-size:17px;color:var(--teal)}
+.br-try span{font-size:14px;color:var(--mute);line-height:1.4}
+.br-faq{margin:8px 0}.br-faq div{padding:10px 0;border-bottom:1px solid var(--rule)}
+.br-faq dt{font-weight:600}.br-faq dd{margin:4px 0 0;color:var(--mute)}
+@media (max-width:640px){.br-try{grid-template-columns:1fr}}
+.br-roll-h{display:none}
+/* Wide screens (>=1100x560), fitted to the viewport: no page scroll. The left column is
+   exactly as wide as the biggest 16:9 slide the height allows (above a compact headline and
+   control row); the sidebar takes the rest (>=340px) and rolls the details like credits. */
+@media screen and (min-width:1100px) and (min-height:560px){
+  html.brief-fit,html.brief-fit body{overflow:hidden;overscroll-behavior:none}
+  html.brief-fit .foot{display:none}
+  html.brief-fit .shell{padding-bottom:0;max-width:none}
+  .brief{--fit-h:calc(100dvh - var(--brief-top,96px) - 12px);--head-h:98px;--ctl-h:36px;
+    max-width:none;height:var(--fit-h);box-sizing:border-box;padding:14px 22px 12px;overflow:hidden}
+  .br-split{display:grid;grid-template-columns:minmax(0,calc((var(--fit-h) - 26px - var(--head-h) - var(--ctl-h)) * 16 / 9)) minmax(340px,1fr);gap:22px;height:100%}
+  .br-main{display:flex;flex-direction:column;min-height:0}
+  .br-head{height:var(--head-h);flex:none;overflow:hidden}
+  .br-head .br-kick{margin:0;font-size:10.5px;line-height:14px}
+  .br-head h1{font-size:clamp(22px,2.9vh,30px);line-height:1.15;margin:3px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .br-head .br-dek{font-size:13.5px;line-height:1.45;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .br-main .br-deck-h,.br-main > .br-note{display:none}
+  .br-main .br-deck{flex:1;min-height:0;margin:0;container-type:size;display:flex;flex-direction:column;justify-content:center}
+  .br-main .br-deck:not(:fullscreen) .br-stage{width:min(100cqw,calc((100cqh - var(--ctl-h)) * 16 / 9));flex:none;box-sizing:border-box;border-radius:10px}
+  .br-main .br-deck:not(:fullscreen) .br-ctl{width:min(100cqw,calc((100cqh - var(--ctl-h)) * 16 / 9));flex-wrap:nowrap;gap:6px;margin-top:7px;font-size:11px}
+  .br-main .br-deck:not(:fullscreen) .br-ctl button,.br-main .br-deck:not(:fullscreen) .br-pdf{padding:3px 9px;border-radius:7px}
+  .br-main .br-deck:not(:fullscreen) .br-dots{gap:4px}
+  .br-main .br-deck:not(:fullscreen) .br-dots i{width:6px;height:6px}
+  .br-side{display:flex;flex-direction:column;min-height:0;height:100%;border-left:1px solid var(--rule);padding-left:22px}
+  .br-roll-h{display:flex;align-items:center;justify-content:space-between;flex:none;padding:0 4px 6px 0;
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+  .br-roll-h button{font:inherit;letter-spacing:.06em;text-transform:none;border:1px solid var(--rule);background:var(--card);color:var(--ink);padding:2px 9px;border-radius:7px;cursor:pointer}
+  .br-roll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 6px 56px 0;font-size:15px;scrollbar-width:thin;scrollbar-color:var(--rule) transparent;
+    -webkit-mask-image:linear-gradient(transparent,#000 20px,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(transparent,#000 20px,#000 calc(100% - 56px),transparent)}
+  .br-side .br-delta{margin:6px 0 4px;gap:8px}
+  .br-side .br-delta div{padding:9px 11px}
+  .br-side .br-delta b{font-size:22px}
+  .br-side .br-delta span{font-size:12.5px;line-height:1.35;display:block}
+  .br-side h2{font-size:20px;margin:28px 0 8px}
+  .br-side .br-roll > h2:first-of-type{margin-top:20px}
+  .br-side .br-try{grid-template-columns:1fr}
+  .br-side .br-try a{padding:9px 12px}
+  .br-side .br-cmp{font-size:13.5px}
+  .br-side .br-cmp td:first-child{white-space:normal}
+}

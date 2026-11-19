@@ -9,9 +9,17 @@
 import { useEffect, useState } from 'react'
 
 export const LIVE = import.meta.env.VITE_AMPS_DATA === 'live'
-export const ORG = import.meta.env.VITE_AMPS_ORG || 'Demo Metro Line'
+export const ORG = import.meta.env.VITE_AMPS_ORG || 'Demo Industries'
+// VITE_AMPS_BRAND=neutral: live data, but no operator branding or operator-only
+// modules (letters, tenders, drawings) — the public demo runs this way.
+export const OPERATOR = LIVE && import.meta.env.VITE_AMPS_BRAND !== 'neutral'
+// Words for the top grouping and its places. A metro says line / station / depot;
+// the neutral demo is a multi-industry estate, so it says site / area / unit.
+export const W = LIVE && !OPERATOR
+  ? { Line: 'Site', Lines: 'Sites', line: 'site', lines: 'sites', Station: 'Area', station: 'area', stations: 'areas', Depot: 'Unit', depot: 'unit', Network: 'Estate' }
+  : { Line: 'Line', Lines: 'Lines', line: 'line', lines: 'lines', Station: 'Station', station: 'station', stations: 'stations', Depot: 'Depot', depot: 'depot', Network: 'Network' }
 
-const API = import.meta.env.VITE_AMPS_API ?? '' // same-origin by default
+export const API = import.meta.env.VITE_AMPS_API ?? '' // same-origin by default
 
 // Asset codes can contain '/' (e.g. "EXF- CHEMICAL/OIL/GREASE ROOM (CPD)"). A
 // single-encoded '%2F' in a URL PATH segment is rejected by the router as a

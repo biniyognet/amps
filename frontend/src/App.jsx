@@ -4,13 +4,14 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import AskAmps from './ask'
 import {
   ASSETS, PM_SCHEDULES, JOB_CARDS, SPECS, PROCUREMENTS, PROC_STAGES,
   FAILURES, SPARES, spareStats, checksheetFor, CHECKSHEET_TEMPLATES, CHECKSHEET_RESULTS,
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
+import { LIVE, ORG, OPERATOR, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -27,8 +28,10 @@ import { CHECKSHEET_FORMATS } from './checksheets.js'
 import { TendersView, ReaderView } from './tenders.jsx'
 import { DrawingsView, DrawingViewer, AssetDrawings } from './drawings.jsx'
 import { GuideView } from './guide.jsx'
+import SnapReport, { SnapPrint, rememberNext } from './snap.jsx'
 import { LettersView, LetterViewer } from './letters.jsx'
 import { PlannedView } from './planned.jsx'
+import { JobCardApproval } from './approval.jsx'
 
 const STATUS_LABEL = {
   in_service: 'In service',
@@ -43,8 +46,10 @@ const StatusChip = ({ status }) => (
 
 /* the maker's mark — Arup's own signature, the way an artist signs a canvas.
    alt carries the full name so the credit stays in the source and for readers. */
-const SignatureMark = () => (
-  <img src="/signature.png" className="sig-mark" alt="maker's signature" title="AMPS" />
+const SignatureMark = () => (OPERATOR
+  ? <img src="/signature.png" className="sig-mark" alt="maker's signature" title="AMPS" />
+  /* public demo: no handwritten signature asset, a typeset mark instead */
+  : <span className="sig-mark sig-type" title="AMPS">A. Biswas</span>
 )
 /* a pencil that deep-links a log entry into the log book for editing — the
    single editing surface everything else points at */
@@ -78,7 +83,6 @@ const FootSig = () => {
    deployments of AMPS so a demo visitor can see it running in the field.
    Metro AMPS is served from the office server over a Cloudflare Tunnel. */
 const SHOWCASE = [
-  { name: 'Metro AMPS', sub: 'Live · Kolkata Metro power-supply', href: 'https://metro.binihost.com', live: true },
   { name: 'This demo', sub: 'Synthetic data — you are here', href: '#/', here: true },
   { divider: true },
   { name: 'biniHost', sub: 'The platform behind it', href: 'https://binihost.com' },
@@ -124,11 +128,13 @@ function ShowcaseDropdown() {
 
 /* the masthead: emblem + AMPS wordmark with its full form, and the
    organisation on a second line so it never drops out after sign-in */
+// navbar mark = the same file the favicon uses (bolt on neutral/demo builds)
 const Brand = () => (
   <a href="#/" className="brand">
     {/* the real Indian Railways emblem is for the live office deployment only —
        a public synthetic demo must not carry a national/government emblem */}
-    {LIVE && <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />}
+    {OPERATOR ? <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />
+              : <img className="brand-emblem brand-fav" src={`${import.meta.env.BASE_URL}${!LIVE || import.meta.env.VITE_AMPS_BRAND === 'neutral' ? 'amps-bolt.svg' : 'metro-logo.svg'}`} alt="" />}
     <span className="brand-lines">
       <span className="brand-l1">
         <span className="brand-name">AMPS</span>
@@ -347,7 +353,7 @@ function LiveDashboard({ go, initialLine = null }) {
     else { setSortKey(k); setSortDir('asc') }
   }
   const sortArrow = (k) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
-  const COLS = [['code', 'Code'], ['name', 'Asset'], ['cls', 'Class'], ['location', 'Station'],
+  const COLS = [['code', 'Code'], ['name', 'Asset'], ['cls', 'Class'], ['location', W.Station],
     ['locationDetail', 'Location'], ['sys', 'System'], ['status', 'Status'], ['last_done', 'Last PM'], ['pm', 'PM cycles']]
   // per-cycle due counts across the current view — shown in the PM-cycles header (M/Q/HY/Y/5Y)
   const cycleDue = { Monthly: 0, Quarterly: 0, 'Half-Yearly': 0, Yearly: 0, '5-Yearly': 0 }
@@ -365,7 +371,7 @@ function LiveDashboard({ go, initialLine = null }) {
     code: { text: fCode, setText: setFCode },
     name: { text: fName, setText: setFName },
     cls: { values: fClass, toggle: toggleIn(setFClass), clear: () => setFClass([]), opts: classesList, allLabel: 'All classes' },
-    location: { values: fLocation, toggle: toggleIn(setFLocation), clear: () => setFLocation([]), opts: locationsList, allLabel: 'All stations' },
+    location: { values: fLocation, toggle: toggleIn(setFLocation), clear: () => setFLocation([]), opts: locationsList, allLabel: `All ${W.stations}` },
     locationDetail: { values: fLocDet, toggle: toggleIn(setFLocDet), clear: () => setFLocDet([]), opts: locDetList, allLabel: 'All locations' },
     sys: { values: fSystem, toggle: toggleIn(setFSystem), clear: () => setFSystem([]), opts: systemsList, allLabel: 'All systems' },
     status: { values: fStatus, toggle: toggleIn(setFStatus), clear: () => setFStatus([]), opts: statusesList, allLabel: 'Any status', fmt: (v) => STATUS_LABEL[v] || v },
@@ -380,10 +386,10 @@ function LiveDashboard({ go, initialLine = null }) {
   const CSV_CYC = ['Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', '5-Yearly']
   const exportCsv = () => {
     const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
-    const head = ['SL', 'Code', 'Asset', 'Class', 'System', 'Station', 'Location', 'Status',
-      'Criticality', 'Depot', 'Make / model', 'Commissioned', 'Codal life (yrs)',
+    const head = ['SL', 'Code', 'Asset', 'Class', 'System', W.Station, 'Location', 'Status',
+      'Criticality', W.Depot, 'Make / model', 'Commissioned', 'Codal life (yrs)',
       'Last PM', 'Next due', 'PM state', ...CSV_CYC.map((c) => `${c} state`),
-      'Open failures', 'Acknowledged', 'Job card', 'Line']
+      'Open failures', 'Acknowledged', 'Job card', W.Line]
     const body = shown.map((a, i) => {
       const s = sched[assetKey(a)]
       const cyc = s?.cycles || {}
@@ -521,7 +527,7 @@ function LiveDashboard({ go, initialLine = null }) {
             {/* Class · Location · System · Status filters now live in the table
                 column headers (▾). Only depot stays here — it has no column. */}
             {depotsList.length > 0 && !me?.depot && (
-              <select value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
+              <select value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label={`Filter by ${W.depot}`}>
                 <option value="">All depots</option>
                 {depotsList.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -562,7 +568,7 @@ function LiveDashboard({ go, initialLine = null }) {
           </div>
           {/* a caption that appears only on the printout: what's being shown */}
           <div className="print-caption">
-            AMPS · {effLine || 'All lines'} — {filters.length === 0 ? 'all assets' : filters.map((k) => FILTER_LABEL[k] || k).join(' + ')}
+            AMPS · {effLine || `All ${W.lines}`} — {filters.length === 0 ? 'all assets' : filters.map((k) => FILTER_LABEL[k] || k).join(' + ')}
             {fSystem.length ? ` · ${fSystem.join('/')}` : ''}{fClass.length ? ` · ${fClass.join('/')}` : ''}{fLocation.length ? ` · ${fLocation.join('/')}` : ''}{fStatus.length ? ` · ${fStatus.map((s) => STATUS_LABEL[s] || s).join('/')}` : ''}{fCrit.length ? ` · Criticality ${fCrit.join('/')}` : ''}
             {q ? ` · “${q}”` : ''} · {shown.length} assets · {new Date().toISOString().slice(0, 10)}
           </div>
@@ -655,7 +661,7 @@ function LiveDashboard({ go, initialLine = null }) {
                             </span>
                           )}</td>
                         <td className="dim" data-l="Class">{a.cls}</td>
-                        <td className="dim" data-l="Station">{a.location}</td>
+                        <td className="dim" data-l={W.Station}>{a.location}</td>
                         <td className="dim wrap-cell" data-l="Location">{a.locationDetail || '—'}</td>
                         <td className="dim" data-l="System">{a.sys ?? '—'}</td>
                         <td data-l="Status"><StatusChip status={a.status} />
@@ -700,7 +706,7 @@ const codalExceeded = (a) => { const e = codalExpiry(a); return e != null && e <
 /* Lines named after colours get their colour as the chip dot — free for any
    org that names lines that way; everyone else gets a neutral dot. */
 const LINE_COLORS = {
-  green: '#1c7a44', blue: '#2b5c99', purple: '#5b3fbf', yellow: '#b98a00',
+  green: '#1c7a44', blue: '#2b5c99', teal: '#0e7c86', amber: '#b7791f', indigo: '#4c51bf', ruby: '#b4234a', metro: '#0e7c86', substation: '#4c51bf', water: '#2b6cb0', factory: '#b7791f', purple: '#5b3fbf', yellow: '#b98a00',
   red: '#a32e2e', orange: '#c2571a', pink: '#b83280', grey: '#52525b', gray: '#52525b',
 }
 const lineColor = (name) => {
@@ -1380,8 +1386,8 @@ function AssetForm({ initial, mode, onDone, onCancel }) {
         <label>Name<input value={f.name} onChange={set('name')} required /></label>
         <label>Asset class<input value={f.asset_class} onChange={set('asset_class')} required
                                  list="af-classes" /></label>
-        <label>Location / station<input value={f.location} onChange={set('location')} required /></label>
-        <label>Line<input value={f.line} onChange={set('line')} placeholder="e.g. Green Line" /></label>
+        <label>Location / {W.station}<input value={f.location} onChange={set('location')} required /></label>
+        <label>{W.Line}<input value={f.line} onChange={set('line')} placeholder={OPERATOR ? 'e.g. Green Line' : 'e.g. City Water Treatment Plant'} /></label>
         <label>System<input value={f.system} onChange={set('system')} placeholder="reporting rollup" /></label>
         <label>Make / model<input value={f.make_model} onChange={set('make_model')} /></label>
         <label>Commissioned on<input type="date" value={f.commissioned_on} onChange={set('commissioned_on')} /></label>
@@ -1506,6 +1512,8 @@ function LiveAssetDetail({ code }) {
                 {canWrite && !editing && (
                   <button className="btn ghost sm" type="button" onClick={() => setEditing(true)}>Edit details</button>
                 )}
+                <a className="btn sm snap-cta no-print" href={`#/snap/${encodeURIComponent(a.code)}`}
+                   onClick={() => { if (!canWrite) rememberNext(`/snap/${encodeURIComponent(a.code)}`) }}>📷 Report a problem</a>
                 <button className="btn ghost sm no-print" type="button" onClick={() => window.print()}>Print</button>
               </div>
             </div>
@@ -1520,7 +1528,7 @@ function LiveAssetDetail({ code }) {
         <div className="asset-facts card">
           {[
             ['Location', a.location],
-            ['Line', a.line || '—'],
+            [W.Line, a.line || '—'],
             ['System', a.sys || '—'],
             ['Asset class', a.cls],
             ['Make / model', a.makeModel || '—'],
@@ -1544,7 +1552,7 @@ function LiveAssetDetail({ code }) {
 
         <div className="card"><MaintenanceSchedule schedule={schedule} /></div>
 
-        <AssetDrawings code={a.code} location={a.location} />
+        {OPERATOR && <AssetDrawings code={a.code} location={a.location} />}
 
         {editing && (
           <div className="card">
@@ -2611,9 +2619,9 @@ function AboutPage() {
 
       {/* the department's standing — its infrastructure, its data. On the live
           deployment this states Metro Railway's ownership (per the departmental
-          order); on the demo it names Metro Railway as where AMPS runs for real. */}
+          order); on the public demo the operator stays unnamed (no consent to name it). */}
       <div className="card about-dept">
-        {LIVE ? (
+        {OPERATOR ? (
           <>
             <h3>Departmental deployment</h3>
             <p>
@@ -2633,8 +2641,8 @@ function AboutPage() {
           <>
             <h3>In production</h3>
             <p>
-              AMPS runs in production at <b>Metro Railway, Kolkata</b>, monitoring
-              asset maintenance across the metro network — the open-source
+              AMPS runs in production at <b>a metro railway in India</b>, monitoring
+              power-supply asset maintenance across its network — the open-source
               framework, adopted as a departmental system.
             </p>
             {/* value proof-points — demo/showcase only; the office deployment
@@ -2715,15 +2723,15 @@ function PrintablesNav({ active }) {
       </button>
       {open && (
         <div className="showcase-menu" role="menu">
-          <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
+          {OPERATOR && <a className="sc-item" role="menuitem" href="#/letters" onClick={() => setOpen(false)}>
             <span className="sc-name">Letters</span><span className="sc-sub">official correspondence — letters, emails & MOM on record</span>
-          </a>
-          <a className="sc-item" role="menuitem" href="#/tenders" onClick={() => setOpen(false)}>
+          </a>}
+          {OPERATOR && <a className="sc-item" role="menuitem" href="#/tenders" onClick={() => setOpen(false)}>
             <span className="sc-name">Tenders</span><span className="sc-sub">contract volumes, clause index & issue intel</span>
-          </a>
-          <a className="sc-item" role="menuitem" href="#/drawings" onClick={() => setOpen(false)}>
+          </a>}
+          {OPERATOR && <a className="sc-item" role="menuitem" href="#/drawings" onClick={() => setOpen(false)}>
             <span className="sc-name">Drawings</span><span className="sc-sub">drawing register — tender & as-built</span>
-          </a>
+          </a>}
           <a className="sc-item" role="menuitem" href="#/printables?t=qr" onClick={() => go('qr')}>
             <span className="sc-name">QR asset tags</span><span className="sc-sub">printable QR labels for every asset</span>
           </a>
@@ -3134,7 +3142,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
     <article className="cs-sheet cs-std">
       <div className="cs-std-page" ref={pageRef}>
         <header className="cs-std-head">
-          <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />
+          {OPERATOR && <img className="cs-std-logo" src="/ir-logo.png" alt="Indian Railways" />}
           <div>
             <div className="cs-std-title"><span className="cs-std-org">{org}</span> · {title}</div>
             <div className="cs-std-sub">
@@ -3146,7 +3154,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
           <QR value={qrVal} size={44} />
         </header>
         <div className="cs-std-meta">
-          <span>Station: <u /></span><span>Equipment ID: <u /></span>
+          <span>{W.Station}: <u /></span><span>Equipment ID: <u /></span>
           <span>{isLog && fmt.frequency === 'Weekly' ? 'Month' : 'Date'}: <u className="s" /></span><span>Shift: <u className="xs" /></span>
         </div>
 
@@ -3170,7 +3178,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
         )}
         <div className="cs-std-rbox" style={{ display: 'none' }}>Remarks / defects observed:</div>
         <footer className="cs-std-sign">
-          {['Done by — Staff / External firm', 'Checked by — (MRLY)'].map((who) => (
+          {['Done by — Staff / External firm', OPERATOR ? 'Checked by — (MRLY)' : 'Checked by — Supervisor'].map((who) => (
             <div key={who}>
               <b>{who}</b>
               <div className="cs-std-sign-l"><span>Name: <u /></span><span>Sign: <u className="s" /></span><span>Date: <u className="xs" /></span></div>
@@ -3340,7 +3348,7 @@ function ChecksheetEditor({ initial, formats = [], onClose, onSaved, setErr }) {
         <label className="fg-span-2">Log columns <span className="ef-opt">(opt — a readings log instead of cycles, comma-separated)</span>
           <input value={slotsTxt} onChange={(e) => setSlotsTxt(e.target.value)} placeholder="e.g. 8:00 AM, 12:00 PM, 4:00 PM  ·  Week 1, Week 2, Week 3, Week 4" /></label>
         <label>Frequency <span className="ef-opt">(opt)</span><input value={freq} onChange={(e) => setFreq(e.target.value)} placeholder="e.g. Yearly" /></label>
-        <label className="fg-span-2">Printed title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="METRO RAILWAY, KOLKATA — 33KV VCB MAINTENANCE" /></label>
+        <label className="fg-span-2">Printed title<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${ORG.toUpperCase()} — 33KV VCB MAINTENANCE`} /></label>
         <label>Asset / equipment <span className="ef-opt">(opt)</span><input value={assetCode} onChange={(e) => setAssetCode(e.target.value)} placeholder="e.g. Third Rail, BET, VCB" /></label>
         <label>Asset class <span className="ef-opt">(opt)</span><input value={cls} onChange={(e) => setCls(e.target.value)} placeholder="class this format matches" /></label>
       </div>
@@ -3486,7 +3494,184 @@ function TagSheet() {
 // Sheet-sync card: last pull time + per-line imported / held counts. Signed-in
 // viewers also get the held rows themselves (source · date · code · why) so a
 // line's coordinator can fix their own sheet; anonymous viewers see counts only.
-function SyncCard({ sync }) {
+// Wide screens fit the dashboard to the viewport (no page scroll): the split's own
+// top offset (topbar + shell padding + any line header) is measured into --dash-top.
+function useDashFit(ready) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const root = document.documentElement
+    if (!ready) return
+    root.classList.add('dash-fit')
+    const set = () => { if (ref.current) root.style.setProperty('--dash-top', `${Math.round(ref.current.getBoundingClientRect().top + window.scrollY)}px`) }
+    set()
+    window.addEventListener('resize', set)
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set)
+    const tb = document.querySelector('.topbar'); if (ro && tb) ro.observe(tb)
+    return () => { root.classList.remove('dash-fit'); window.removeEventListener('resize', set); ro?.disconnect() }
+  }, [ready])
+  return ref
+}
+
+// Slim failures-per-month chart: drawn at the box's own pixel size (no scaled
+// text), thin rounded bars on a soft gradient, the latest month in full accent.
+function SlimTrend({ data }) {
+  const box = useRef(null)
+  const [sz, setSz] = useState({ w: 0, h: 0 })
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    const set = () => setSz({ w: el.clientWidth, h: el.clientHeight })
+    set()
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set)
+    ro?.observe(el)
+    return () => ro?.disconnect()
+  }, [])
+  const { w, h } = sz
+  const max = Math.max(...data.map((m) => m.count), 1)
+  const P = { t: 18, b: 20, l: 4, r: 4 }
+  const ih = Math.max(0, h - P.t - P.b)
+  const slot = (w - P.l - P.r) / Math.max(data.length, 1)
+  // bars butt up against each other (1.5 px seam) so the months read as one area
+  const bw = Math.max(4, slot - 1.5)
+  const x = (i) => P.l + slot * (i + 0.5)
+  const y = (v) => P.t + ih * (1 - v / max)
+  return (
+    <div className="slim-trend" ref={box}>
+      {w > 0 && h > 40 && (
+        <svg width={w} height={h} role="img" aria-label="Failures per month">
+          <defs>
+            <linearGradient id="st-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#60CCF0" /><stop offset="1" stopColor="#bfe6f7" stopOpacity=".55" />
+            </linearGradient>
+            <linearGradient id="st-g2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#0078B4" /><stop offset="1" stopColor="#60CCF0" />
+            </linearGradient>
+          </defs>
+          {[0.5, 1].map((f) => <line key={f} x1={P.l} x2={w - P.r} y1={y(max * f)} y2={y(max * f)} className="st-grid" />)}
+          <line x1={P.l} x2={w - P.r} y1={y(0) + 0.5} y2={y(0) + 0.5} className="st-axis" />
+          {data.map((m, i) => {
+            const last = i === data.length - 1
+            const bh = Math.max(m.count ? 3 : 0, ih * (m.count / max))
+            return (
+              <g key={m.label}>
+                {m.count > 0 && <rect x={x(i) - bw / 2} y={y(0) - bh} width={bw} height={bh}
+                                      fill={last ? 'url(#st-g2)' : 'url(#st-g)'} />}
+                {m.count > 0 && <line x1={x(i) - bw / 2} x2={x(i) + bw / 2} y1={y(0) - bh + 0.75} y2={y(0) - bh + 0.75} className="st-cap" />}
+                <text x={x(i)} y={y(0) - bh - 6} textAnchor="middle" className={`st-val${last ? ' last' : ''}`}>{m.count}</text>
+                <text x={x(i)} y={h - 5} textAnchor="middle" className="st-cat">{m.label}</text>
+              </g>
+            )
+          })}
+        </svg>
+      )}
+    </div>
+  )
+}
+
+// Right sidebar: one card, three tabs — the rolling logbook feed, failures in
+// colour by state, and the sheet-sync log — so the left 60% stays all charts.
+const FEED_TYPE = { failure: 'ft-fail', rectification: 'ft-rect', acknowledgement: 'ft-ack', job_card: 'ft-job', maintenance: 'ft-mnt' }
+const FAIL_STATE = { open: ['fs-open', 'Open'], acknowledged: ['fs-ack', 'Acknowledged'], job_card: ['fs-job', 'Job card'], resolved: ['fs-ok', 'Resolved'] }
+const feedWhen = (e) => {
+  const d = e.at ? new Date(e.at) : null
+  if (!d || Number.isNaN(d.getTime())) return e.log_date || ''
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+    : d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
+}
+function DashFeed({ groups, fails, sync, failHref }) {
+  const [tab, setTab] = usePersistedState('dash.side', 'log')  // last opened sidebar tab survives reloads
+  // live feel: on the first load the newest entry pops in; after that every
+  // entry a 60 s refresh brings in that was not on screen before pops in
+  const seen = useRef(null)
+  const fresh = useRef(new Set())
+  const keys = groups.map((g) => g.key)
+  if (keys.length && keys.join('\n') !== seen.current?.sig) {
+    fresh.current = seen.current ? new Set(keys.filter((k) => !seen.current.all.has(k))) : new Set(keys.slice(0, 1))
+    seen.current = { sig: keys.join('\n'), all: new Set(keys) }
+  }
+  const roll = useRef(null)
+  const glideSig = useRef('')
+  useEffect(() => {
+    const el = roll.current
+    const sig = `${tab}|${tab === 'log' ? keys[0] || '' : (fails || [])[0]?.id || ''}`
+    if (!el || sig === glideSig.current || el.scrollHeight <= el.clientHeight + 4) return
+    glideSig.current = sig
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { el.scrollTop = 0; return }
+    const from = el.scrollHeight - el.clientHeight, dur = Math.min(2600, 900 + from * 0.9), t0 = performance.now()
+    let raf = 0, stop = false
+    const halt = () => { stop = true }
+    el.addEventListener('wheel', halt, { passive: true }); el.addEventListener('touchstart', halt, { passive: true })
+    el.scrollTop = from
+    const step = (t) => {
+      if (stop) return
+      const k = Math.min(1, (t - t0) / dur)
+      el.scrollTop = from * (1 - (1 - Math.pow(1 - k, 3)))
+      if (k < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => { cancelAnimationFrame(raf); el.removeEventListener('wheel', halt); el.removeEventListener('touchstart', halt) }
+  }, [tab, keys[0], fails])
+  const openN = (fails || []).filter((f) => (f.state || 'open') === 'open').length
+  const liveN = (fails || []).filter((f) => f.state && f.state !== 'resolved' && f.state !== 'open').length
+  const held = sync ? Object.values(sync.lines || {}).reduce((n, s) => n + (s.held_count || 0), 0) : 0
+  const tabs = [
+    ['log', 'Recent logs', null],
+    ['fail', 'Failures', openN ? <b className="dt-n bad">{openN}</b> : liveN ? <b className="dt-n warn">{liveN}</b> : null],
+    // shown only once a sheet sync has reported (the cron puller on a real deployment)
+    ...(sync ? [['sync', 'Sync log', held ? <b className="dt-n warn">{held}</b> : <i className="dt-ok" aria-label="all imported" />]] : []),
+  ]
+  return (
+    <aside className="dash-side" aria-label="Live feed">
+      <div className="ds-tabs" role="tablist">
+        {tabs.map(([k, label, badge]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={`ds-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
+            {label}{badge}
+          </button>
+        ))}
+        <span className="ds-live" title="Refreshed every minute"><i />live</span>
+      </div>
+      <div className="ds-roll" role="tabpanel" ref={roll}>
+        {tab === 'log' && (groups.length === 0 ? <p className="dim ds-empty">No entries yet.</p> : groups.slice(0, 40).map(({ key, e, n, codes }) => (
+          <a key={key} className={`df-row ${FEED_TYPE[e.type] || 'ft-gen'}${fresh.current.has(key) ? ' df-new' : ''}`} href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
+             title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
+            <span className="df-top">
+              <span className="df-type">{(e.type || 'general').replace('_', ' ')}</span>
+              {n === 1 && e.asset_code && <span className="df-code">{e.asset_code}</span>}
+              {n > 1 && <span className="dr-x">×{n}</span>}
+              <span className="df-when">{feedWhen(e)}</span>
+            </span>
+            <span className="df-txt">{tidyLog(e.text)}</span>
+          </a>
+        )))}
+        {tab === 'fail' && (fails == null ? <p className="dim ds-empty">Sign in to see the failure log.</p>
+          : fails.length === 0 ? <p className="dim ds-empty">No failures logged. 👍</p>
+          : fails.map((f) => {
+            const [cls, label] = FAIL_STATE[f.state || 'open'] || FAIL_STATE.open
+            return (
+              <a key={f.id} className={`df-row df-fail ${cls}`} href={f.asset_code ? `#/asset/${encodeURIComponent(f.asset_code)}` : failHref} title={f.asset_name || f.asset_code || ''}>
+                <span className="df-top">
+                  <span className="df-state"><i />{label}</span>
+                  {f.asset_code && <span className="df-code">{f.asset_code}</span>}
+                  {f.station && <span className="df-sub">{f.station}{f.system ? ` · ${f.system}` : ''}</span>}
+                  <span className="df-when">{feedWhen(f)}</span>
+                </span>
+                <span className="df-txt">{tidyLog(f.text)}</span>
+              </a>
+            )
+          }))}
+        {tab === 'sync' && (sync ? <SyncCard sync={sync} bare />
+          : <p className="dim ds-empty">No sheet sync recorded yet. Each scheduled pull from the coordination sheets reports here: rows imported, rows held and why.</p>)}
+      </div>
+      <div className="ds-foot">
+        {tab === 'log' && <a className="crumb" href="#/log">Open the log book →</a>}
+        {tab === 'fail' && <a className="crumb" href={failHref}>Open the failures dashboard →</a>}
+      </div>
+    </aside>
+  )
+}
+
+function SyncCard({ sync, bare = false }) {
   const lines = Object.entries(sync.lines || {})
   const at = new Date(sync.at)
   const ago = Math.max(0, Math.round((Date.now() - at.getTime()) / 3600000))
@@ -3494,7 +3679,7 @@ function SyncCard({ sync }) {
   const canSee = lines.some(([, s]) => Array.isArray(s.held))
   const CAP = 30
   return (
-    <section className="card viz-card sync-card">
+    <section className={bare ? 'sync-card sync-bare' : 'card viz-card sync-card'}>
       <h2 className="viz-h">Sheet sync <span className="viz-note">last pulled {at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} · {ago < 1 ? 'just now' : ago < 48 ? `${ago} h ago` : `${Math.round(ago / 24)} d ago`}</span></h2>
       <div className="sync-lines">
         {lines.map(([ln, s]) => (
@@ -3537,11 +3722,20 @@ function LineDashboard({ go, initialLine = null }) {
   const [bkStn, setBkStn] = useState('')   // Overdue-breakup card: station filter ('' = all)
   const [now, setNow] = useState(() => new Date())   // live clock in the toolbar
   const [sync, setSync] = useState(null)   // last sheet pull: per-line imported / held rows
+  const [fails, setFails] = useState(null) // latest failures for the sidebar (null = not visible to this viewer)
+  const fit = useDashFit(!(loading || schedLoading))
   useEffect(() => {
     const lq = initialLine ? `&line=${encodeURIComponent(initialLine)}` : ''
-    getJSON(`/api/logbook/failure-stats?days=180&months=6${lq}`).then(setStats).catch(() => {})
-    getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
+    getJSON(`/api/logbook/failure-stats?days=180&months=12${lq}`).then(setStats).catch(() => {})
     getJSON(`/api/sync/status${initialLine ? `?line=${encodeURIComponent(initialLine)}` : ''}`).then(setSync).catch(() => setSync(null))
+    // the sidebar feed stays live: latest entries + failures re-pulled every minute
+    const pull = () => {
+      getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
+      getJSON(`/api/logbook?entry_type=failure&limit=40${lq}`).then(setFails).catch(() => setFails(null))
+    }
+    pull()
+    const t = setInterval(pull, 60000)
+    return () => clearInterval(t)
   }, [initialLine])
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
   // Dock the hood beneath the sticky topbar like the register's toolbar: measure
@@ -3733,13 +3927,14 @@ function LineDashboard({ go, initialLine = null }) {
     a.click(); URL.revokeObjectURL(a.href)
   }
   return (
-    <>
+    <div className="dash-split" ref={fit}>
+      <div className="dash-main">
       <div className="card dash-hood">
       <div className="dash-toolbar">
-        <h1 className="dash-title" title="Preventive-maintenance compliance & asset health">{line} · Maintenance Overview</h1>
+        <h1 className="sr-only">{line} · Maintenance Overview</h1>
         <span className="dash-kpis">
           <a className="dk" href={regHref} title="Assets in service (spares and decommissioned not counted)"><b>{total.toLocaleString()}</b> assets</a>
-          <span className="dk" title={`${depots} depot${depots === 1 ? '' : 's'}`}><b>{stations}</b> stations</span>
+          <span className="dk" title={`${depots} ${W.depot}${depots === 1 ? '' : 's'}`}><b>{stations}</b> {W.stations}</span>
           <a className={`dk${openF ? ' dk-bad' : ''}`} href={failHref} title="Failures open, acknowledged or on a job card"><b>{openF}</b> open failures</a>
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
@@ -3767,11 +3962,10 @@ function LineDashboard({ go, initialLine = null }) {
           legend IS the breakdown — no duplicate KPI row). */}
       <section className="hstrip">
         <div className="h-compl">
-          <Ring pct={compliance} cls={complClass} size={60} stroke={7} label={`PM compliance ${compliance}%`} />
+          <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
             <span className="h-pk">PM compliance</span>
-            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> within schedule</span>
-            {bucket.grace > 0 && <span className="h-cap"><b>{bucket.grace.toLocaleString()}</b> records awaited · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>}
+            <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule{bucket.grace > 0 && <> · <b>{bucket.grace.toLocaleString()}</b> awaited</>} · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
           </div>
         </div>
         {meter(segs, 'PM compliance breakdown')}
@@ -3788,7 +3982,7 @@ function LineDashboard({ go, initialLine = null }) {
                   <span className="crs-lbl">{r.label}</span>
                   <span className="crs-n">{r.n.toLocaleString()} assets{r.od > 0 && <> · <b className="od">{r.od.toLocaleString()} overdue</b></>}</span>
                 </span>
-                <Ring pct={r.pct} cls={r.cls} size={40} stroke={4.5} na={r.na}
+                <Ring pct={r.pct} cls={r.cls} size={32} stroke={4} na={r.na}
                       label={r.na ? `Only ${r.inC} in cycle — too few for a %` : `${r.ok.toLocaleString()} of ${r.inC.toLocaleString()} within schedule`} />
               </a>
               {meter(r.segs, `Criticality ${r.k} PM breakdown`, `${r.k} · `, r.k)}
@@ -3807,8 +4001,8 @@ function LineDashboard({ go, initialLine = null }) {
               <option value="">All systems</option>
               {bkSystems.map((sy) => <option key={sy} value={sy}>{sy}</option>)}
             </select>
-            <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label="Filter breakup by station">
-              <option value="">All stations</option>
+            <select className="viz-sel" value={bkStn} onChange={(e) => setBkStn(e.target.value)} aria-label={`Filter breakup by ${W.station}`}>
+              <option value="">All {W.stations}</option>
               {bkStations.map((st) => <option key={st} value={st}>{st}</option>)}
             </select>
           </div>
@@ -3864,36 +4058,18 @@ function LineDashboard({ go, initialLine = null }) {
         <p className="viz-insight"><a className="crumb" href={regHref}>Open the register →</a></p>
       </section>
 
-      {/* recent logbook */}
-      <section className="card viz-card">
-        <h2 className="viz-h">Recent logbook <span className="viz-note">latest entries</span></h2>
-        {recent.length === 0 ? <p className="dim">No entries yet.</p> : (
-          <div className="dash-recent">
-            {recentGroups.slice(0, 7).map(({ key, e, n, codes }) => (
-              <a key={key} className="dr-row" href={codes.size === 1 && e.asset_code ? `#/asset/${encodeURIComponent(e.asset_code)}` : '#/log'}
-                 title={n > 1 ? `${n} entries · ${[...codes].filter(Boolean).slice(0, 12).join(', ')}` : e.asset_code || ''}>
-                <span className={`chip ${e.type === 'failure' ? 'd-overdue' : ''}`}><span className="dot" />{e.type}</span>
-                <span className="dr-txt">{tidyLog(e.text).slice(0, 72)}{n === 1 && e.asset_code && <span className="dr-code">{e.asset_code}</span>}</span>
-                {n > 1 && <span className="dr-x">×{n}</span>}
-                <span className="dim dt dr-date">{e.log_date}</span>
-              </a>
-            ))}
-          </div>
-        )}
-        <p className="viz-insight"><a className="crumb" href="#/log">Open the log book →</a></p>
+      {/* failures per month — slim bars */}
+      <section className="card viz-card dash-trend">
+        <h2 className="viz-h">Failures / month <span className="viz-note">last {trend.length}{trend.length ? ` · avg ${Math.round(trend.reduce((n, m) => n + m.count, 0) / trend.length)}/mo` : ''}</span>
+          <a className="crumb viz-more" href={failHref}>Failures →</a></h2>
+        {trend.length ? <SlimTrend data={trend} /> : <p className="dim">No failure data.</p>}
       </section>
-
-      {/* failures per month — last card */}
-      <section className="card viz-card">
-        <h2 className="viz-h">Failures / month <span className="viz-note">last 6</span></h2>
-        {trend.length ? <TrendChart data={trend} fit /> : <p className="dim">No failure data.</p>}
-        <p className="viz-insight"><a className="crumb" href={failHref}>Open the failures dashboard →</a></p>
-      </section>
-
-      {/* sheet sync — when the coordination sheets were last pulled, and which rows were held */}
-      {sync && <SyncCard sync={sync} />}
       </div>
-    </>
+      </div>
+
+      {/* right 40%: rolling logbook, failures by state, sheet-sync log */}
+      <DashFeed groups={recentGroups} fails={fails} sync={sync} failHref={failHref} />
+    </div>
   )
 }
 
@@ -3902,7 +4078,7 @@ function LineDashboard({ go, initialLine = null }) {
    first, with days-pending front and centre. Signed-in only (operational). */
 function exportJobCards(cards) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const head = ['Raised', 'Status', 'Asset', 'Station', 'Location', 'Fault', 'Issued by', 'Issued to', 'Job card detail', 'Closed', 'Age (d)', 'Action taken']
+  const head = ['Raised', 'Status', 'Asset', W.Station, 'Location', 'Fault', 'Issued by', 'Issued to', 'Job card detail', 'Closed', 'Age (d)', 'Action taken']
   const stat = { open: 'Open', closed: 'Closed by agency', penalty: 'Penalty — we fixed' }
   const iss = (v) => (v && v !== 'unknown' && !v.endsWith('-import') ? v : '')
   const rows = cards.map(({ f, jc, rb, status, age }) => [
@@ -3982,7 +4158,7 @@ function JobCardsView({ line = '' }) {
     oldest: ['Oldest / longest pending', (a, b) => b.age - a.age],
     asset: ['Asset code', (a, b) => (a.f.asset_code || '').localeCompare(b.f.asset_code || '')],
     agency: ['Agency', (a, b) => (a.jc.attended_by || '').localeCompare(b.jc.attended_by || '')],
-    station: ['Station', (a, b) => (a.f.station || a.jc.station || '').localeCompare(b.f.station || b.jc.station || '')],
+    station: [W.Station, (a, b) => (a.f.station || a.jc.station || '').localeCompare(b.f.station || b.jc.station || '')],
   }
   const shown = (TABS.find(([k]) => k === tab)?.[2] || cards).slice().sort(SORTS[sort][1])
   // avg turnaround of closed cards (raised→closed), for the chase metric
@@ -4071,7 +4247,7 @@ function JobCardsView({ line = '' }) {
               <col style={{ width: '9%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
               {canWrite && <col style={{ width: '9%' }} />}
             </colgroup>
-            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>Station</th><th>Location</th><th>Fault</th>
+            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>{W.Station}</th><th>Location</th><th>Fault</th>
               <th className={fAgency.length ? 'th-filtered' : ''}>Issued to
                 <ColFilter open={openCol === 'ag'} onToggle={() => setOpenCol(openCol === 'ag' ? null : 'ag')}
                            onClose={() => setOpenCol(null)} values={fAgency}
@@ -4094,7 +4270,7 @@ function JobCardsView({ line = '' }) {
                       title={status === 'open' ? `open for ${age} days` : `closed in ${age} days`}>{age}d</span></td>
                   <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`} title={STT[status]}>{STL[status][1]}</span></td>
                   <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                  <td className="dim nobreak" data-l="Station">{f.station || jc.station || '—'}</td>
+                  <td className="dim nobreak" data-l={W.Station}>{f.station || jc.station || '—'}</td>
                   <td className="dim" data-l="Location">{f.category || '—'}</td>
                   <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></td>
                   <td className="dim" data-l="Issued to">{jc.attended_by || '—'}
@@ -4103,6 +4279,7 @@ function JobCardsView({ line = '' }) {
                   <td className="wrap-cell" data-l="Job card">
                     {ref ? <span className="lt-jc">{ref}</span> : <span className="dim">—</span>}
                     {jcNew && <div className="lt-head lt-sub" title={jcNew}>{jcNew}</div>}
+                    <JobCardApproval jc={jc} f={f} />
                     <JcScan jc={jc} rb={rb} canWrite={canWrite} />
                   </td>
                   {canWrite && (
@@ -4224,7 +4401,7 @@ function DocsView() {
           <li>AMPS is <b>depot-wise</b>. Each line has one or more depots; each depot has its own
             <b> Assets</b> and <b>Logs</b> tab pair in the coordination sheet.</li>
           <li>Your login is <b>scoped to your depot</b> — you see and edit only your own depot.</li>
-          <li>The <b>Green Line (CPD)</b> register is the reference standard for format.</li>
+          {OPERATOR && <li>The <b>Green Line (CPD)</b> register is the reference standard for format.</li>}
         </ul>
       </section>
 
@@ -4267,11 +4444,11 @@ function DocsView() {
           <span className="docs-k">location</span> — fill it and tell the desk, and it will be picked up the same day.</p>
       </section>
 
-      <section className="card docs-sec">
+      {OPERATOR && <section className="card docs-sec">
         <h2>5 · Tenders &amp; contract reader</h2>
         <p>Contract volumes, issues and the clauses behind them — editing is for Green Line logins, every other line reads.
           {' '}<a href="#/tenders?guide">Read the short tenders guide →</a></p>
-      </section>
+      </section>}
     </div>
   )
 }
@@ -4286,7 +4463,7 @@ const NAV = LIVE ? [
   ['/failures', 'Failures'],
   ['/job-cards', 'Job cards'],
   ['/printables', 'More'],
-  ['/guide', 'Guide'],
+  ['/guide', OPERATOR ? 'Guide' : 'Pitch'],
 ] : [
   ['/', 'Assets'],
   ['/planner', 'Planner'],
@@ -4317,7 +4494,9 @@ function LoginForm({ autoFocus = false }) {
     setBusy(true); setErr(null)
     try {
       await apiLogin(username.trim(), password)
-      location.hash = '/'
+      let next = '/'
+      try { next = sessionStorage.getItem('amps-next') || '/'; sessionStorage.removeItem('amps-next') } catch { /* private mode */ }
+      location.hash = next
       location.reload() // fresh session everywhere: nav, scope, authorship
     } catch (ex) {
       setErr(String(ex.message || 'login failed'))
@@ -4452,13 +4631,13 @@ function Landing() {
     <div className="gate land">
       <div className="land-wrap">
         <header className="land-head">
-          <img className="land-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`}
-               alt="Indian Railways" />
+          {OPERATOR && <img className="land-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`}
+               alt="Indian Railways" />}
           <div className="land-head-rule" aria-hidden="true" />
           <div>
             <div className="gate-badge">⚡ AMPS <span className="gate-live">● LIVE</span></div>
             <h1 className="gate-title">{ORG}</h1>
-            <p className="gate-sub">Asset Maintenance &amp; Preventive Scheduling — every line at a glance</p>
+            <p className="gate-sub">Asset Maintenance &amp; Preventive Scheduling — every {W.line} at a glance</p>
           </div>
           <a className="btn gate-signin-btn" href="#/login">Sign in</a>
         </header>
@@ -4535,9 +4714,9 @@ function Landing() {
           {/* right rail: the network-wide figures, tucked over the train art so
               the right side reads as a balanced "at a glance" panel */}
           <aside className="land-glance">
-            <div className="land-glance-h">Network at a glance</div>
+            <div className="land-glance-h">{W.Network} at a glance</div>
             <div className="land-kpis">
-              {kpi(lines ? lines.length : '—', 'Lines')}
+              {kpi(lines ? lines.length : '—', W.Lines)}
               {kpi(loading ? '—' : nf(net.assets), 'Assets')}
               {kpi(nf(locations), 'Locations')}
               {kpi(net.open == null ? '—' : nf(net.open), 'Open failures', net.open ? 'alert' : '')}
@@ -4564,7 +4743,7 @@ function LoginPage() {
           <div className="gate-auth-brand">Sign in to <span className="brand-name">AMPS</span></div>
           <p className="gate-auth-sub">{ORG} — operational access for your line: report failures, write the log, register assets. Viewing needs no account.</p>
           <LoginForm autoFocus />
-          <a className="gate-back" href="#/">← Back to lines</a>
+          <a className="gate-back" href="#/">← Back to {W.lines}</a>
           <div className="gate-foot"><AmpsLink /> · MIT © 2026 <SignatureMark /></div>
         </div>
       </div>
@@ -4595,7 +4774,7 @@ function LineNav({ line, active, showAllLines }) {
   return (
     <span className="line-nav">
       {showAllLines && (
-        <a className="ln-btn ln-back" href="#/" title="All lines" aria-label="All lines">
+        <a className="ln-btn ln-back" href="#/" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
         </a>
       )}
@@ -4731,7 +4910,7 @@ export default function App() {
 
   // split the path from its query (e.g. /log?d=2026-01-13&edit=13863) so a
   // row anywhere can deep-link straight into the logbook to edit an entry
-  const routePath = route.split('?')[0]
+  const routePath = ((p) => p === '/pitch' ? '/guide' : p)(route.split('?')[0])
   const routeQuery = new URLSearchParams(route.split('?')[1] || '')
   const assetMatch = routePath.match(/^\/asset\/(.+)$/)
   // codes carry spaces/parens — the hash percent-encodes them, so decode once
@@ -4748,23 +4927,25 @@ export default function App() {
   const letterMatch = routePath.match(/^\/procurement\/([^/]+)\/letter$/)
   const csMatch = routePath.match(/^\/checksheet\/(wo|pm)\/([^/]+)(?:\/(.+))?$/)
   const jcMatch = routePath.match(/^\/jobcard\/(.+)$/)
+  const snapMatch = routePath.match(/^\/snap\/(.+)$/)
+  const printMatch = routePath.match(/^\/print\/(failure|jobcard)\/(\d+)$/)
 
   if (LIVE && meLoading) return null // one clean paint: landing or app, never both
 
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
-         src={`${import.meta.env.BASE_URL}landing-art.webp?v=57cfb09`} />
+         src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
   )
 
   // Anonymous surface = landing (line squares + sign-in), a chosen line
   // view-only, and QR-scanned asset pages. Everything else routes home.
   if (anonymous) {
     if (routePath === '/login') return <>{siteArt}<LoginPage /></>
-    if (onLanding) return <>{siteArt}<Landing /></> // full-screen, own chrome
+    if (onLanding) return <>{siteArt}<Landing /><AskAmps /></> // full-screen, own chrome
     const navLine = failLine || (lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : null) || (lineMatch ? decodeURIComponent(lineMatch[1]) : null)
     return (
       <>{siteArt}
@@ -4774,8 +4955,8 @@ export default function App() {
           <nav className="nav">
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href="#/" className={!navLine ? 'active' : ''}>Lines</a>}
-            <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>Guide</a>
+              : <a href="#/" className={!navLine ? 'active' : ''}>{W.Lines}</a>}
+            <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
               <span className="li-txt">Sign in</span></a>
@@ -4784,10 +4965,12 @@ export default function App() {
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
+          : snapMatch ? <SnapReport code={safeDecode(snapMatch[1])} />
           : lineAssetsMatch ? <LineAssets name={safeDecode(lineAssetsMatch[1])} />
           : <LineView name={decodeURIComponent(lineMatch[1])} />}
         <footer className="foot">{ORG} · maintenance records · <AmpsLink />, MIT © 2026 <FootSig /></footer>
       </div>
+      <AskAmps />
       </>
     )
   }
@@ -4817,7 +5000,7 @@ export default function App() {
             if (path === '/printables') return <PrintablesNav key={path} active={['/printables', '/letters', '/letters/view', '/tenders', '/tenders/read', '/drawings', '/drawings/view'].includes(routePath)} />
             return <a key={path} href={`#${path}`} className={routePath === path ? 'active' : ''}>{label}</a>
           })}
-          {!LIVE && <ShowcaseDropdown />}
+          {!OPERATOR && !LIVE && <ShowcaseDropdown />}
           {signedIn && (
             <span className="who">
               <span className="dot" style={{ background: lineColor(me.line || '') }} />
@@ -4830,6 +5013,8 @@ export default function App() {
       </header>
 
       {assetMatch ? (LIVE ? <LiveAssetDetail code={assetCode} /> : <AssetDetail code={assetCode} />)
+        : snapMatch ? (LIVE ? <SnapReport code={safeDecode(snapMatch[1])} /> : <NotYet />)
+        : printMatch ? (LIVE ? <SnapPrint kind={printMatch[1]} id={printMatch[2]} code={routeQuery.get('asset')} /> : <NotYet />)
         : lineFailMatch ? (LIVE ? <LineFailures name={failLine} /> : <Failures />)
         : lineAssetsMatch ? (LIVE ? <LineAssets name={safeDecode(lineAssetsMatch[1])} /> : <NotYet />)
         : lineMatch ? (LIVE ? <LineView name={decodeURIComponent(lineMatch[1])} /> : <NotYet />)
@@ -4842,12 +5027,12 @@ export default function App() {
         /* legacy top-level /failures now redirects to the signed-in line's board */
         : routePath === '/failures' ? (LIVE ? <FailuresRedirect me={me} go={go} /> : <Failures />)
         : routePath === '/job-cards' ? (LIVE ? <JobCardsView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
-        : routePath === '/letters/view' ? (LIVE ? <LetterViewer id={routeQuery.get('id')} /> : <NotYet />)
-        : routePath === '/letters' ? (LIVE ? <LettersView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
-        : routePath === '/tenders' ? (LIVE ? <TendersView /> : <NotYet />)
-        : routePath === '/tenders/read' ? (LIVE ? <ReaderView vol={routeQuery.get('v')} page={routeQuery.get('p')} q={routeQuery.get('q')} /> : <NotYet />)
-        : routePath === '/drawings' ? (LIVE ? <DrawingsView /> : <NotYet />)
-        : routePath === '/drawings/view' ? (LIVE ? <DrawingViewer id={routeQuery.get('d')} page={routeQuery.get('p')} /> : <NotYet />)
+        : routePath === '/letters/view' ? (OPERATOR ? <LetterViewer id={routeQuery.get('id')} /> : <NotYet />)
+        : routePath === '/letters' ? (OPERATOR ? <LettersView line={signedIn && me.line ? me.line : ''} /> : <NotYet />)
+        : routePath === '/tenders' ? (OPERATOR ? <TendersView /> : <NotYet />)
+        : routePath === '/tenders/read' ? (OPERATOR ? <ReaderView vol={routeQuery.get('v')} page={routeQuery.get('p')} q={routeQuery.get('q')} /> : <NotYet />)
+        : routePath === '/drawings' ? (OPERATOR ? <DrawingsView /> : <NotYet />)
+        : routePath === '/drawings/view' ? (OPERATOR ? <DrawingViewer id={routeQuery.get('d')} page={routeQuery.get('p')} /> : <NotYet />)
         : routePath === '/spares' ? (LIVE ? <NotYet /> : <Spares />)
         : routePath === '/procurement' ? (LIVE ? <NotYet /> : <Procurement />)
         : routePath === '/printables' ? <Printables initial={routeQuery.get('t') || 'qr'} fmtId={routeQuery.get('f') || ''} />
@@ -4858,6 +5043,7 @@ export default function App() {
         : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
+      {LIVE && !OPERATOR && <AskAmps />}
       <footer className="foot">
         {LIVE
           ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>

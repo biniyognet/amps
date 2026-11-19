@@ -2,7 +2,8 @@
    presentation deck for the GM. Sub-pages are /guide?s=<id>; the deck is
    /guide?s=gm (arrow keys / buttons step the slides). */
 import { useEffect, useState } from 'react'
-import { LIVE, getJSON, useMe } from './api.js'
+import { LIVE, ORG, OPERATOR, getJSON, useMe } from './api.js'
+import Brief from './brief.jsx'
 
 const SECTIONS = [
   ['Guides', [
@@ -249,6 +250,7 @@ const PAGES = { coordinator: Coordinator, logbook: LogbookGuide, tenders: Tender
   users: Users, order: OrderDoc, data: DataDoc, gm: Deck }
 
 export function GuideView({ section }) {
+  if (!OPERATOR) return <Brief />
   const s = PAGES[section] ? section : 'coordinator'
   const Page = PAGES[s]
   const [group, label] = (() => { for (const [h, items] of SECTIONS) for (const [id, l] of items) if (id === s) return [h, l]; return ['', ''] })()

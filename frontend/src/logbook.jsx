@@ -10,7 +10,7 @@
 
    API base: same-origin by default; demo hosting builds with VITE_AMPS_API. */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LIVE, ORG, useMe } from './api.js'
+import { LIVE, ORG, W, useMe } from './api.js'
 
 /* Optional time — the plain native picker. Blank = no time. */
 function TimeInput({ value, onChange, className = '', label = 'Time (optional)' }) {
@@ -24,8 +24,9 @@ const API = import.meta.env.VITE_AMPS_API ?? ''
 
 /* Compress a photo before upload: downscale to maxDim, grayscale, JPEG q — a
    legible A4 checksheet drops from ~3 MB to ~150 KB, so the free off-box backup
-   holds years of scans. PDFs pass through (already a document). */
-async function compressImage(file, maxDim = 1700, quality = 0.72) {
+   holds years of scans. PDFs pass through (already a document). A fault photo
+   (Snap & Report) keeps its colour: scorch marks and wire colours are evidence. */
+export async function compressImage(file, maxDim = 1700, quality = 0.72, gray = true) {
   if (!file.type.startsWith('image/')) return file
   try {
     const img = await createImageBitmap(file)
@@ -34,7 +35,7 @@ async function compressImage(file, maxDim = 1700, quality = 0.72) {
     const canvas = document.createElement('canvas')
     canvas.width = w; canvas.height = h
     const ctx = canvas.getContext('2d')
-    ctx.filter = 'grayscale(1)'
+    if (gray) ctx.filter = 'grayscale(1)'
     ctx.drawImage(img, 0, 0, w, h)
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', quality))
     if (!blob || blob.size >= file.size) return file   // no gain → keep original
@@ -232,6 +233,11 @@ const addDays = (iso, n) => {
    on today — imported history can end months back, and anchoring on the
    calendar would open the book on an empty window. */
 const PAGE_SIZE = 100
+const WIDE_MQ = '(min-width: 1100px)'   // master-detail split from here up
+/* the colour rail each ledger row carries: PM · failure · job card · shift */
+const RAIL = { maintenance: 'pm', failure: 'fail', job_card: 'jc', acknowledgement: 'ack',
+  rectification: 'fix', general: 'shift' }
+const RAIL_LEGEND = [['pm', 'PM'], ['fail', 'Failure'], ['jc', 'Job card'], ['fix', 'Fix'], ['shift', 'Shift']]
 
 const PERIODS = [
   ['Week', 'week'], ['Month', 'month'], ['Year', 'year'], ['All time', 'all'],
@@ -253,6 +259,14 @@ const periodRange = (period, anchorIso) => {
 
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+/* a date window in a few characters: "Nov 2026" for a whole month, else "1 Nov – 19 Nov" */
+const fmtSpan = (from, to) => {
+  const f = new Date(from + 'T00:00:00'), t = new Date(to + 'T00:00:00')
+  if (f.getDate() === 1 && addDays(to, 1).slice(8) === '01' && from.slice(0, 7) === to.slice(0, 7))
+    return f.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+  const dm = (d) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  return from === to ? dm(f) : `${dm(f)} – ${dm(t)}`
+}
 // entry `at`/`time` are stored as the IST clock time the user typed (naive), so
 // show them literally — no tz conversion (that would double-shift by +5:30).
 const fmtTime = (ts) =>
@@ -334,8 +348,30 @@ function DateRuler({ value, onChange, days = 10 }) {
     return { dow: d.toLocaleDateString(undefined, { weekday: 'short' }), day: d.getDate() }
   }
   const inStrip = strip.includes(value)
+  // On a phone the strip scrolls sideways; keep the picked day (else Today,
+  // the last chip) in view instead of leaving it past the right edge.
+  const ref = useRef(null)
+  useEffect(() => {
+    const fit = () => {
+      const el = ref.current
+      const a = el && (el.querySelector('.ruler-day.active') || el.lastElementChild)
+      if (!a || el.scrollWidth <= el.clientWidth) return
+      if (a === el.lastElementChild) { el.scrollLeft = el.scrollWidth; return }
+      const box = el.getBoundingClientRect(), r = a.getBoundingClientRect()
+      if (r.right > box.right) el.scrollLeft += r.right - box.right + 2
+      else if (r.left < box.left) el.scrollLeft -= box.left - r.left + 2
+    }
+    fit()
+    // chips widen once the webfont lands, the strip narrows on rotate: re-fit then
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    for (const c of el.children) ro.observe(c)
+    return () => ro.disconnect()
+  }, [value])
   return (
-    <div className="date-ruler" role="tablist" aria-label="Log date">
+    <div className="date-ruler" ref={ref} role="tablist" aria-label="Log date">
       <input type="date" className={`ruler-pick${!inStrip && value ? ' active' : ''}`}
              value={value} max={t} onChange={(e) => e.target.value && onChange(e.target.value)}
              aria-label="Older date" />
@@ -970,7 +1006,7 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
       <p className="bulk-hint">Tip: copy a block of cells from Excel and paste into any cell — it fills across &amp; down. Drag the small square at a cell's corner to copy its value down the rows.</p>
       <div className="tbl-wrap">
         <table className="bulk-grid">
-          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Cycle</th><th>System</th><th>{W.Station}</th><th>Equipment (Asset ID)</th><th>Details</th><th>Action taken</th><th>Team</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
@@ -981,7 +1017,7 @@ function BulkEntry({ assets, defaultDate, systems = [], onDone, onClose }) {
                 <td className={inFill(i, 'system') ? 'bg-fillrng' : ''}><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}>
                   <option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'system')}</td>
                 <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}>
-                  <option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
+                  <option value="">{W.Station}…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
                 <td className={inFill(i, 'asset') ? 'bg-fillrng' : ''}>
                   <input value={r.asset} list={`bc-${i}`} placeholder="scan/type code" onPaste={(e) => pasteInto(i, 'asset', e)}
                          onChange={(e) => { const v = e.target.value; const hit = byCode[v]
@@ -1107,14 +1143,14 @@ export function JobCardEntry({ assets, systems = [], defaultDate, bulk = true, o
       {bulk && <p className="bulk-hint">Tip: paste a block of cells from Excel into any cell, or drag a cell's corner square to fill down.</p>}
       <div className="tbl-wrap">
         <table className="bulk-grid jc-grid">
-          <thead><tr><th>#</th><th>Date</th><th>System</th><th>Station</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued by</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Date</th><th>System</th><th>{W.Station}</th><th>Equipment (Asset ID)</th><th>Fault</th><th>Issued by</th><th>Issued to (agency)</th><th>Job card detail</th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} onMouseEnter={() => fill && setFillEnd(i)}>
                 <td className="dim bg-n">{i + 1}</td>
                 <td className={inFill(i, 'date') ? 'bg-fillrng' : ''}><input type="date" value={r.date} max={today()} onChange={(e) => set(i, 'date', e.target.value)} onPaste={(e) => pasteInto(i, 'date', e)} />{handle(i, 'date')}</td>
                 <td className={inFill(i, 'system') ? 'bg-fillrng' : ''}><select value={r.system} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, system: e.target.value, station: '' } : x)))}><option value="">System…</option>{sysList.map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'system')}</td>
-                <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}><option value="">Station…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
+                <td className={inFill(i, 'station') ? 'bg-fillrng' : ''}><select value={r.station} onChange={(e) => set(i, 'station', e.target.value)}><option value="">{W.Station}…</option>{stationsFor(r.system).map((s) => <option key={s} value={s}>{s}</option>)}</select>{handle(i, 'station')}</td>
                 <td className={inFill(i, 'asset') ? 'bg-fillrng' : ''}>
                   <input value={r.asset} list={`jc-${i}`} placeholder="scan/type code" onPaste={(e) => pasteInto(i, 'asset', e)}
                          onChange={(e) => { const v = e.target.value; const hit = byCode[v]; setRows((rs) => rs.map((x, j) => (j === i ? { ...x, asset: v, system: hit?.system ?? x.system, station: hit?.location ?? x.station } : x))) }} />
@@ -1176,11 +1212,15 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
   const [bulkOpen, setBulkOpen] = useState(false)          // spreadsheet-style bulk entry grid
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
-  const filtRef = useRef(null)   // the Filters menu (a <details>) — closes on an outside click
+  // master-detail: the ledger lists rows; the picked one opens in a side pane
+  // on wide screens (>= 1100px) and inline under its row below that
+  const [selId, setSelId] = useState(editId ? Number(editId) : null)
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(WIDE_MQ).matches)
   useEffect(() => {
-    const off = (e) => { const el = filtRef.current; if (el?.open && !el.contains(e.target)) el.open = false }
-    document.addEventListener('mousedown', off)
-    return () => document.removeEventListener('mousedown', off)
+    const m = window.matchMedia(WIDE_MQ)
+    const f = () => setWide(m.matches)
+    m.addEventListener('change', f)
+    return () => m.removeEventListener('change', f)
   }, [])
   const [apiOk, setApiOk] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -1317,6 +1357,8 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     }
   }
 
+  const reload = () => load()
+
   useEffect(() => { load() }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to, page])  // eslint-disable-line react-hooks/exhaustive-deps
   // any change of what we are looking at starts again at the first page
   useEffect(() => { setPage(0) }, [logDate, allDates, fCat, fType, fDepot, fSystem, fLocation, qParam, from, to])
@@ -1343,6 +1385,8 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     const setVars = () => {
       const tb = document.querySelector('.topbar')
       if (tb) document.documentElement.style.setProperty('--topbar-h', `${tb.offsetHeight}px`)
+      // the docked day ruler: sticky day headers + the detail pane park under it
+      if (toolbarRef.current) document.documentElement.style.setProperty('--lb-rib-h', `${toolbarRef.current.offsetHeight}px`)
     }
     setVars(); window.addEventListener('resize', setVars)
     return () => window.removeEventListener('resize', setVars)
@@ -1375,7 +1419,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
       })
       const body = await r.json().catch(() => null)
       setImpResult(r.ok ? body : { error: body?.detail || `HTTP ${r.status}` })
-      if (r.ok) load()
+      if (r.ok) reload()
     } catch (err) {
       setImpResult({ error: String(err) })
     }
@@ -1388,6 +1432,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     if (!editId) return
     if (focusDate) { setLogDate(focusDate); setAllDates(false) }
     setEditingId(Number(editId))
+    setSelId(Number(editId))
     setHistoryFor(null)
   }, [editId, focusDate])
 
@@ -1496,7 +1541,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
       setRDate(''); setRTim(''); setRText(''); setRTeam(''); setRConsumables(''); setRFaultType('')
       setTeam('')
       setAllDates(false)  // show the day just written to
-      await load()
+      await reload()
     } catch (ex) {
       setErr(String(ex.message || ex).replace(/^Error: /, ''))
     } finally {
@@ -1526,7 +1571,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
         throw new Error(body?.detail || `HTTP ${res.status}`)
       }
       setRectifying(null)
-      await load()
+      await reload()
     } catch (ex) {
       setErr(String(ex.message || ex).replace(/^Error: /, ''))
     } finally {
@@ -1539,6 +1584,159 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
     return m
   }, {})
 
+  // the one selected entry, in full: right pane on wide screens, inline under
+  // its row on narrow ones. Everything the old per-entry card did lives here.
+  const sel = entries.find((e) => e.id === selId)
+  const renderDetail = (en) => {
+    const openFail = en.type === 'failure' && !en.ended_at
+    return (
+      <div className={`log-entry lb-entry rail-${RAIL[en.type] || 'shift'}${editingId === en.id ? ' editing' : ''}`}>
+        <div className="le-row">
+          <div className="le-main">
+            <div className="log-meta">
+              <span className="dt le-time">{fmtDate(en.log_date)}{!en.at.includes('T00:00:00') ? ` · ${fmtTime(en.at)}` : ''} · {en.shift}</span>
+              {en.system && <span className="chip sys"><span className="dot" />{en.system}</span>}
+              {en.category && <span className="chip grp"><span className="dot" />{en.category}</span>}
+              <span className={`chip ${['defect', 'failure'].includes(en.type) ? 'd-overdue' : ''}`}>
+                <span className="dot" />{en.type}{en.subtype ? ` · ${en.subtype}` : ''}
+              </span>
+              {en.asset_code
+                ? <a className="code" href={`#/asset/${encodeURIComponent(en.asset_code)}`}>{en.asset_code}</a>
+                : en.type === 'failure' && <span className="chip d-overdue"><span className="dot" />unlinked</span>}
+              {en.type === 'failure' && (en.ended_at
+                ? <span className="chip w-done"><span className="dot" />resolved{en.down_hours != null ? ` · ${fmtHrs(en.down_hours)}` : ''}</span>
+                : <span className="chip d-overdue"><span className="dot" />open</span>)}
+              {en.rectifies_id && <span className="dim le-ref">rectifies #{en.rectifies_id}</span>}
+              {en.corrects_id && (
+                <button type="button" className="edited-btn"
+                        onClick={() => setHistoryFor(historyFor === en.id ? null : en.id)}
+                        title="Show edit history"><HistoryIcon /> edited</button>
+              )}
+            </div>
+            <LogBody en={en} />
+            {en.action_taken && <div className="le-action"><span className="lc-tag">Action taken</span> {en.action_taken}</div>}
+            {en.station && !en.asset_code && <div className="le-station"><span className="lc-tag">{W.Station}</span> {en.station}</div>}
+            {en.consumables && <div className="le-consumables"><span className="lc-tag">Consumed</span> {en.consumables}</div>}
+            <div className="le-by">
+              <b>{en.attended_by || en.entered_by}</b>
+              {en.attended_by && en.attended_by !== en.entered_by && <> · rec. {en.entered_by}</>}
+            </div>
+          </div>
+          {canWrite && editingId !== en.id && (
+            <div className="le-actions">
+              <button type="button" className="icon-btn" title="Edit entry" aria-label="Edit entry"
+                      onClick={() => { setEditingId(en.id); setRectifying(null) }}><PencilIcon /></button>
+              {openFail && rectifying !== en.id && (
+                <button type="button" className="icon-btn resolve" title="Rectify — log the fix" aria-label="Rectify"
+                        onClick={() => { setRectifying(en.id); setEditingId(null) }}><ResolveIcon /></button>
+              )}
+            </div>
+          )}
+        </div>
+        {historyFor === en.id && <VersionHistory id={en.id} />}
+        {canWrite && editingId === en.id && (
+          <EditEntryForm entry={en} assets={assets} systems={systems} classSystem={classSystem}
+                         initialResp={initialResp}
+                         onCancel={closeEdit}
+                         onSaved={() => { closeEdit(); reload() }} />
+        )}
+        {canWrite && rectifying === en.id && openFail && (
+          <RectifyForm failure={en} busy={busy}
+                       onCancel={() => setRectifying(null)}
+                       onSubmit={(f) => submitRectify(en, f)} />
+        )}
+      </div>
+    )
+  }
+
+  // the head pieces: one docked bar on wide screens (day ruler left · filters and
+  // actions right; the open counts live on their own tabs), the ledger head below 1100px
+  const ruler = <DateRuler value={allDates ? '' : logDate} days={7}
+                           onChange={(d) => { setLogDate(d); setAllDates(false); setNewOpen(false) }} />
+  const ledgerTitle = (
+    <>
+      <span className="lb-tag">LOG</span>
+      <h2>Ledger</h2>
+      <span className="lb-cap" title={allDates && from ? `${fmtDate(from)} — ${fmtDate(to)}` : fmtDate(logDate)}>
+        {qParam.trim() || allDates ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}` : wide ? fmtSpan(logDate, logDate) : fmtDate(logDate)}
+        {allDates && from && !qParam.trim() ? ` · ${wide ? fmtSpan(from, to) : `${fmtDate(from)} — ${fmtDate(to)}`}` : ''}
+      </span>
+    </>
+  )
+  const ledgerActions = (
+    <div className="asset-actions">
+      {canWrite && (
+        <button type="button" className={`icon-btn${newOpen ? ' on' : ''}`} title="New log entry"
+                aria-label="New log entry" onClick={() => { setNewOpen((v) => !v); setBulkOpen(false) }}>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
+        </button>
+      )}
+      {canWrite && (
+        <button type="button" className={`icon-btn${bulkOpen ? ' on' : ''}`} title="Bulk entry — spreadsheet grid"
+                aria-label="Bulk entry" onClick={() => { setBulkOpen((v) => !v); setNewOpen(false) }}>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <rect x="2.2" y="3" width="11.6" height="10" rx="1.2" /><path d="M2.2 6.4h11.6M2.2 9.7h11.6M6 3v10M10 3v10" strokeWidth="1.1" /></svg>
+        </button>
+      )}
+      <button type="button" className="icon-btn" title="Download the entries in view (CSV)"
+              aria-label="Download entries" onClick={exportCsv} disabled={!entries.length}>
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
+      </button>
+      <button type="button" className="icon-btn" title="Print the log in view"
+              aria-label="Print log" onClick={() => window.print()}>
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
+      </button>
+      {canWrite && (
+        <button type="button" className={`icon-btn${impBusy ? ' disabled' : ''}`} title="Import history CSV"
+                aria-label="Import history" onClick={() => fileRef.current?.click()} disabled={impBusy}>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 9.8V2.6M4.8 5.8 8 2.6l3.2 3.2M3 12.8h10" /></svg>
+        </button>
+      )}
+      <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImportFile} />
+    </div>
+  )
+  const ledgerFilters = (
+    <div className="lb-filters no-print">
+      {/* merged scope: "all dates" + the period window in one control. A day
+          picked on the ruler shows the neutral state; choosing a period
+          switches to that window. */}
+      <select className={`lb-f${allDates ? ' on' : ''}`} value={allDates ? period : ''}
+              onChange={(e) => { setPeriod(e.target.value); setAllDates(true) }} aria-label="Date scope">
+        <option value="" disabled hidden>Single day ▸</option>
+        {PERIODS.map(([lbl, v]) => <option key={v} value={v}>{v === 'all' ? 'All dates' : `This ${lbl.toLowerCase()}`}</option>)}
+      </select>
+      <input className="lb-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)}
+             placeholder="Search — text, asset, crew, fault…" aria-label="Search the log" />
+      {depots.length > 0 && !me?.depot && (
+        <select className={`lb-f${fDepot ? ' on' : ''}`} value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
+          <option value="">All depots</option>
+          {filterDepots.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      )}
+      <select className={`lb-f${fType ? ' on' : ''}`} value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Filter by type">
+        <option value="">All types</option>
+        {ENTRY_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+      </select>
+      <select className={`lb-f${fSystem ? ' on' : ''}`} value={fSystem} onChange={(e) => { setFSystem(e.target.value); setFLocation('') }} aria-label="Filter by system">
+        <option value="">All systems</option>
+        {systems.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <select className={`lb-f${fLocation ? ' on' : ''}`} value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by station">
+        <option value="">All {W.stations}</option>
+        {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
+      </select>
+      {(search || fType || fDepot || fSystem || fLocation || !allDates) && (
+        <button type="button" className="lb-clear" onClick={() => {
+          setSearch(''); setFType(''); setFDepot(''); setFSystem(''); setFLocation(''); setAllDates(true)
+        }}>Clear</button>
+      )}
+    </div>
+  )
+
   return (
     <>
       {apiOk === false && (
@@ -1547,97 +1745,22 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
         </div>
       )}
 
-      {/* one ribbon, one row: calendar + search/filter + actions — unified like the asset page */}
-      <div className="log-ribbon" ref={toolbarRef}>
-        <DateRuler value={allDates ? '' : logDate} days={7}
-                   onChange={(d) => { setLogDate(d); setAllDates(false); setNewOpen(false) }} />
-        <div className="log-tools">
-          {/* merged scope: "all dates" + the period window in one control. A day
-              picked on the calendar shows the neutral state; choosing a period
-              switches to that window (what the separate "All dates" button did). */}
-          <select className="log-scope" value={allDates ? period : ''}
-                  onChange={(e) => { setPeriod(e.target.value); setAllDates(true) }} aria-label="Date scope">
-            <option value="" disabled hidden>Single day ▸</option>
-            {PERIODS.map(([lbl, v]) => <option key={v} value={v}>{v === 'all' ? 'All dates' : `This ${lbl.toLowerCase()}`}</option>)}
-          </select>
-          <input className="asset-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-                 placeholder="Search the log — text, asset, crew, fault…" aria-label="Search the log" />
-          <details className="log-filters" ref={filtRef}>
-            <summary className={`btn ghost sm${[fDepot, fType, fSystem, fLocation].some(Boolean) ? ' on' : ''}`}
-                     title="Filter by depot, type, system, station">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-                <path d="M2.5 4h11M4.5 8h7M6.5 12h3" /></svg>
-              Filters{[fDepot, fType, fSystem, fLocation].filter(Boolean).length ? ` · ${[fDepot, fType, fSystem, fLocation].filter(Boolean).length}` : ''}
-            </summary>
-            <div className="lf-pop">
-          {depots.length > 0 && !me?.depot && (
-            <select value={fDepot} onChange={(e) => setFDepot(e.target.value)} aria-label="Filter by depot">
-              <option value="">All depots</option>
-              {filterDepots.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          )}
-          <select value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Filter by type">
-            <option value="">All types</option>
-            {ENTRY_TYPES.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
-          </select>
-          <select value={fSystem} onChange={(e) => { setFSystem(e.target.value); setFLocation('') }} aria-label="Filter by system">
-            <option value="">All systems</option>
-            {systems.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={fLocation} onChange={(e) => setFLocation(e.target.value)} aria-label="Filter by station">
-            <option value="">All stations</option>
-            {filterStations.map((l) => <option key={l} value={l}>{l}</option>)}
-          </select>
-            </div>
-          </details>
-          {(search || fType || fSystem || fLocation || !allDates) && (
-            <button type="button" className="btn ghost sm" onClick={() => {
-              setSearch(''); setFType(''); setFSystem(''); setFLocation(''); setAllDates(true)
-            }}>Clear</button>
-          )}
-          <span className="asset-count">
-            {qParam.trim() || allDates ? `${total.toLocaleString()} entr${total === 1 ? 'y' : 'ies'}` : fmtDate(logDate)}
-          </span>
-          <div className="asset-actions">
-            {canWrite && (
-              <button type="button" className={`icon-btn${newOpen ? ' on' : ''}`} title="New log entry"
-                      aria-label="New log entry" onClick={() => { setNewOpen((v) => !v); setBulkOpen(false) }}>
-                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                  <path d="M8 3.2v9.6M3.2 8h9.6" /></svg>
-              </button>
-            )}
-            {canWrite && (
-              <button type="button" className={`icon-btn${bulkOpen ? ' on' : ''}`} title="Bulk entry — spreadsheet grid"
-                      aria-label="Bulk entry" onClick={() => { setBulkOpen((v) => !v); setNewOpen(false) }}>
-                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                  <rect x="2.2" y="3" width="11.6" height="10" rx="1.2" /><path d="M2.2 6.4h11.6M2.2 9.7h11.6M6 3v10M10 3v10" strokeWidth="1.1" /></svg>
-              </button>
-            )}
-            <button type="button" className="icon-btn" title="Download the entries in view (CSV)"
-                    aria-label="Download entries" onClick={exportCsv} disabled={!entries.length}>
-              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
-            </button>
-            <button type="button" className="icon-btn" title="Print the log in view"
-                    aria-label="Print log" onClick={() => window.print()}>
-              <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
-            </button>
-            {canWrite && (
-              <button type="button" className={`icon-btn${impBusy ? ' disabled' : ''}`} title="Import history CSV"
-                      aria-label="Import history" onClick={() => fileRef.current?.click()} disabled={impBusy}>
-                <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 9.8V2.6M4.8 5.8 8 2.6l3.2 3.2M3 12.8h10" /></svg>
-              </button>
-            )}
-            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImportFile} />
-          </div>
+      {wide ? (
+        <div className="asset-toolbar log-ribbon lb-bar" ref={toolbarRef}>
+          {ruler}
+          <div className="lb-bar-r">{ledgerFilters}{ledgerActions}</div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* the day ruler stays docked under the top bar: it picks the day for
+              both reading and writing */}
+          <div className="log-ribbon" ref={toolbarRef}>{ruler}</div>
+        </>
+      )}
 
       {canWrite && bulkOpen && (
         <BulkEntry assets={assets} defaultDate={logDate} systems={systems}
-                   onDone={() => { setBulkOpen(false); load() }} onClose={() => setBulkOpen(false)} />
+                   onDone={() => { setBulkOpen(false); reload() }} onClose={() => setBulkOpen(false)} />
       )}
 
       {canWrite && newOpen && (
@@ -1692,7 +1815,7 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
                 </label>
                 <label>Station
                   <select value={station} onChange={(e) => setStation(e.target.value)}>
-                    <option value="">Station…</option>
+                    <option value="">{W.Station}…</option>
                     {stationsForSystem.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
@@ -1841,110 +1964,82 @@ export default function LogBook({ editId = null, focusDate = null, initialResp =
               </span>}
         </div>
       )}
-      {allDates && from && !qParam.trim() && <p className="dim log-range">{fmtDate(from)} — {fmtDate(to)}</p>}
 
-      {Object.entries(byDay).map(([day, list]) => (
-        <div key={day} className="log-day">
-          <h3 className="log-date dt">{fmtDate(day)}</h3>
-          <div className="card">
-            {/* All four shifts always appear, so an empty shift reads as
-                "nothing was logged" rather than as missing data. Empty ones
-                collapse to one line; the shift being written to is marked. */}
-            {ENTRY_SHIFTS.reduce((segs, sh) => {
-              const rows = list.filter((en) => en.shift === sh)
-              const last = segs[segs.length - 1]
-              if (!rows.length && last && !last.rows.length) last.shs.push(sh)
-              else segs.push({ shs: [sh], rows })
-              return segs
-            }, []).map(({ shs, rows }) => {
-              const sh = shs[0]
-              const isSel = shs.includes(shift)
-              if (!rows.length) {
-                // consecutive quiet shifts share one line: "M · E · N — no entries"
-                return (
-                  <div key={sh} className={`log-shift empty${isSel ? ' sel' : ''}`}
-                       title={shs.map((x) => `${x} — ${SHIFT_LABEL[x]}`).join('\n')}>
-                    <span className="log-shift-h">
-                      {shs.length === 1 ? `${sh} — ${SHIFT_LABEL[sh]}`
-                        : shs.map((x, i) => <span key={x} className={x === shift ? 'on' : ''}>{i ? ' · ' : ''}{x}</span>)}
-                    </span>
-                    <span className="dim">no entries</span>
-                  </div>
-                )
-              }
+      {/* the ledger: one full-width card. Head = tag · title · caption, then the
+          scope, search and filters inline (never a drawer), then the actions. */}
+      <section className="card lb-ledger">
+        {!wide && (
+          <div className="lb-head">
+            {ledgerTitle}
+            {ledgerActions}
+          </div>
+        )}
+        {!wide && ledgerFilters}
+
+        <div className={`lb-split${wide ? ' wide' : ''}`}>
+          <div className="lb-list">
+            {Object.entries(byDay).map(([day, list]) => {
+              // per-shift tally in the day header: a quiet shift still reads
+              // "nothing logged" (M 0) rather than as missing data
+              const per = Object.fromEntries(ENTRY_SHIFTS.map((s) => [s, list.filter((en) => en.shift === s).length]))
+              const rows = [...list].sort((a, b) => ENTRY_SHIFTS.indexOf(a.shift) - ENTRY_SHIFTS.indexOf(b.shift))
               return (
-                <div key={sh} className={`log-shift${isSel ? ' sel' : ''}`}>
-                  <div className="log-shift-h">
-                    {sh} — {SHIFT_LABEL[sh]} <span className="dim">· {rows.length}</span>
+                <div key={day} className="lb-day">
+                  <div className="lb-day-h">
+                    <span className="dt">{fmtDate(day)}</span>
+                    <span className="lb-day-n">{list.length}</span>
+                    <span className="lb-day-sh">
+                      {ENTRY_SHIFTS.map((s) => (
+                        <span key={s} className={`${per[s] ? '' : 'z'}${s === shift ? ' on' : ''}`} title={`${SHIFT_LABEL[s]} shift — ${per[s] || 'no'} entr${per[s] === 1 ? 'y' : 'ies'}`}>
+                          {s} {per[s]}
+                        </span>
+                      ))}
+                    </span>
                   </div>
                   {rows.map((en) => {
+                    const on = selId === en.id
                     const openFail = en.type === 'failure' && !en.ended_at
-                    const editing = editingId === en.id
+                    const { head } = logParts(en)
                     return (
-                    <div className={`log-entry${editing ? ' editing' : ''}`} id={`le-${en.id}`} key={en.id}>
-                      <div className="le-row">
-                        <div className="le-main">
-                          <div className="log-meta">
-                            {!en.at.includes('T00:00:00') && <span className="dt le-time">{fmtTime(en.at)}</span>}
-                            {en.system && <span className="chip sys"><span className="dot" />{en.system}</span>}
-                            {en.category && <span className="chip grp"><span className="dot" />{en.category}</span>}
-                            <span className={`chip ${['defect', 'failure'].includes(en.type) ? 'd-overdue' : ''}`}>
-                              <span className="dot" />{en.type}{en.subtype ? ` · ${en.subtype}` : ''}
-                            </span>
-                            {en.asset_code
-                              ? <a className="code" href={`#/asset/${encodeURIComponent(en.asset_code)}`}>{en.asset_code}</a>
-                              : en.type === 'failure' && <span className="chip d-overdue"><span className="dot" />unlinked</span>}
+                      <div key={en.id} className={`lb-item${on ? ' on' : ''}`}>
+                        <div className={`lb-row rail-${RAIL[en.type] || 'shift'}${on ? ' on' : ''}${editingId === en.id ? ' editing' : ''}`}
+                             id={`le-${en.id}`} role="button" tabIndex={0} aria-expanded={on}
+                             onClick={() => setSelId(on && !wide ? null : en.id)}
+                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelId(on && !wide ? null : en.id) } }}>
+                          <span className="lb-c-t dt">{!en.at.includes('T00:00:00') ? fmtTime(en.at) : ''}</span>
+                          <span className="lb-c-sh" title={`${SHIFT_LABEL[en.shift] || en.shift} shift`}>{en.shift}</span>
+                          <span className="lb-c-ty">{TYPE_LABEL[en.type] || en.type}{en.subtype ? ` · ${en.subtype}` : ''}</span>
+                          <span className="lb-c-as">{en.asset_code || (en.type === 'failure' ? <i className="lb-unl">unlinked</i> : en.station || en.system || '')}</span>
+                          <span className="lb-c-tx" title={bodyText(en.text)}>{head}</span>
+                          <span className="lb-c-st">
                             {en.type === 'failure' && (en.ended_at
-                              ? <span className="chip w-done"><span className="dot" />resolved{en.down_hours != null ? ` · ${fmtHrs(en.down_hours)}` : ''}</span>
-                              : <span className="chip d-overdue"><span className="dot" />open</span>)}
-                            {en.rectifies_id && <span className="dim le-ref">rectifies #{en.rectifies_id}</span>}
-                            {en.corrects_id && (
-                              <button type="button" className="edited-btn"
-                                      onClick={() => setHistoryFor(historyFor === en.id ? null : en.id)}
-                                      title="Show edit history"><HistoryIcon /> edited</button>
-                            )}
-                          </div>
-                          <LogBody en={en} />
-                          {en.action_taken && <div className="le-action"><span className="lc-tag">Action taken</span> {en.action_taken}</div>}
-                          {en.station && !en.asset_code && <div className="le-station"><span className="lc-tag">Station</span> {en.station}</div>}
-                          {en.consumables && <div className="le-consumables"><span className="lc-tag">Consumed</span> {en.consumables}</div>}
-                          <div className="le-by">
-                            <b>{en.attended_by || en.entered_by}</b>
-                            {en.attended_by && en.attended_by !== en.entered_by && <> · rec. {en.entered_by}</>}
-                          </div>
+                              ? <span className="lb-st ok">resolved{en.down_hours != null ? ` · ${fmtHrs(en.down_hours)}` : ''}</span>
+                              : <span className="lb-st bad">open</span>)}
+                            {en.corrects_id && <span className="lb-st ed" title="Edited — history in the detail">edited</span>}
+                          </span>
+                          <span className="lb-c-by">{en.attended_by || en.entered_by}</span>
+                          {openFail && <span className="sr-only">open failure</span>}
                         </div>
-                        {canWrite && editingId !== en.id && (
-                          <div className="le-actions">
-                            <button type="button" className="icon-btn" title="Edit entry" aria-label="Edit entry"
-                                    onClick={() => { setEditingId(en.id); setRectifying(null) }}><PencilIcon /></button>
-                            {openFail && rectifying !== en.id && (
-                              <button type="button" className="icon-btn resolve" title="Rectify — log the fix" aria-label="Rectify"
-                                      onClick={() => { setRectifying(en.id); setEditingId(null) }}><ResolveIcon /></button>
-                            )}
-                          </div>
-                        )}
+                        {!wide && on && renderDetail(en)}
                       </div>
-                      {historyFor === en.id && <VersionHistory id={en.id} />}
-                      {canWrite && editingId === en.id && (
-                        <EditEntryForm entry={en} assets={assets} systems={systems} classSystem={classSystem}
-                                       initialResp={initialResp}
-                                       onCancel={closeEdit}
-                                       onSaved={() => { closeEdit(); load() }} />
-                      )}
-                      {canWrite && rectifying === en.id && openFail && (
-                        <RectifyForm failure={en} busy={busy}
-                                     onCancel={() => setRectifying(null)}
-                                     onSubmit={(f) => submitRectify(en, f)} />
-                      )}
-                    </div>
-                  )})}
+                    )
+                  })}
                 </div>
               )
             })}
+            {apiOk && !entries.length && <p className="dim lb-empty">No entries for this filter.</p>}
           </div>
+          {wide && (
+            <aside className="lb-detail" aria-label="Entry detail">
+              <div className="lb-legend" aria-label="Row rails">
+                {RAIL_LEGEND.map(([k, l]) => <span key={k} className={`rail-${k}`}><i />{l}</span>)}
+              </div>
+              {sel ? renderDetail(sel)
+                : <p className="dim lb-pick">{entries.length ? 'Pick an entry on the left to see it in full, edit it or log its fix.' : 'Nothing in view.'}</p>}
+            </aside>
+          )}
         </div>
-      ))}
-      {apiOk && !entries.length && <p className="dim">No entries for this filter.</p>}
+      </section>
 
       {total > PAGE_SIZE && (
         <div className="log-pager">
