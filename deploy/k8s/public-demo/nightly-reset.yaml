@@ -38,6 +38,7 @@ metadata:
   name: amps-nightly-reset
   namespace: amps-demo
 spec:
+  suspend: true            # Buildathon 20-21 Nov: keep the demo data; set false after 21 Nov
   schedule: "0 3 * * *"
   timeZone: Asia/Kolkata
   concurrencyPolicy: Forbid
