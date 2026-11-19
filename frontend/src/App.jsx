@@ -1468,10 +1468,12 @@ function AssetAudit({ code }) {
   )
 }
 
-/* The register's right-hand peek: identity, facts, PM plan and the latest log
-   lines of one asset, without leaving the list. The full page stays one click away. */
+/* The register's right-hand peek: the WHOLE asset record, laid out like the
+   phone page — pinned header (identity, badges, QR, actions), then every section
+   of the full page (facts, PM schedule, logbook groups, work orders, audit).
+   The full page stays one click away for editing and print. */
 function AssetPeek({ code }) {
-  const { asset: a, log, loading, error } = useLiveAsset(code)
+  const { asset: a, history, log, loading, error } = useLiveAsset(code)
   const { schedule } = useAssetSchedule(code)
   const { canWrite } = useMe()
   if (loading) return <p className="dim lb-pick">Loading {code}…</p>
@@ -1482,10 +1484,17 @@ function AssetPeek({ code }) {
   return (
     <div className="rp" style={{ '--line-c': accent }}>
       <div className="rp-head">
-        <span className="rp-code">{a.code}</span>
-        <b className="rp-name">{a.name}</b>
-        <span className="rp-sub">{a.cls}{a.sys ? ` · ${a.sys}` : ''}</span>
-        <span className="rp-loc"><span className="ln-dot" style={{ background: accent }} />{a.line ? `${a.line} · ` : ''}{a.location}</span>
+        <div className="rp-top">
+          <div className="rp-id">
+            <span className="rp-code">{a.code}</span>
+            <b className="rp-name">{a.name}</b>
+            <span className="rp-sub">{a.cls}{a.sys ? ` · ${a.sys}` : ''}</span>
+            <span className="rp-loc"><span className="ln-dot" style={{ background: accent }} />{a.line ? `${a.line} · ` : ''}{a.location}</span>
+          </div>
+          <a className="rp-qr" href={href} title="The asset's QR tag: scan for its history">
+            <QR value={assetUrl(a.code)} size={84} />
+          </a>
+        </div>
         <div className="rp-badges">
           <span className={`status-pill s-${a.status}`}><span className="dot" />{STATUS_LABEL[a.status]}</span>
           <span className={`crit-badge c-${a.criticality}`} title="Criticality">Criticality {a.criticality}</span>
@@ -1500,19 +1509,44 @@ function AssetPeek({ code }) {
       <dl className="rp-facts">
         {[
           ['Location', a.locationDetail || a.location],
+          [W.Line, a.line || '—'],
+          ['System', a.sys || '—'],
+          ['Asset class', a.cls],
           ['Make / model', a.makeModel || '—'],
           ['Commissioned', a.commissionedOn || '—'],
-          ['Codal life', a.codalLifeYears != null ? `${a.codalLifeYears} years` : '—'],
+          ['Codal life', a.codalLifeYears != null ? `${a.codalLifeYears} years${codalExceeded(a) ? ` · exceeded ${codalExpiry(a).getFullYear()}` : ''}` : '—'],
           ['Last serviced', maint.length ? maint[0].log_date : '—'],
           ['Records', `${log.length} log · ${maint.length} maintenance`],
         ].map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+        {a.description && <div className="rp-wide"><dt>Description</dt><dd>{a.description}</dd></div>}
+        {a.remarks && <div className="rp-wide"><dt>Remarks</dt><dd>{a.remarks}</dd></div>}
       </dl>
       <div className="rp-sect"><MaintenanceSchedule schedule={schedule} /></div>
+      {OPERATOR && <div className="rp-sect"><AssetDrawings code={a.code} location={a.location} /></div>}
       <div className="rp-sect">
-        <h3>Latest log</h3>
-        {log.length ? <LogList rows={log.slice(0, 6)} staff={canWrite} /> : <p className="dim">Nothing logged yet.</p>}
-        {log.length > 6 && <a className="rp-more" href={href}>All {log.length} entries →</a>}
+        <AssetLogSections log={log} staff={canWrite} code={a.code} canWrite={canWrite} />
       </div>
+      {history.length > 0 && (
+        <div className="rp-sect"><div className="sect">
+          <h3>Work-order history · {history.length}</h3>
+          {history.map((w) => (
+            <div className="wo" key={w.work_order_id}>
+              <div className="row1">
+                <span className="code">#{w.work_order_id}</span>
+                <span className="t">{w.title}</span>
+                <WoChip status={w.status} />
+              </div>
+              {w.findings && <div className="findings">{w.findings}</div>}
+              <div className="sub">
+                {w.type}
+                {w.done_by && <> · by <b>{w.done_by}</b></>}
+                {w.closed_at && <> · closed <span className="dt">{w.closed_at.slice(0, 10)}</span></>}
+              </div>
+            </div>
+          ))}
+        </div></div>
+      )}
+      {canWrite && <div className="rp-sect"><AssetAudit code={a.code} /></div>}
     </div>
   )
 }

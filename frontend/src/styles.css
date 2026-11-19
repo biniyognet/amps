@@ -2214,15 +2214,13 @@ body:has(.gate) {
 
 
 /* ---- scrollbar / selection / focus — shared ecosystem chrome ---- */
-::-webkit-scrollbar { width: 11px; height: 11px; }
-::-webkit-scrollbar-track { background: #EEF4F8; }
-::-webkit-scrollbar-thumb {
-  background: #9CC5DC; border-radius: 9999px;
-  border: 3px solid #EEF4F8; background-clip: padding-box;
-}
-::-webkit-scrollbar-thumb:hover { background: #0078B4; background-clip: padding-box; }
-::-webkit-scrollbar-corner { background: #EEF4F8; }
-html { scrollbar-width: thin; scrollbar-color: #9CC5DC #EEF4F8; }
+/* slim everywhere: a thin rounded thumb on no track (Chrome/Firefox read the
+   standard pair, Safari the -webkit rules) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: #B9CEDC; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #0078B4; }
+html, * { scrollbar-width: thin; scrollbar-color: #B9CEDC transparent; }
 
 ::selection { background: rgba(96, 204, 240, .35); color: #0B2A3F; }
 
@@ -3039,7 +3037,7 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .lb-detail { position: sticky; top: calc(var(--topbar-h, 78px) + var(--lb-rib-h, 52px) + 4px);
-  max-height: calc(100vh - var(--topbar-h, 78px) - var(--lb-rib-h, 52px) - 16px); overflow-y: auto; min-width: 0; }
+  max-height: calc(100vh - var(--topbar-h, 78px) - var(--lb-rib-h, 52px) - 16px); overflow-y: auto; min-width: 0; overscroll-behavior: contain; }
 .lb-entry.log-entry { padding: 12px 14px; border-bottom: none; box-shadow: inset 3px 0 0 var(--rail); }
 .lb-entry.log-entry:hover { background: transparent; }
 .lb-entry .le-actions { opacity: 1; }
@@ -3345,7 +3343,10 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .reg-table tbody tr.row-peek td { background: var(--accent-soft); }
   .reg-table tbody tr.row-peek td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   .reg-peek { position: sticky; top: calc(var(--topbar-h, 78px) + var(--toolbar-h, 52px) + 4px);
-    max-height: calc(100vh - var(--topbar-h, 78px) - var(--toolbar-h, 52px) - 16px); overflow-y: auto; min-width: 0; margin: 0; padding: 0; }
+    max-height: calc(100vh - var(--topbar-h, 78px) - var(--toolbar-h, 52px) - 16px); overflow-y: auto; min-width: 0; margin: 0; padding: 0;
+    overscroll-behavior: contain;               /* the peek's scroll never drags the page */
+    scrollbar-color: transparent transparent; }  /* thumb only while the pointer is on it */
+  .reg-peek:hover { scrollbar-color: #B9CEDC transparent; }
 }
 /* the split keeps rows one line: Class and Location move to the peek (System too below 1600 px) */
 @media screen and (min-width: 1100px) {
@@ -3358,7 +3359,12 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 }
 @media print { .reg-split.wide { display: block; } .reg-peek { display: none !important; } }
 .rp { font-size: 12.5px; }
-.rp-head { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px 10px; box-shadow: inset 3px 0 0 var(--line-c, var(--accent)); border-bottom: 1px solid var(--border); }
+/* header stays pinned while the facts, schedule and log scroll under it */
+.rp-head { position: sticky; top: 0; z-index: 2; background: var(--surface, #fff); display: flex; flex-direction: column; gap: 3px; padding: 12px 14px 10px; box-shadow: inset 3px 0 0 var(--line-c, var(--accent)), 0 1px 0 var(--border); }
+.rp-top { display: flex; align-items: flex-start; gap: 12px; }
+.rp-id { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.rp-qr { flex: none; display: block; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: #fff; line-height: 0; }
+.rp-qr svg { width: 84px; height: 84px; display: block; }
 .rp-code { font: 600 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink-3); letter-spacing: .02em; }
 .rp-name { font-size: 15px; line-height: 1.25; color: var(--ink); }
 .rp-sub { color: var(--ink-2); font-size: 12px; }
@@ -3367,6 +3373,14 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .rp-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .rp-facts dt { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 650; }
 .rp-facts dd { margin: 1px 0 0; color: var(--ink); overflow-wrap: anywhere; }
+.rp-facts .rp-wide { grid-column: 1 / -1; }
+/* full-page sections, phone-compact inside the peek */
+.rp .sect h3 { font-size: 12px; margin-bottom: 6px; }
+.rp .sect-h-row { gap: 6px; }
+.rp .logsub-h { font-size: 11px; margin: 6px 0 4px; }
+.rp .wo { padding: 6px 0; font-size: 12px; }
+.rp .wo .row1 { flex-wrap: wrap; gap: 4px 8px; }
+.rp .findings { font-size: 12px; }
 .rp-sect { padding: 0 2px; border-bottom: 1px solid var(--border); }
 .rp-sect:last-child { border-bottom: none; }
 .rp-sect > h3 { font-size: 12px; margin: 10px 12px 4px; }
