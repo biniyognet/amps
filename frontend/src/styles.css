@@ -3310,8 +3310,13 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .dash-main .dash-abc > .dash-trend { grid-column: auto; margin: 0; display: flex; flex-direction: column; min-height: 0; padding: 8px 12px 4px; }
   .dash-main .dash-abc .viz-h { white-space: nowrap; font-size: 12px; margin-bottom: 2px; }
   .dash-main .dash-abc .slim-trend { flex: 1; height: auto; min-height: 96px; max-height: none; }
-  .dash-main .dash-abc .crit-card { --dash-lead: 214px; display: flex; flex-direction: column; justify-content: space-evenly; padding: 1px 0; }
+  .dash-main .dash-abc .crit-card { --dash-lead: 240px; display: flex; flex-direction: column; justify-content: space-evenly; padding: 1px 0; }
   .dash-main .crit-card .crs-head { padding: 3px 12px; gap: 8px; }
+  /* fixed lead: ring + meter start at the same x whatever the overdue count's width */
+  .dash-main .crit-card .crs-head { flex: none; width: var(--dash-lead); min-width: var(--dash-lead); max-width: var(--dash-lead); }
+  .dash-main .crit-card .crs-txt { overflow: hidden; }
+  .dash-main .crit-card .crs-n { overflow: hidden; text-overflow: ellipsis; }
+  .dash-main .crit-card .h-meter { flex: 1 1 0; min-width: 0; }
   .dash-main .crit-card .crs-badge { width: 20px; height: 20px; border-radius: 6px; font-size: 11px; }
   .dash-main .crit-card .ring { transform: scale(.82); }
   .dash-main .crit-card .crs-lbl { font-size: 9.5px; }
