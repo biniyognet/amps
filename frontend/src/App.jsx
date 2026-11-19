@@ -5291,7 +5291,7 @@ export default function App() {
           <nav className="nav">
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href={dashHref()} className={routePath === '/sites' || routePath === '/dash' || lineMatch ? 'active' : ''}>{W.Lines}</a>}
+              : <a href={dashHref()} className={routePath === '/sites' || routePath === '/dash' || lineMatch ? 'active' : ''}>Dashboard</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
