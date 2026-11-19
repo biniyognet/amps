@@ -8,7 +8,7 @@
 ### Setup (MSI laptop)
 - [x] Free disk space on C: (target ≥ 25 GB) — done 20 Nov, ~161 GB free
 - [x] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026 — done 20 Nov, billing account "GDP Event Credit" Active, $0 spent
-- [ ] Antigravity IDE: open this folder (`C:\Arups_Wokspace\amps`)
+- [ ] Antigravity IDE: open **this** folder `C:\Arups_Wokspace\amps-buildathon` (not the parent — workspace skills load from its `.agents/skills`)
 - [ ] Install extension **Google Cloud Data Agent Kit** (Extensions → search) 
       CLI: `agy plugin install https://github.com/GoogleCloudPlatform/data-agent-kit-plugin`
 - [ ] Install gcloud CLI + `gcloud auth login`
