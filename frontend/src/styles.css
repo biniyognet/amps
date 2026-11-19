@@ -3892,3 +3892,19 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
   .gd-side { top: 62px; max-height: calc(100vh - 74px); overflow-y: auto; }
   .gd-main.docs { max-width: 1080px; }
 }
+
+/* account badge: name / password / sign-out folded into one menu (11-19) */
+.nav .showcase.acct { margin-left: 4px; }
+.nav .showcase.acct .acct-menu { left: auto; right: 0; min-width: 210px; }
+.acct-btn {
+  width: 32px; height: 32px; border-radius: 99px; border: 1.5px solid var(--acct-c);
+  background: color-mix(in srgb, var(--acct-c) 12%, var(--surface)); color: var(--acct-c);
+  font: 700 12px/1 inherit; letter-spacing: .03em; cursor: pointer; padding: 0;
+  display: inline-grid; place-items: center;
+}
+.acct-btn:hover, .acct-btn.open { background: color-mix(in srgb, var(--acct-c) 22%, var(--surface)); }
+.acct-who { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 6px; }
+.acct-menu button.sc-item { width: 100%; background: none; border: 0; text-align: left; cursor: pointer; font: inherit; }
+/* the line picker keeps one width whatever is picked, so nothing after it shifts */
+.topbar .site-pick .sp-sel select { width: 170px; }
+@media (max-width: 700px) { .topbar .site-pick .sp-sel select { width: 130px; } }

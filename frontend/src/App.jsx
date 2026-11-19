@@ -5191,6 +5191,39 @@ function Redirect({ to }) {
   return null
 }
 
+/* signed-in user: one round badge in the topbar; name, password and sign-out
+   live in its menu so the nav keeps its room */
+function AccountMenu({ me, onPassword }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return undefined
+    const close = () => setOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [open])
+  const initials = (me.full_name || me.username || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+  return (
+    <span className="showcase acct" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className={`acct-btn${open ? ' open' : ''}`} onClick={() => setOpen(!open)}
+              aria-expanded={open} aria-haspopup="true" title={me.full_name}
+              style={{ '--acct-c': me.line ? lineColor(me.line) : 'var(--accent)' }}>{initials}</button>
+      {open && (
+        <div className="showcase-menu acct-menu" role="menu">
+          <div className="acct-who">
+            <span className="sc-name">{me.full_name}</span>
+            <span className="sc-sub">{me.line || 'All lines'}{me.role ? ` · ${String(me.role).replace(/_/g, ' ')}` : ''}</span>
+          </div>
+          <div className="sc-divider" />
+          <button type="button" className="sc-item" role="menuitem" onClick={() => { setOpen(false); onPassword() }}>
+            <span className="sc-name">Change password</span></button>
+          <button type="button" className="sc-item" role="menuitem" onClick={apiLogout}>
+            <span className="sc-name">Sign out</span></button>
+        </div>
+      )}
+    </span>
+  )
+}
+
 function ChangePasswordModal({ onClose }) {
   const [cur, setCur] = useState('')
   const [next, setNext] = useState('')
@@ -5397,13 +5430,13 @@ export default function App() {
 <Brand />
         <nav className="nav">
           {!me?.line && !assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites'} />}
-          {(lineMatch || lineAssetsMatch || lineFailMatch) && navLine && (
-            <LineNav line={navLine} showAllLines={!me?.line}
-                     active={lineAssetsMatch ? 'assets' : lineFailMatch ? 'failures' : 'dash'} />
-          )}
           {NAV.map(([path, label]) => {
-            // the line cluster above already carries Dashboard / Assets / Failures
-            if ((lineMatch || lineAssetsMatch || lineFailMatch) && navLine && ['/', '/assets', '/failures'].includes(path)) return null
+            // one fixed order on every page: inside a line, Dashboard / Assets
+            // point at that line's views instead of moving into a cluster
+            const inLine = (lineMatch || lineAssetsMatch || lineFailMatch) && navLine
+            if (LIVE && inLine && path === '/') return <a key={path} href={`#/line/${encodeURIComponent(navLine)}`} className={lineMatch ? 'active' : ''}>{label}</a>
+            if (LIVE && path === '/') return <a key={path} href="#/" className={['/', '/dash', '/sites'].includes(routePath) ? 'active' : ''}>{label}</a>
+            if (LIVE && inLine && path === '/assets') return <a key={path} href={`#/line/${encodeURIComponent(navLine)}/assets`} className={lineAssetsMatch ? 'active' : ''}>{label}</a>
             // Failures is per-line now: send a coordinator to their own line's
             // board, an admin to the line in view (or the redirect picker).
             if (LIVE && path === '/failures') {
@@ -5415,14 +5448,7 @@ export default function App() {
             return <a key={path} href={`#${path}`} className={routePath === path ? 'active' : ''}>{label}</a>
           })}
           {!OPERATOR && !LIVE && <ShowcaseDropdown />}
-          {signedIn && (
-            <span className="who">
-              <span className="dot" style={{ background: lineColor(me.line || '') }} />
-              {me.full_name}{me.line ? ` · ${me.line}` : ''}
-              <button className="mini-btn" type="button" onClick={() => setPwOpen(true)}>Change password</button>
-              <button className="mini-btn muted" type="button" onClick={apiLogout}>Sign out</button>
-            </span>
-          )}
+          {signedIn && <AccountMenu me={me} onPassword={() => setPwOpen(true)} />}
         </nav>
       </header>
 
