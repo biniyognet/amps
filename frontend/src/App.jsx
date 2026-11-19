@@ -1912,15 +1912,15 @@ function Ring({ pct, cls, size = 56, stroke = 6, na = false, label }) {
   )
 }
 
-function TrendChart({ data, compact, fit }) {
+function TrendChart({ data, compact, fit, slim }) {
   // compact (single-row analytics) uses a taller aspect so the bars fill the
   // card instead of hugging the top; the wide 2-col demo keeps the short aspect;
   // fit (dashboard card) is wide-and-short so the chart fills the card's width.
-  const W = 560, H = fit ? 250 : compact ? 320 : 170, PAD = { t: 18, r: 8, b: 24, l: 8 }
+  const W = slim ? 360 : 560, H = slim ? 132 : fit ? 250 : compact ? 320 : 170, PAD = { t: slim ? 16 : 18, r: 8, b: slim ? 20 : 24, l: 8 }
   const max = Math.max(...data.map((m) => m.count), 1)
   const iw = W - PAD.l - PAD.r
   const ih = H - PAD.t - PAD.b
-  const bw = Math.min(fit ? 46 : 34, (iw / data.length) * 0.5)
+  const bw = Math.min(slim ? 12 : fit ? 46 : 34, (iw / data.length) * 0.5)
   const x = (i) => PAD.l + (iw / data.length) * (i + 0.5)
   const y = (v) => PAD.t + ih * (1 - v / max)
   // ~4 round gridlines (one per unit drew 96 lines at a 96-failure month)
@@ -1936,9 +1936,9 @@ function TrendChart({ data, compact, fit }) {
           {m.count > 0 && (
             <>
               <rect x={x(i) - bw / 2} y={y(m.count)} width={bw} height={ih - (y(m.count) - PAD.t) + 0.5}
-                    rx={0} className="viz-bar-base" />
-              <rect x={x(i) - bw / 2} y={y(m.count)} width={bw} height={Math.min(8, ih * (m.count / max))}
-                    rx={4} className="viz-bar-cap" />
+                    rx={slim ? bw / 2 : 0} className="viz-bar-base" />
+              {!slim && <rect x={x(i) - bw / 2} y={y(m.count)} width={bw} height={Math.min(8, ih * (m.count / max))}
+                    rx={4} className="viz-bar-cap" />}
               <text x={x(i)} y={y(m.count) - 6} className="viz-val" textAnchor="middle">{m.count}</text>
             </>
           )}
@@ -2204,10 +2204,25 @@ function LiveFailures({ line = '' }) {
           {stats.by_class.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
         </select>
         {!anon && (q || cls || fAge.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setCls(''); setFAge([]) }}>Clear</button>}
-        {!anon && <span className="asset-count">{view.length} shown{line && ` · ${line}`}</span>}
-        {anon && <span className="asset-count">Public summary · sign in for records</span>}
+        <div className="fl-sum fl-in" aria-label="Failure summary">
+          <span className="fl-s" title={`${stats.total} failures · ${periodLabel.toLowerCase()}`}><b>{stats.total}</b> failures</span>
+          <span className={`fl-s${stats.open ? ' bad' : ''}`}><b>{stats.open}</b> open</span>
+          <span className="fl-s" title={stats.measured ? `${stats.downtime_hours} h in total · ${stats.measured} timed` : 'no clock times recorded'}>
+            <b>{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</b> downtime</span>
+          {median != null && !anon
+            ? <span className="fl-s" title={`typical (median) restore · mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><b>{fmtHrs(median)}</b> restore</span>
+            : <span className="fl-s"><b>{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</b> MTTR</span>}
+          <span className={`fl-s${stats.unlinked ? ' warn' : ''}`} title="Failures not yet linked to an asset"><b>{stats.unlinked}</b> unlinked</span>
+        </div>
+        <span className="asset-count fl-count" title={line || undefined}>{anon ? 'Public summary' : `${view.length} shown`}</span>
+        <div className="asset-actions">
+          <button type="button" className={`icon-btn${showViz ? ' on' : ''}`} aria-pressed={showViz} onClick={() => setShowViz((v) => !v)}
+                  title={showViz ? 'Hide analytics' : 'Show analytics · trend, by class, fault types, repeat offenders'} aria-label="Analytics">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2.5 13.5h11M4.5 11V8M8 11V4.5M11.5 11V6.5" /></svg>
+          </button>
         {!anon && (
-          <div className="asset-actions">
+          <>
             <button type="button" className="icon-btn" title="Download the failures in view (CSV)"
                     aria-label="Download failures" onClick={exportCsv} disabled={!view.length}>
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2217,33 +2232,16 @@ function LiveFailures({ line = '' }) {
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4.5 6V2.5h7V6M4.5 12H3.2V6.4h9.6V12H11.5M4.5 9.6h7V13.5h-7z" /></svg>
             </button>
-          </div>
+          </>
         )}
-      </div>
-
-      {/* the five headline numbers as one slim line beside the analytics toggle, not a row of tiles */}
-      <div className="fl-bar">
-      <button type="button" className="viz-toggle" onClick={() => setShowViz((v) => !v)} aria-expanded={showViz}>
-        <span className={`chev${showViz ? ' open' : ''}`}>▸</span> Analytics
-        <span className="dim">· trend, by class, fault types, repeat offenders</span>
-      </button>
-        <div className="fl-sum" aria-label="Failure summary">
-          <span className="fl-s"><b>{stats.total}</b> failures · {periodLabel.toLowerCase()}</span>
-          <span className={`fl-s${stats.open ? ' bad' : ''}`}><b>{stats.open}</b> open</span>
-          <span className="fl-s" title={stats.measured ? `${stats.downtime_hours} h in total · ${stats.measured} timed` : 'no clock times recorded'}>
-            <b>{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</b> downtime</span>
-          {median != null && !anon
-            ? <span className="fl-s" title={`mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><b>{fmtHrs(median)}</b> typical restore</span>
-            : <span className="fl-s"><b>{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</b> MTTR</span>}
-          <span className={`fl-s${stats.unlinked ? ' warn' : ''}`} title="Failures not yet linked to an asset"><b>{stats.unlinked}</b> unlinked</span>
         </div>
       </div>
 
       {showViz && (
-        <div className="viz-grid2 viz-compact">
+        <div className="viz-grid2 viz-compact fl-viz">
           <section className="card viz-card">
             <h2 className="viz-h">Failures per month <span className="viz-note">last {months} months</span></h2>
-            <TrendChart data={trend} compact />
+            <TrendChart data={trend} slim />
             <p className="viz-insight">
               {dir === 'down' && <>Improving — {last3} in the last 3 months vs {prev3} in the previous 3.</>}
               {dir === 'up' && <>Worsening — {last3} in the last 3 months vs {prev3} in the previous 3.</>}

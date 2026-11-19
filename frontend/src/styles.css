@@ -3683,3 +3683,27 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
 @media screen and (max-width: 760px) { .fl-sum { margin-left: 0; } .fl-sum .fl-s { padding: 0 10px 0 0; border-left: 0; } }
 .jc-toolbar .asset-kpis.fl-nometer { flex: 0 1 auto; }
 .card.fl-empty { padding: 12px 16px; }
+
+/* ---- failures v86: headline numbers + analytics toggle live in the toolbar row; slim analytics ---- */
+.jc-toolbar .fl-sum.fl-in { margin-left: auto; flex: 0 1 auto; font-size: 11.5px; }
+.jc-toolbar .fl-sum.fl-in .fl-s { padding: 0 9px; }
+.jc-toolbar .fl-sum.fl-in .fl-s b { font-size: 13px; }
+.jc-toolbar .fl-count { margin-left: 0; padding-left: 9px; border-left: 1px solid var(--border); }
+@media screen and (max-width: 1250px) { .jc-toolbar .fl-sum.fl-in { order: 98; flex-basis: 100%; margin-left: 0; } .jc-toolbar .fl-count { margin-left: auto; border-left: 0; } }
+@media screen and (max-width: 760px) { .jc-toolbar .fl-sum.fl-in .fl-s { padding: 0 10px 0 0; border-left: 0; } }
+.fl-viz { gap: 8px; margin-bottom: 10px; }
+.fl-viz .viz-card { padding: 9px 12px 8px; border-radius: 10px; box-shadow: none; display: flex; flex-direction: column; }
+.fl-viz .viz-h { font-size: 10.5px; letter-spacing: .07em; margin-bottom: 4px; color: var(--ink-2); flex-wrap: nowrap; white-space: nowrap; }
+.fl-viz .viz-note { margin-left: auto; font-size: 10px; letter-spacing: .01em; }
+.fl-viz .viz { display: block; width: 100%; height: auto; max-height: 150px; }
+.fl-viz .viz-cat { font-size: 9px; }
+.fl-viz .viz-val { font-size: 10px; }
+.fl-viz .viz-bar-base { fill: var(--accent, #0078B4); opacity: .78; }
+.fl-viz .viz-grid { stroke-dasharray: 2 3; }
+.fl-viz .hbars { padding: 0; }
+.fl-viz .bar-row { grid-template-columns: minmax(84px, 42%) 1fr 22px; gap: 8px; padding: 2.5px 0; }
+.fl-viz .bar-label { font-size: 11.5px; }
+.fl-viz .bar-track { height: 6px; border-radius: 99px; background: #eef3f7; overflow: hidden; }
+.fl-viz .bar-fill { border-radius: 99px; }
+.fl-viz .bar-val { font-size: 11.5px; }
+.fl-viz .viz-insight { margin-top: auto; padding-top: 5px; border-top: 0; font-size: 10.5px; line-height: 1.35; color: var(--ink-3); }
