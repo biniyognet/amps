@@ -78,6 +78,15 @@ const FootSig = () => {
     ? <a href="#/about" className="foot-sig" aria-label="About AMPS"><SignatureMark /></a>
     : <SignatureMark />
 }
+/* the signed-in shell's footer line — also rendered under the checksheet sheet column */
+const ShellFoot = ({ className = '' }) => (
+  <footer className={`foot ${className}`.trim()}>
+    {LIVE
+      ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>
+      : <>Demonstration environment · synthetic data only · <AmpsLink />, MIT © 2026 </>}
+    <FootSig />
+  </footer>
+)
 
 /* Showcase dropdown — demo-only (amps.binihost.com). Points to the real
    deployments of AMPS so a demo visitor can see it running in the field.
@@ -2970,6 +2979,11 @@ function ChecksheetPrint({ published, initialId, modeSwitch }) {
   const bySys = shown.reduce((m, f) => { (m[csSystem(f)] = m[csSystem(f)] || []).push(f); return m }, {})
   const sheets = Array.from({ length: Math.min(Math.max(copies, 1), 20) }, (_, i) => i)
   const isLog = fmt?.slots?.length > 0
+  useEffect(() => {   // the picker is a full-height rail; the footer moves under the sheet column
+    const root = document.documentElement
+    root.classList.add('cs-rail')
+    return () => root.classList.remove('cs-rail')
+  }, [])
   return (
     <div>
       <CsFilterBar formats={published} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={shown.length} modeSwitch={modeSwitch} />
@@ -3029,9 +3043,12 @@ function ChecksheetPrint({ published, initialId, modeSwitch }) {
                   <button className="btn" type="button" onClick={() => window.print()}>Print</button>
                 </div>
               </div>
-              {sheets.map((i) => <ChecksheetSheet key={i} fmt={fmt} printFreq={printFreq} layout={layout} />)}
+              <div className="cs-sheets">
+                {sheets.map((i) => <ChecksheetSheet key={i} fmt={fmt} printFreq={printFreq} layout={layout} />)}
+              </div>
             </>
           ) : <div className="card"><p className="dim" style={{ margin: 0 }}>{published.length ? 'Pick a format.' : 'No published checksheet formats yet.'}</p></div>}
+          <ShellFoot className="cs-foot no-print" />
         </div>
       </div>
     </div>
@@ -5422,12 +5439,7 @@ export default function App() {
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
       {LIVE && <AskAmps />}
-      <footer className="foot">
-        {LIVE
-          ? <>{ORG} · maintenance records · <AmpsLink />, MIT © 2026 </>
-          : <>Demonstration environment · synthetic data only · <AmpsLink />, MIT © 2026 </>}
-        <FootSig />
-      </footer>
+      <ShellFoot />
     </div>
     </>
   )
