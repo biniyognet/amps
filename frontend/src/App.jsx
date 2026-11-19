@@ -4792,6 +4792,24 @@ const CAPS = [
   ['#/log', 'Shift log book', 'The daily register of work done, readings and handovers, searchable.', 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM9 9h6M9 13h6'],
   ['#/printables', 'QR tags & printables', 'Print tag sheets and checklists straight from the register.', 'M7 8V3h10v5M5 8h14v8h-2v4H7v-4H5zM9 14h6'],
 ]
+function GemStar({ size = 16 }) {
+  return (
+    <svg className="gem-star" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#4285F4" /><stop offset=".55" stopColor="#9B72CB" /><stop offset="1" stopColor="#D96570" /></linearGradient></defs>
+      <path fill="url(#gemg)" d="M12 1.5c.6 5.4 4.1 9.4 10.5 10.5-6.4 1.1-9.9 5.1-10.5 10.5C11.4 17.1 7.9 13.1 1.5 12 7.9 10.9 11.4 6.9 12 1.5z" />
+    </svg>
+  )
+}
+
+// what Gemini actually does in this build (backend: api/snap.py, api/ai.py, api/autoplan.py)
+const GEM_CAPS = [
+  ['Vision', 'Reads the fault photo itself: burn marks, a tripped relay, a leaking seal.'],
+  ['Structured output', 'Answers to a fixed schema, so the report and job card fields fill in directly.'],
+  ['Function calling', 'Chooses from 6 read-only tools over the live register, PM schedule and failure log.'],
+  ['Multilingual', 'Notes and questions in English, हिन्दी or বাংলা; answers in the same language.'],
+]
+
 function Landing() {
   if (OPERATOR) return <OperatorLanding />
   const lines = useLines()
@@ -4819,9 +4837,12 @@ function Landing() {
       <section className="lx-hero" aria-label="AMPS">
         <div className="lx-main">
         <div className="lx-copy">
-          <span className="lx-live"><i />Live demo · synthetic data</span>
+          <div className="lx-tags">
+            <span className="lx-live"><i />Live demo · synthetic data</span>
+            <span className="lx-gem"><GemStar size={14} />Built on Google Gemini</span>
+          </div>
           <h1>A failure nobody logs comes back as downtime.</h1>
-          <p>Scan the tag, snap the fault, and Gemini drafts the report and job card. A person checks and submits.
+          <p>Scan the tag, snap the fault, and Google Gemini drafts the report and job card. A person checks and submits.
             Every {W.line}'s maintenance on one record.</p>
           <div className="lx-cta">
             <a className="lx-btn pri" href={dashHref()}>Open the dashboard →</a>
@@ -4867,8 +4888,8 @@ function Landing() {
       <section className="lx-sec lx-dark" aria-labelledby="lx-ai">
         <div className="lx-wrap">
           <header className="lx-head">
-            <span className="lx-kick">AI, with a person in the loop</span>
-            <h2 id="lx-ai">Gemini does the paperwork. People make the calls.</h2>
+            <span className="lx-kick lx-kick-gem"><GemStar size={14} />Built on Google AI</span>
+            <h2 id="lx-ai">Google Gemini does the paperwork. People make the calls.</h2>
             <p>Every answer is looked up in the register, PM schedule and failure log. Nothing is saved until someone approves it.</p>
           </header>
           <div className="lx-cards">
@@ -4882,6 +4903,15 @@ function Landing() {
               <LxIcon d="M5 3h10l4 4v14H5zM9 11h6M9 15h6M9 7h3" />
               <b>AI maintenance plans</b><span>Gemini drafts the PM plan for a {W.line}; a supervisor approves each change.</span><em>See how →</em></a>
           </div>
+          <ol className="lx-flow" aria-label="How a Snap travels">
+            <li><small>Phone</small><b>Photo + rough note</b></li>
+            <li className="gem"><small><GemStar size={12} /> Google AI</small><b>gemini-2.5-flash</b></li>
+            <li><small>Schema JSON</small><b>Report + job card</b></li>
+            <li><small>Person</small><b>Checks and submits</b></li>
+          </ol>
+          <dl className="lx-gcaps">
+            {GEM_CAPS.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}
+          </dl>
         </div>
       </section>
       <section className="lx-sec lx-light" aria-labelledby="lx-cap">
