@@ -7,7 +7,7 @@
 
 ### Setup (MSI laptop)
 - [x] Free disk space on C: (target ≥ 25 GB) — done 20 Nov, ~161 GB free
-- [ ] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026
+- [x] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026 — done 20 Nov, billing account "GDP Event Credit" Active, $0 spent
 - [ ] Antigravity IDE: open this folder (`C:\Arups_Wokspace\amps`)
 - [ ] Install extension **Google Cloud Data Agent Kit** (Extensions → search) 
       CLI: `agy plugin install https://github.com/GoogleCloudPlatform/data-agent-kit-plugin`
@@ -56,11 +56,66 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 - Stack: FastAPI + SQLAlchemy 2 + Alembic · Postgres or SQLite · React (Vite) frontend
 
 ## 4. Confusions to clear (mental model)
-> Write the question, then the answer we agree on.
+
+### Q1. AMPS is already production-grade on binihost. What is `buildathon` for?
+**It is not a rebuild or a migration.** `buildathon` is a branch of the same repo that adds a **Google AI + data layer on top of AMPS as it is now**.
+- Production (amps.binihost.com, the Metro box) stays as it is. Nothing moves off binihost.
+- Every new feature is **additive**: new endpoints, new tables or columns, new screens. If one breaks, the rest of AMPS still works.
+- What the judges score is **how well Google tech is used** (Gemini, AlloyDB/pgvector, BigQuery, MCP, Agent Skills, Cloud Run), not how complete the CMMS is. We already have the complete CMMS, and that is our advantage.
+- After the event, the features that prove useful are merged into the main AMPS line. The rest stays on the branch.
+
+**Rule of thumb:** binihost = the product. buildathon = the product + a visible AI brain, demoed for one weekend.
+
+### Side by side — AMPS now vs AMPS buildathon
+
+| Layer | AMPS now (binihost) | AMPS buildathon (adds) | Kind of change |
+|---|---|---|---|
+| Frontend | React + Vite SPA, Ensign site 70 (amps.binihost.com) | New panels: "Similar past failures", risk badge on assets, analytics chat | Additive UI |
+| API | FastAPI + SQLAlchemy 2 + Alembic, k3s `amps-demo` | New routes: `/ai/similar`, `/ai/extract`, `/ai/risk`, MCP server | Additive endpoints |
+| Database | Postgres 16 (pod), nightly reset 03:00 | + `vector` extension and an embeddings column (in the same Postgres, or an **AlloyDB Express** copy for the demo) | Additive schema (Alembic migration) |
+| AI calls | Gemini 2.5 Flash over REST `generateContent` (Ask AMPS, Snap & Report, Auto-plan) | + embeddings, **AI.EXTRACT** on remarks, risk scoring | Extends the same Gemini key |
+| Agent access | Ask AMPS = 6 read-only tools inside the app | **F3 MCP server** exposes the same 6 tools to any agent (Antigravity, Claude, Gemini CLI) | Wrapper, no logic change |
+| Guardrails | Code-level (read-only tools, human submits) | **F5 SKILL.md**: rules an agent must follow on AMPS data | New doc file |
+| Analytics | Dashboard counts/charts | **F4** logbook/failures → BigQuery + Conversational Analytics (ask in English) | New export job + Google console |
+| Hosting | binihost k3s + Ensign | Same. **Cloud Run** copy only if we want a "deployed on Google" line | Optional mirror |
+| Data | Metro data stays on the Metro box | Demo uses **Demo Industries** seed data only, never Metro data | No change |
+
+### What each feature needs (to choose what to build)
+| F | Feature | Needs | Effort | Demo wow |
+|---|---|---|---|---|
+| F1 | Similar past failures | pgvector + Gemini embeddings | M | High |
+| F2 | Fault fields from remarks | Gemini (AI.EXTRACT-style prompt) | S | Medium |
+| F3 | AMPS MCP server | Python MCP SDK, the 6 existing tools | S | High (agent-native) |
+| F4 | BigQuery analytics agent | BigQuery dataset + export | M–L | Medium |
+| F5 | AMPS SKILL.md | One markdown file | XS | Low alone, strong with F3 |
+| F6 | Failure-risk score | F1/F2 output + a simple formula | M | High on the dashboard |
+
+## 4b. Keyword brief (one line each)
+| Keyword | What it is | Where it fits in AMPS |
+|---|---|---|
+| Gemini | Google's LLM family (2.5 Flash is fast and cheap) | Already powers Ask AMPS / Snap |
+| Embedding | Text turned into a list of numbers; similar meaning = nearby numbers | Turn each failure remark into a vector |
+| pgvector (`vector`) | Postgres extension that stores vectors and finds nearest ones | F1 "find failures like this one" |
+| ScaNN | Google's fast nearest-neighbour index (AlloyDB) | Speeds up F1 at scale; not needed for demo size |
+| AlloyDB / Express | Google's managed Postgres; Express = free-tier, scales to zero | Optional demo DB showing Google data stack |
+| `google_ml_integration` | AlloyDB extension: call Gemini from SQL | Lets SQL do embeddings / AI.EXTRACT |
+| AI.EXTRACT / AI.IF | SQL functions: pull fields out of text / filter by English condition | F2 structured fault fields |
+| BigQuery | Google's data warehouse for big analytics | F4 estate-wide analytics |
+| Conversational Analytics | BigQuery agent: English question → SQL → chart | F4 "which station fails most in monsoon?" |
+| MCP (Model Context Protocol) | Standard plug for agents to call tools/data | F3: any agent can query AMPS safely |
+| Agent Skill (SKILL.md) | Markdown rules/know-how an agent loads only when relevant | F5 AMPS data guardrails |
+| Data Agent Kit (DAK) | Google's pack of MCP servers + skills for its databases | Connects Antigravity to AlloyDB/BigQuery fast |
+| Antigravity / `agy` | Google's agent-first IDE / its CLI | Where we build during the event |
+| AI Studio | Web playground to try prompts and get a Gemini key | Prompt testing |
+| Cloud Run | Run a container on Google, get a URL, scales to zero | Optional Google-hosted copy |
+| Function calling | LLM picks one of our tools and fills its arguments | How Ask AMPS works today |
+| RAG | Retrieve relevant records first, then let the LLM answer from them | F1 + Ask AMPS together |
+| Progressive disclosure | Load detail only when needed (skills) | Keeps the agent prompt small |
 
 | # | Question | Answer / pattern |
 |---|---|---|
-| 1 | | |
+| 1 | Why buildathon if AMPS is production-grade? | Branch = AI layer on top, additive, demo on seed data; prod untouched (Q1) |
+| 2 | | |
 
 ## 5. Decisions log
 | Time | Decision | Why |
