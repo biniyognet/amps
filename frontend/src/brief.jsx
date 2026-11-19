@@ -186,8 +186,8 @@ export default function Brief() {
       <header className="br-head">
       <p className="br-kick">BRIEF · AMPS · OPEN-SOURCE EAM · {new Date().getFullYear()}</p>
       <h1>AMPS — scan, snap, and Gemini drafts the job card</h1>
-      <p className="br-dek">A failure nobody logs comes back as downtime. Scan the asset’s QR, take a photo, and Gemini drafts the
-        failure report and job card for a person to confirm. Open-source EAM for any plant, ₹0 licence.</p>
+      <p className="br-dek"><span className="br-dek-x">A failure nobody logs comes back as downtime. </span>Scan the asset’s QR, take a photo, and Gemini drafts the
+        failure report and job card for a person to confirm.<span className="br-dek-x"> Open-source EAM for any plant, ₹0 licence.</span></p>
       </header>
 
       <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-three slides</h2>

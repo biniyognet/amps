@@ -58,14 +58,16 @@
   html.brief-fit,html.brief-fit body{overflow:hidden;overscroll-behavior:none}
   html.brief-fit .foot{display:none}
   html.brief-fit .shell{padding-bottom:0;max-width:none}
-  .brief{--fit-h:calc(100dvh - var(--brief-top,96px) - 12px);--head-h:98px;--ctl-h:36px;
+  .brief{--fit-h:calc(100dvh - var(--brief-top,96px) - 12px);--head-h:52px;--ctl-h:36px;
     max-width:none;height:var(--fit-h);box-sizing:border-box;padding:14px 22px 12px;overflow:hidden}
   .br-split{display:grid;grid-template-columns:minmax(0,calc((var(--fit-h) - 26px - var(--head-h) - var(--ctl-h)) * 16 / 9)) minmax(340px,1fr);gap:22px;height:100%}
   .br-main{display:flex;flex-direction:column;min-height:0}
-  .br-head{height:var(--head-h);flex:none;overflow:hidden}
-  .br-head .br-kick{margin:0;font-size:10.5px;line-height:14px}
-  .br-head h1{font-size:clamp(22px,2.9vh,30px);line-height:1.15;margin:3px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .br-head .br-dek{font-size:13.5px;line-height:1.45;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* v85: one title row (h1 + kicker chip) + one dek line, so the deck gets the height */
+  .br-head{height:var(--head-h);flex:none;overflow:hidden;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:14px;align-content:flex-start}
+  .br-head h1{order:1;flex:0 1 auto;min-width:0;font-size:clamp(20px,2.6vh,24px);line-height:28px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .br-head .br-kick{order:2;margin:0 0 0 auto;font-size:10px;line-height:14px;white-space:nowrap}
+  .br-head .br-dek{order:3;flex:1 0 100%;font-size:13px;line-height:20px;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .br-head .br-dek-x{display:none}
   .br-main .br-deck-h,.br-main > .br-note{display:none}
   .br-main .br-deck{flex:1;min-height:0;margin:0;container-type:size;display:flex;flex-direction:column;justify-content:center}
   .br-main .br-deck:not(:fullscreen) .br-stage{width:min(100cqw,calc((100cqh - var(--ctl-h)) * 16 / 9));flex:none;box-sizing:border-box;border-radius:10px}
