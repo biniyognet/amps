@@ -3336,3 +3336,44 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
   .dash-main .hstrip .h-cl { font-size: 9.5px; }
   .dash-main .dash-od2 { flex: 0 1 auto; max-height: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* v66 (Arup 11-19): asset register = list + right-hand peek, 70:30 like the log book.
+   Click a row → peek; double-click / Enter on the picked row / "Open full record" → full page. */
+@media screen and (min-width: 1100px) {
+  .reg-split.wide { display: grid; grid-template-columns: minmax(0, 7fr) minmax(340px, 3fr); gap: 10px; align-items: start; }
+  .reg-split.wide > .tbl-wrap { min-width: 0; margin: 0; }
+  .reg-table tbody tr.row-peek td { background: var(--accent-soft); }
+  .reg-table tbody tr.row-peek td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .reg-peek { position: sticky; top: calc(var(--topbar-h, 78px) + var(--toolbar-h, 52px) + 4px);
+    max-height: calc(100vh - var(--topbar-h, 78px) - var(--toolbar-h, 52px) - 16px); overflow-y: auto; min-width: 0; margin: 0; padding: 0; }
+}
+/* the split keeps rows one line: Class and Location move to the peek (System too below 1600 px) */
+@media screen and (min-width: 1100px) {
+  .reg-split.wide .reg-table col:nth-child(4), .reg-split.wide .reg-table col:nth-child(6),
+  .reg-split.wide .reg-table tr > :nth-child(4), .reg-split.wide .reg-table tr > :nth-child(6) { display: none; }
+  .reg-split.wide .reg-table td:not([data-l="Asset"]) { white-space: nowrap; }
+}
+@media screen and (min-width: 1100px) and (max-width: 1599px) {
+  .reg-split.wide .reg-table col:nth-child(7), .reg-split.wide .reg-table tr > :nth-child(7) { display: none; }
+}
+@media print { .reg-split.wide { display: block; } .reg-peek { display: none !important; } }
+.rp { font-size: 12.5px; }
+.rp-head { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px 10px; box-shadow: inset 3px 0 0 var(--line-c, var(--accent)); border-bottom: 1px solid var(--border); }
+.rp-code { font: 600 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink-3); letter-spacing: .02em; }
+.rp-name { font-size: 15px; line-height: 1.25; color: var(--ink); }
+.rp-sub { color: var(--ink-2); font-size: 12px; }
+.rp-loc { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 12px; }
+.rp-badges, .rp-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rp-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.rp-facts dt { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 650; }
+.rp-facts dd { margin: 1px 0 0; color: var(--ink); overflow-wrap: anywhere; }
+.rp-sect { padding: 0 2px; border-bottom: 1px solid var(--border); }
+.rp-sect:last-child { border-bottom: none; }
+.rp-sect > h3 { font-size: 12px; margin: 10px 12px 4px; }
+.rp .sect { padding: 10px 12px; }
+.rp .sect h3 { font-size: 12px; flex-wrap: wrap; }
+.rp-more { display: inline-block; margin: 4px 12px 12px; font-size: 12px; }
+.rp .sl-row { grid-template-columns: 24px 1fr auto; row-gap: 2px; gap: 2px 8px; font-size: 12.5px; }
+.rp .sl-last { grid-column: 2 / 3; grid-row: 2; }
+.rp .sl-why { grid-column: 2 / 4; grid-row: 3; }
+.rp .sl-empty { display: none; }

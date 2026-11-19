@@ -208,6 +208,16 @@ function LiveDashboard({ go, initialLine = null }) {
   const [impResult, setImpResult] = useState(null)
   const fileRef = useRef(null)
   const toolbarRef = useRef(null)
+  // >= 1100 px a row opens the asset in a right-hand peek (70:30, like the log
+  // book); below that a row still goes to the full asset page
+  const [peek, setPeek] = useState(null)
+  const [regWide, setRegWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches)
+  useEffect(() => {
+    const m = window.matchMedia('(min-width: 1100px)')
+    const f = () => setRegWide(m.matches)
+    m.addEventListener('change', f)
+    return () => m.removeEventListener('change', f)
+  }, [])
   // printing renders the WHOLE filtered set (not just the on-screen page) so a
   // printout is never silently truncated to 150 rows; the effect prints after the
   // full table has painted, then restores the paged view.
@@ -343,6 +353,8 @@ function LiveDashboard({ go, initialLine = null }) {
   const pageRows = shown.slice(pageSafe * REG_PAGE, (pageSafe + 1) * REG_PAGE)
   // when printing, render every filtered row so the printout is complete
   const renderRows = printAll ? shown : pageRows
+  // the peek holds the picked asset while it stays in the filtered set, else the first row
+  const peekCode = peek && shown.some((a) => a.code === peek) ? peek : pageRows[0]?.code
   // SL (serial) numbering — absolute position in the filtered set, so a printout
   // of a paged view still numbers continuously
   const rowOffset = printAll ? 0 : pageSafe * REG_PAGE
@@ -595,6 +607,7 @@ function LiveDashboard({ go, initialLine = null }) {
           {shown.length === 0 ? (
             <div className="card"><p className="dim" style={{ margin: 0 }}>No assets match — clear the search or filters.</p></div>
           ) : (
+            <div className={`reg-split${regWide ? ' wide' : ''}`}>
             <div className="card tbl-wrap freeze-head reg-print">
               <table className="sortable reg-table">
                 <colgroup>
@@ -637,10 +650,11 @@ function LiveDashboard({ go, initialLine = null }) {
                     const ackHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=acknowledgement` : `#/asset/${encodeURIComponent(a.code)}`
                     const rectHref = single ? `#/log?d=${fdate}&edit=${fid}&resp=rectification` : `#/asset/${encodeURIComponent(a.code)}`
                     return (
-                      <tr key={a.code} tabIndex={0}
-                          className={nOpen ? 'row-faulty' : nAck ? 'row-ack' : nJob ? 'row-job' : ''}
-                          onClick={() => go(`/asset/${encodeURIComponent(a.code)}`)}
-                          onKeyDown={(e) => e.key === 'Enter' && go(`/asset/${encodeURIComponent(a.code)}`)}>
+                      <tr key={a.code} tabIndex={0} aria-selected={regWide ? a.code === peekCode : undefined}
+                          className={`${nOpen ? 'row-faulty' : nAck ? 'row-ack' : nJob ? 'row-job' : ''}${regWide && a.code === peekCode ? ' row-peek' : ''}`}
+                          onClick={() => regWide ? setPeek(a.code) : go(`/asset/${encodeURIComponent(a.code)}`)}
+                          onDoubleClick={() => go(`/asset/${encodeURIComponent(a.code)}`)}
+                          onKeyDown={(e) => e.key === 'Enter' && (regWide && a.code !== peekCode ? setPeek(a.code) : go(`/asset/${encodeURIComponent(a.code)}`))}>
                         <td className="sl-col">{rowOffset + i + 1}</td>
                         <td className="code" data-l="Code">{a.code}</td>
                         <td data-l="Asset">{a.name}
@@ -675,6 +689,12 @@ function LiveDashboard({ go, initialLine = null }) {
                   })}
                 </tbody>
               </table>
+            </div>
+            {regWide && (
+              <aside className="card reg-peek no-print" aria-label="Asset detail">
+                {peekCode ? <AssetPeek key={peekCode} code={peekCode} /> : <p className="dim lb-pick">Pick an asset on the left.</p>}
+              </aside>
+            )}
             </div>
           )}
           {shown.length > REG_PAGE && (
@@ -1444,6 +1464,55 @@ function AssetAudit({ code }) {
           {r.detail && <div className="findings">{r.detail}</div>}
         </div>
       ))}
+    </div>
+  )
+}
+
+/* The register's right-hand peek: identity, facts, PM plan and the latest log
+   lines of one asset, without leaving the list. The full page stays one click away. */
+function AssetPeek({ code }) {
+  const { asset: a, log, loading, error } = useLiveAsset(code)
+  const { schedule } = useAssetSchedule(code)
+  const { canWrite } = useMe()
+  if (loading) return <p className="dim lb-pick">Loading {code}…</p>
+  if (error || !a) return <p className="dim lb-pick">Could not load {code}.</p>
+  const accent = lineColor(a.line)
+  const maint = log.filter((e) => e.type === 'maintenance')
+  const href = `#/asset/${encodeURIComponent(a.code)}`
+  return (
+    <div className="rp" style={{ '--line-c': accent }}>
+      <div className="rp-head">
+        <span className="rp-code">{a.code}</span>
+        <b className="rp-name">{a.name}</b>
+        <span className="rp-sub">{a.cls}{a.sys ? ` · ${a.sys}` : ''}</span>
+        <span className="rp-loc"><span className="ln-dot" style={{ background: accent }} />{a.line ? `${a.line} · ` : ''}{a.location}</span>
+        <div className="rp-badges">
+          <span className={`status-pill s-${a.status}`}><span className="dot" />{STATUS_LABEL[a.status]}</span>
+          <span className={`crit-badge c-${a.criticality}`} title="Criticality">Criticality {a.criticality}</span>
+          {codalExceeded(a) && <span className="codal-badge"><span className="dot" />Exceeded service life</span>}
+        </div>
+        <div className="rp-acts">
+          <a className="btn sm" href={href}>Open full record →</a>
+          <a className="btn ghost sm snap-cta" href={`#/snap/${encodeURIComponent(a.code)}`}
+             onClick={() => { if (!canWrite) rememberNext(`/snap/${encodeURIComponent(a.code)}`) }}>📷 Report a problem</a>
+        </div>
+      </div>
+      <dl className="rp-facts">
+        {[
+          ['Location', a.locationDetail || a.location],
+          ['Make / model', a.makeModel || '—'],
+          ['Commissioned', a.commissionedOn || '—'],
+          ['Codal life', a.codalLifeYears != null ? `${a.codalLifeYears} years` : '—'],
+          ['Last serviced', maint.length ? maint[0].log_date : '—'],
+          ['Records', `${log.length} log · ${maint.length} maintenance`],
+        ].map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+      </dl>
+      <div className="rp-sect"><MaintenanceSchedule schedule={schedule} /></div>
+      <div className="rp-sect">
+        <h3>Latest log</h3>
+        {log.length ? <LogList rows={log.slice(0, 6)} staff={canWrite} /> : <p className="dim">Nothing logged yet.</p>}
+        {log.length > 6 && <a className="rp-more" href={href}>All {log.length} entries →</a>}
+      </div>
     </div>
   )
 }
