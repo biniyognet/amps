@@ -25,7 +25,7 @@ def call(url, key, body=None):
                                  headers={"x-goog-api-key": key, "content-type": "application/json"})
     t = time.monotonic()
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=30) as r:
             return r.status, json.load(r), time.monotonic() - t
     except urllib.error.HTTPError as e:
         try:
@@ -33,6 +33,8 @@ def call(url, key, body=None):
         except Exception:
             msg = e.reason
         return e.code, {"error": msg}, time.monotonic() - t
+    except OSError as e:  # timeouts and resets count as a failed call, not a crash
+        return 0, {"error": f"{type(e).__name__}: {e}"}, time.monotonic() - t
 
 
 def main():
