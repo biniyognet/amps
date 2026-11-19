@@ -3661,3 +3661,25 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
     font-size: 10.5px; font-weight: 600; line-height: 1.3; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .reg-split.wide .reg-peek-h span { margin-left: auto; font-size: 9.5px; letter-spacing: .02em; text-transform: none; font-weight: 500; }
 }
+
+/* ---- failures v84: same slim board as the job cards — tabs + age bar in the toolbar,
+   the headline numbers as one line beside the analytics toggle, rows with a state bar ---- */
+.fl-bar { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 0 0 12px; }
+.fl-bar .viz-toggle { width: auto; margin: 0; }
+.fl-sum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.fl-sum .fl-s { padding: 0 12px; border-left: 1px solid var(--border); white-space: nowrap; }
+.fl-sum .fl-s:first-child { border-left: 0; }
+.fl-sum .fl-s b { font-size: 15px; font-weight: 700; color: var(--ink); margin-right: 3px; font-variant-numeric: tabular-nums; }
+.fl-sum .fl-s.bad b { color: var(--critical); }
+.fl-sum .fl-s.warn b { color: #8a6100; }
+.fl-slim tr.fl-open { --jc-bar: #22a355; }
+.fl-slim tr.fl-acknowledged { --jc-bar: #e0a010; }
+.fl-slim tr.fl-job_card { --jc-bar: #d4c000; }
+.fl-slim tr.fl-open.warm, .fl-slim tr.fl-acknowledged.warm, .fl-slim tr.fl-job_card.warm { --jc-bar: #e0863a; }
+.fl-slim tr.fl-open.hot, .fl-slim tr.fl-acknowledged.hot, .fl-slim tr.fl-job_card.hot { --jc-bar: var(--critical); background: color-mix(in srgb, var(--critical) 4%, transparent); }
+.fl-slim tr.fl-resolved { --jc-bar: color-mix(in srgb, var(--good) 45%, transparent); }
+.fl-slim tr.fl-unlinked { --jc-bar: var(--ink-4, #b9b4ae); }
+.fl-slim .fl-unl { background: #eeeae5; color: var(--ink-3); border-color: transparent; }
+@media screen and (max-width: 760px) { .fl-sum { margin-left: 0; } .fl-sum .fl-s { padding: 0 10px 0 0; border-left: 0; } }
+.jc-toolbar .asset-kpis.fl-nometer { flex: 0 1 auto; }
+.card.fl-empty { padding: 12px 16px; }

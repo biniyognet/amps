@@ -2087,8 +2087,9 @@ function LiveFailures({ line = '' }) {
   const [state, setState] = usePersistedState('fail.state', 'open')   // tab: 'open' | 'resolved'
   const [period, setPeriod] = usePersistedState('fail.period', 0)
   const [showViz, setShowViz] = usePersistedState('fail.showViz', true)  // analytics charts, collapsible
+  const [fAge, setFAge] = useState([])   // open-age bar picks, same as the job cards board
   const [limit, setLimit] = useState(ROW_PAGE)
-  useEffect(() => setLimit(ROW_PAGE), [state, q, cls, period, line])
+  useEffect(() => setLimit(ROW_PAGE), [state, q, cls, period, line, fAge])
   const toolbarRef = useRef(null)
   useEffect(() => {
     const setVars = () => { const tb = document.querySelector('.topbar'); if (tb) document.documentElement.style.setProperty('--topbar-h', `${tb.offsetHeight}px`) }
@@ -2139,6 +2140,12 @@ function LiveFailures({ line = '' }) {
   const shown = state === 'open' ? openRows : state === 'acknowledged' ? ackRows
     : state === 'job_card' ? jobRows : resolvedRows
   const ageD = (d) => Math.max(0, Math.round((Date.now() - new Date(`${d}T00:00:00`)) / 86400000))
+  // not-yet-resolved failures by age = the chase list; same slim bar as the asset register + job cards
+  const BUCKETS = [['b1', '≤ 14 d', 0, 14, 'seg-ok'], ['b2', '15–30 d', 15, 30, 'seg-due'], ['b3', '31–90 d', 31, 90, 'seg-warm'], ['b4', '> 90 d', 91, Infinity, 'seg-od']]
+    .map(([k, lbl, lo, hi, cls]) => [k, lbl, lo, hi, cls, shown.filter((r) => r.state !== 'resolved' && ageD(r.log_date) >= lo && ageD(r.log_date) <= hi).length]).filter((b) => b[5] > 0)
+  const ageSum = BUCKETS.reduce((n, b) => n + b[5], 0) || 1
+  const inAge = (r) => !fAge.length || BUCKETS.some(([k, , lo, hi]) => fAge.includes(k) && ageD(r.log_date) >= lo && ageD(r.log_date) <= hi)
+  const view = state === 'resolved' ? shown : shown.filter(inAge)
   // a mean over a few multi-month outages reads as "1,730 h"; the median is what a typical failure costs
   const timed = rows.filter((r) => r.down_hours != null && (!since || r.log_date >= since)).map((r) => r.down_hours).sort((a, b) => a - b)
   const median = timed.length ? (timed[(timed.length - 1) >> 1] + timed[timed.length >> 1]) / 2 : null
@@ -2147,7 +2154,7 @@ function LiveFailures({ line = '' }) {
   const exportCsv = () => {
     const cell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
     const head = ['asset', 'class', 'occurred', 'restored', 'down_hours', 'state', 'team', 'fault_type', 'what_happened']
-    const body = shown.map((f) => [f.asset_code || '', f.category || '', f.log_date,
+    const body = view.map((f) => [f.asset_code || '', f.category || '', f.log_date,
       f.ended_at ? (f.ended_at.slice(11, 16) === '00:00' ? f.ended_at.slice(0, 10) : f.ended_at.slice(0, 16).replace('T', ' ')) : '',
       f.down_hours ?? '', !f.asset_code ? 'unlinked' : f.ended_at ? 'restored' : 'open',
       f.attended_by || f.entered_by || '', f.fault_type || '', tidyLog(f.text)].map(cell).join(','))
@@ -2157,21 +2164,36 @@ function LiveFailures({ line = '' }) {
     a.download = `amps-failures-${state}-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url)
   }
 
+  const TABS = [['open', 'Open', openRows, 'Nothing done yet'], ['acknowledged', 'Acknowledged', ackRows, 'Noted, not yet fixed'],
+    ['job_card', 'Job card', jobRows, 'Job card issued to an agency'], ['resolved', 'Resolved', resolvedRows, 'Rectified']]
   return (
     <>
-      <div className="asset-toolbar" ref={toolbarRef}>
+      <div className="asset-toolbar jc-toolbar" ref={toolbarRef}>
         {!anon && <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-               placeholder="Search failures — asset, fault, crew…" aria-label="Search failures" />}
+               placeholder="Search asset, fault, crew…" aria-label="Search failures" />}
         {!anon && (
-          <div className="asset-filter" role="tablist" aria-label="Failure state">
-            <button type="button" className={`btn preset ${state === 'open' ? 'active' : ''}${openRows.length ? ' has-od' : ''}`}
-                    onClick={() => setState('open')}>Open {openRows.length}</button>
-            <button type="button" className={`btn preset ${state === 'acknowledged' ? 'active' : ''}${ackRows.length ? ' has-ack' : ''}`}
-                    onClick={() => setState('acknowledged')}>Acknowledged {ackRows.length}</button>
-            <button type="button" className={`btn preset ${state === 'job_card' ? 'active' : ''}${jobRows.length ? ' has-job' : ''}`}
-                    onClick={() => setState('job_card')}>Job card {jobRows.length}</button>
-            <button type="button" className={`btn preset ${state === 'resolved' ? 'active' : ''}`}
-                    onClick={() => setState('resolved')}>Resolved {resolvedRows.length}</button>
+          <div className={`asset-kpis hstrip${fAge.length ? ' has-pick' : ''}${state !== 'resolved' && BUCKETS.length ? '' : ' fl-nometer'}`} role="group" aria-label="Failure state">
+            {TABS.map(([k, lbl, list, tip]) => (
+              <button key={k} type="button" aria-pressed={state === k} title={tip}
+                      className={`rk-stat${state === k ? ' on' : ''}${k === 'open' && list.length ? ' bad' : k === 'acknowledged' && list.length ? ' warn' : ''}`}
+                      onClick={() => { setState(k); setFAge([]) }}>
+                <span className="v">{list.length}</span><span className="k">{lbl}</span>
+              </button>
+            ))}
+            {state !== 'resolved' && BUCKETS.length > 0 && (
+              <div className="h-meter" aria-label="Failures in this tab by age">
+                {BUCKETS.map(([k, lbl, , , cls, n], i) => (
+                  <button key={k} type="button" aria-pressed={fAge.includes(k)}
+                          onClick={() => setFAge(fAge.includes(k) ? fAge.filter((x) => x !== k) : [...fAge, k])}
+                          className={`h-col ${cls}${n / ageSum < 0.1 ? ' nar' : ''}${fAge.includes(k) ? ' on' : ''}`}
+                          style={{ flex: `${n} 1 0`, '--i': i }} title={`${lbl}: ${n} · click to filter`}>
+                    <span className={`h-seg cc-seg ${cls}`} />
+                    <span className="h-cn">{n}</span>
+                    <span className="h-cl">{lbl}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} aria-label="Period">
@@ -2181,13 +2203,13 @@ function LiveFailures({ line = '' }) {
           <option value="">All classes</option>
           {stats.by_class.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
         </select>
-        {!anon && (q || cls) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setCls('') }}>Clear</button>}
-        {!anon && <span className="asset-count">{shown.length} shown</span>}
+        {!anon && (q || cls || fAge.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setCls(''); setFAge([]) }}>Clear</button>}
+        {!anon && <span className="asset-count">{view.length} shown{line && ` · ${line}`}</span>}
         {anon && <span className="asset-count">Public summary · sign in for records</span>}
         {!anon && (
           <div className="asset-actions">
             <button type="button" className="icon-btn" title="Download the failures in view (CSV)"
-                    aria-label="Download failures" onClick={exportCsv} disabled={!shown.length}>
+                    aria-label="Download failures" onClick={exportCsv} disabled={!view.length}>
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
             </button>
@@ -2199,28 +2221,23 @@ function LiveFailures({ line = '' }) {
         )}
       </div>
 
-      <div className="kpis kpis-slim">
-        <div className="tile"><div className="v">{stats.total}</div>
-          <div className="k">Failures — {periodLabel.toLowerCase()}</div></div>
-        <div className={stats.open ? 'tile alert' : 'tile'}><div className="v">{stats.open}</div>
-          <div className="k">Open breakdowns</div></div>
-        <div className="tile" title={stats.measured ? `${stats.downtime_hours} h in total` : ''}><div className="v">{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</div>
-          <div className="k">Downtime{stats.measured ? ` · ${stats.measured} timed` : ' — none timed'}</div></div>
-        {median != null && !anon ? (
-          <div className="tile" title={`mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><div className="v">{fmtHrs(median)}</div>
-            <div className="k">Typical restore · median{stats.mttr_hours != null ? ` (mean ${fmtHrs(stats.mttr_hours)})` : ''}</div></div>
-        ) : (
-          <div className="tile"><div className="v">{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</div>
-            <div className="k">{stats.mttr_hours != null ? `MTTR · ${stats.measured} of ${stats.closed}` : 'MTTR — needs clock times'}</div></div>
-        )}
-        <div className={stats.unlinked ? 'tile warn' : 'tile'}><div className="v">{stats.unlinked}</div>
-          <div className="k">Unlinked records</div></div>
-      </div>
-
+      {/* the five headline numbers as one slim line beside the analytics toggle, not a row of tiles */}
+      <div className="fl-bar">
       <button type="button" className="viz-toggle" onClick={() => setShowViz((v) => !v)} aria-expanded={showViz}>
         <span className={`chev${showViz ? ' open' : ''}`}>▸</span> Analytics
         <span className="dim">· trend, by class, fault types, repeat offenders</span>
       </button>
+        <div className="fl-sum" aria-label="Failure summary">
+          <span className="fl-s"><b>{stats.total}</b> failures · {periodLabel.toLowerCase()}</span>
+          <span className={`fl-s${stats.open ? ' bad' : ''}`}><b>{stats.open}</b> open</span>
+          <span className="fl-s" title={stats.measured ? `${stats.downtime_hours} h in total · ${stats.measured} timed` : 'no clock times recorded'}>
+            <b>{stats.measured ? fmtHrs(stats.downtime_hours) : '—'}</b> downtime</span>
+          {median != null && !anon
+            ? <span className="fl-s" title={`mean ${stats.mttr_hours ?? '—'} h over ${timed.length} timed`}><b>{fmtHrs(median)}</b> typical restore</span>
+            : <span className="fl-s"><b>{stats.mttr_hours != null ? fmtHrs(stats.mttr_hours) : '—'}</b> MTTR</span>}
+          <span className={`fl-s${stats.unlinked ? ' warn' : ''}`} title="Failures not yet linked to an asset"><b>{stats.unlinked}</b> unlinked</span>
+        </div>
+      </div>
 
       {showViz && (
         <div className="viz-grid2 viz-compact">
@@ -2267,55 +2284,53 @@ function LiveFailures({ line = '' }) {
         </p></div>
       ) : (
       <>
-      <h2 className="fail-log-h">{{ open: 'Open failures', acknowledged: 'Acknowledged failures', job_card: 'Job card issued', resolved: 'Resolved failures' }[state]} <span className="dim" style={{ fontWeight: 400, fontSize: 15 }}>· {shown.length}</span></h2>
+      {view.length === 0 ? (
+        <div className="card fl-empty"><p className="dim" style={{ margin: 0 }}>{state === 'open' ? 'No open failures — nothing waiting. 👍' : 'Nothing matches this filter.'}</p></div>
+      ) : (
       <div className="card tbl-wrap">
-        <table className="jc-table fit-card">
-          {/* percentage widths so every column fits the card (no h-scroll);
-              the Fault column flexes into the remaining width */}
+        <table className="jc-table fit-card jc-slim fl-slim">
+          {/* percentage widths: fits the card at any width; Fault flexes into the remainder */}
           <colgroup>
-            <col style={{ width: '12%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
-            <col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '12%' }} />
-            <col />{canWrite && <col style={{ width: '9%' }} />}
+            <col style={{ width: '9%' }} /><col style={{ width: '17%' }} /><col />
+            <col style={{ width: '13%' }} /><col style={{ width: '11%' }} /><col style={{ width: '8%' }} />
+            {canWrite && <col style={{ width: '10%' }} />}
           </colgroup>
-          <thead><tr><th>Asset</th><th>Class</th><th>Occurred</th><th>Restored</th><th>{state === 'resolved' ? 'Down' : 'Down / age'}</th><th>State</th><th>Team</th><th>Fault → what happened</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
+          <thead><tr><th>{state === 'resolved' ? 'State' : 'Pending'}</th><th>Asset</th><th>Fault → what happened</th><th>Team</th>
+            <th>Occurred</th><th>Down</th>{canWrite && <th aria-label="Edit"></th>}</tr></thead>
           <tbody>
-            {shown.slice(0, limit).map((f) => (
-              <tr key={f.id} tabIndex={0}
-                  onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
-                  onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
-                <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                <td className="dim" data-l="Class">{f.category || '—'}</td>
-                <td className="dim dt" data-l="Occurred">{f.log_date}</td>
-                {/* midnight means no clock time was recorded — show the date alone
-                    rather than an invented 00:00 (same rule as the log book) */}
-                <td className="dim dt" data-l="Restored">{f.ended_at
-                  ? (f.ended_at.slice(11, 16) === '00:00'
-                      ? f.ended_at.slice(0, 10)
-                      : f.ended_at.slice(0, 16).replace('T', ' '))
-                  : '—'}</td>
-                <td className="dt" data-l="Down">{f.down_hours != null
-                  ? <span title={`${f.down_hours} h`}>{fmtHrs(f.down_hours)}</span>
-                  : !f.ended_at && f.state !== 'resolved'
-                    ? <span className={`jc-age${ageCls(ageD(f.log_date))}`} title={`open for ${ageD(f.log_date)} days`}>{ageD(f.log_date)}d</span>
-                    : '—'}</td>
-                <td data-l="State">{!f.asset_code
-                  ? <span className="chip"><span className="dot" />Unlinked</span>
-                  : <span className={`chip ${FAIL_STATE_CHIP[f.state] || 'd-overdue'}`}><span className="dot" />{FAIL_STATE_LABEL[f.state] || 'open'}</span>}</td>
-                <td className="dim" data-l="Team">{f.attended_by || f.entered_by || '—'}</td>
-                <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} /></td>
+            {view.slice(0, limit).map((f) => {
+              const age = ageD(f.log_date), done = f.state === 'resolved' || !!f.ended_at
+              const go = () => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)
+              // midnight means no clock time was recorded — show the date alone (same rule as the log book)
+              const rest = f.ended_at ? (f.ended_at.slice(11, 16) === '00:00' ? f.ended_at.slice(0, 10) : f.ended_at.slice(0, 16).replace('T', ' ')) : ''
+              return (
+              <tr key={f.id} tabIndex={0} className={`jc-row fl-${f.asset_code ? f.state : 'unlinked'}${done ? '' : ageCls(age)}`}
+                  onClick={go} onKeyDown={(e) => e.key === 'Enter' && go()}>
+                <td data-l={done ? 'State' : 'Pending'}>{done
+                  ? <span className="jc-pill jc-closed" title={`Restored${rest ? ` ${rest}` : ''}`}>Restored</span>
+                  : <span className={`jc-age${ageCls(age)}`} title={`${FAIL_STATE_LABEL[f.state] || 'open'} · ${age} days`}>{age}d</span>}</td>
+                <td data-l="Asset">{f.asset_code
+                  ? <span className="code jc-code">{f.asset_code}</span>
+                  : <span className="jc-pill fl-unl">Unlinked</span>}
+                  {f.category && <div className="lt-sub">{f.category}</div>}</td>
+                <td data-l="Fault"><div className="jc-fault"><LogText text={f.text} ft={f.fault_type} /></div></td>
+                <td data-l="Team">{f.attended_by || f.entered_by || '—'}</td>
+                <td className="dt" data-l="Occurred">{f.log_date}<div className="lt-sub">{rest ? `→ ${rest}` : `→ ${FAIL_STATE_LABEL[f.state] || 'open'}`}</div></td>
+                <td className="dt" data-l="Down">{f.down_hours != null ? <span title={`${f.down_hours} h`}>{fmtHrs(f.down_hours)}</span> : <span className="dim">—</span>}</td>
                 {canWrite && (
-                  <td className="td-edit" data-l="Edit">
+                  <td className="td-edit" data-l="Edit" onClick={(e) => e.stopPropagation()}>
                     <EditLink id={f.id} date={f.log_date}
                               label={f.ended_at ? 'Edit in log book' : 'Resolve / link in log book'} />
                   </td>
                 )}
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
-        {shown.length === 0 && <p className="dim" style={{ padding: '1rem' }}>Nothing matches this filter.</p>}
-        <MoreRows shown={Math.min(limit, shown.length)} total={shown.length} setLimit={setLimit} />
+        <MoreRows shown={Math.min(limit, view.length)} total={view.length} setLimit={setLimit} />
       </div>
+      )}
       </>
       )}
     </>
