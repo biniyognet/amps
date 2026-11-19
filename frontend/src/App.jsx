@@ -4067,7 +4067,7 @@ function LineDashboard({ go, initialLine = null }) {
         <div className="h-compl">
           <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
-            <span className="h-pk">PM compliance</span>
+            {me?.line ? <span className="h-pk">PM compliance</span> : <SitePicker current={initialLine || ''} />}
             <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
           </div>
         </div>
@@ -4896,6 +4896,29 @@ function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/* Site switcher for viewers who see every site (no own line): a back chevron to
+   the whole estate plus a dropdown of the sites — lives in the totals row. */
+function SitePicker({ current = '' }) {
+  const lines = useLines()
+  const pick = (v) => { location.hash = v ? `#/line/${encodeURIComponent(v)}` : '#/' }
+  return (
+    <span className="site-pick">
+      {current && (
+        <a className="sp-back" href="#/" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </a>
+      )}
+      <span className="sp-sel" style={{ '--line-c': current ? lineColor(current) : 'var(--accent)' }}>
+        <span className="sp-dot" />
+        <select value={current} onChange={(e) => pick(e.target.value)} aria-label={W.Line}>
+          <option value="">All {W.lines}{lines ? ` · ${lines.length}` : ''}</option>
+          {(lines || []).map((l) => <option key={l.name} value={l.name}>{l.name}</option>)}
+        </select>
+      </span>
+    </span>
   )
 }
 
