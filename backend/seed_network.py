@@ -529,12 +529,98 @@ def seed():
             n_pm += 1
         print(f"Planned maintenance: {n_pm} jobs ({n_sh} from the agencies' own schedules).")
 
+        n_story = _stories(db, crews)
+        print(f"AI demo stories: {n_story} failures with full remarks.")
+
         db.commit()
         print(f"Seeded {len(LINES)} sites, {sum(len(s) for s in STATIONS.values())} areas, "
               f"{n_assets} assets, {n_logs} maintenance entries, {n_fail} failures "
               f"({n_jc} job cards), {len(users)} users.")
     finally:
         db.close()
+
+
+# ---- AI demo stories ------------------------------------------------------
+# A few assets with a history worth showing a judge: repeat faults written the way
+# a fitter writes them (similar past failures, fault-field extraction), an old
+# critical asset that keeps failing (risk badge), and notes in हिन्दी / বাংলা.
+# (asset code, days ago, hours down or None = still open, fault, remark, action)
+STORIES = [
+    # repeat offender: past codal life, same seal fault three times, open again today
+    ("CWT-{0}-MTR-01", 214, 30.5, "Mechanical seal leak",
+     "Raw water pump motor 1 tripped on overload at 06:40. Water spraying from the drive-end seal, "
+     "bearing housing hot to touch (78 °C on IR gun). Pump isolated, standby pump 2 taken in service.",
+     "DE mechanical seal and DE bearing 6312 replaced. Alignment checked, 0.05 mm. Trial run 2 h OK."),
+    ("CWT-{0}-MTR-01", 131, 41.0, "Mechanical seal leak",
+     "Seal leaking again on pump motor 1, drip rate ~1 litre/min, vibration 7.1 mm/s on DE (limit 4.5). "
+     "Suspect misalignment after last seal job.",
+     "Seal replaced again; soft foot found under NDE, shimmed. Laser alignment done. Vibration 2.8 mm/s."),
+    ("CWT-{0}-MTR-01", 58, 52.0, "Bearing overheating",
+     "पंप मोटर 1 का DE बेयरिंग गरम, आवाज़ आ रही है। सील से हल्का रिसाव भी। मोटर बंद किया।",
+     "Bearing and seal replaced; impeller wear ring worn, ordered. Recommend motor rewind check."),
+    ("CWT-{0}-MTR-01", 2, None, "Mechanical seal leak",
+     "Pump motor 1 seal leak for the 4th time this year, water on the terminal box. Insulation 0.8 MΩ "
+     "(was 50 MΩ). Kept isolated, standby running alone, no redundancy now.", None),
+    # the Snap demo panel: two earlier trips, so the history panel is not empty
+    ("MTD-CEN-HSC-01", 96, 3.2, "HSCB tripped on overcurrent",
+     "HSCB 1 tripped on overcurrent during evening peak, 18:12. Relay showed I>> 4.2 kA. "
+     "No fault found on feeder walk. Reclosed after section clear from TPC.",
+     "Relay settings checked against the protection chart; trip coil tested. Reclosed, load normal."),
+    ("MTD-CEN-HSC-01", 33, 6.5, "HSCB tripped on overcurrent",
+     "HSCB 1 tripped again on overcurrent, arc chute shows burn marks, smell of burning near panel.",
+     "Arc chute and main contacts replaced by Voltara Service; contact resistance 38 µΩ. Tested OK."),
+    # old critical transformer, rising trend
+    ("EGS-{1}-PTR-01", 160, 70.0, "Transformer oil temperature high",
+     "PTR 1 OTI 92 °C, WTI 104 °C at 14:00 on 41 °C ambient. Two cooler fans not running.",
+     "Cooler fan motors 2 and 3 replaced, fan contactor replaced. OTI 71 °C on full load."),
+    ("EGS-{1}-PTR-01", 45, 120.0, "Transformer Buchholz alarm",
+     "Buchholz alarm on PTR 1 at 02:15, gas collected in relay. DGA sample sent, acetylene 6 ppm.",
+     "Gas was air from a loose breather joint; joint resealed, oil filtered. DGA retest normal."),
+    # multilingual and messy, for fault-field extraction
+    ("MTD-{2}-ESC-01", 12, 9.0, "Escalator stopped — step sag switch",
+     "এসকেলেটর ১ সকাল ৭:৪০ এ বন্ধ, স্টেপ স্যাগ সুইচ অপারেট করেছে। একটা স্টেপ রোলার ভাঙা।",
+     "Step roller replaced, step chain tension adjusted. Run tested both directions."),
+    ("BSR-{3}-GBX-01", 20, 14.0, "Gearbox oil leak",
+     "gear box oil leaking from output shaft seal, oil level below min, noise high. mill stopped 2 hrs",
+     "Output shaft oil seal replaced, oil topped up (ISO VG 320). Noise normal."),
+]
+
+
+def _stories(db, crews) -> int:
+    """Adds STORIES on top of the generated history (own RNG, so that stays identical)."""
+    srng = random.Random(1120)
+    assets = list(db.scalars(select(Asset)))
+    n = 0
+    for pat, ago, hours, fault, remark, action in STORIES:
+        head, _, tail = pat.partition("-{")   # "CWT-{0}-MTR-01": first CWT-*-MTR-01 by code
+        tail = tail.partition("}")[2]
+        a = next((x for x in sorted(assets, key=lambda x: x.code)
+                  if (x.code == pat if not tail else
+                      x.code.startswith(head + "-") and x.code.endswith(tail))), None)
+        if not a:
+            continue
+        if a.code.endswith("MTR-01") and a.codal_life_years:   # the repeat offender is past its life
+            a.commissioned_on = TODAY.replace(year=TODAY.year - a.codal_life_years - 3)
+        line = next(l for l in crews if db.get(Location, a.line_id).name == l)
+        d = TODAY - timedelta(days=ago)
+        start = _at(d, srng.randint(6, 20))
+        f = LogEntry(at=start, log_date=d, shift=ShiftCode.GENERAL, type=LogEntryType.FAILURE,
+                     system=a.system, category=a.asset_class.name, fault_type=fault,
+                     station=a.location.name, asset=a, line_id=a.line_id, text=remark,
+                     entered_by=srng.choice(crews[line]))
+        db.add(f)
+        db.flush()
+        n += 1
+        if hours is None:
+            continue
+        end = start + timedelta(hours=hours)
+        db.add(LogEntry(at=end, log_date=end.date(), shift=ShiftCode.GENERAL,
+                        type=LogEntryType.RECTIFICATION, rectifies_id=f.id, asset=a,
+                        line_id=a.line_id, system=a.system, station=a.location.name,
+                        action_taken=action, text=action,
+                        attended_by=", ".join(srng.sample(crews[line], 2)),
+                        entered_by=srng.choice(crews[line])))
+    return n
 
 
 if __name__ == "__main__":
