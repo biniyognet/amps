@@ -23,7 +23,7 @@ from sqlalchemy import select
 
 from app.db import SessionLocal, init_db
 from app.models import (
-    Asset, AssetClass, AssetStatus, Criticality, Location, LocationKind,
+    Agency, AgencyScope, Asset, AssetClass, AssetStatus, Criticality, Location, LocationKind,
     LogEntry, LogEntryType, PMPlan, PMPlanned, RosterEntry, RosterPattern, ShiftCode,
     User, UserRole,
 )
@@ -156,6 +156,15 @@ LAST = ["Mehta", "Iyer", "Nair", "Rao", "Joshi", "Kapoor", "Menon", "Pillai",
         "Shetty", "Varma", "Kulkarni", "Desai", "Reddy", "Bhatt", "Chopra"]
 AGENCIES = ["Voltara Service", "Kestrel Field Team", "Ascendo Care", "Coolpath Services",
             "Hydroflow Contracts", "Tornalis Support", "Ironbark Service"]
+# who maintains what, per unit: each site's two outside agencies take a few
+# systems on AMC; every system not listed stays with the section's own staff.
+AGENCY_SCOPE = {
+    "MTD": {"Voltara Service": ["Traction / PS"], "Kestrel Field Team": ["Lift & Escalator", "HVAC"]},
+    "EGS": {"Ascendo Care": ["HV Switchyard"], "Coolpath Services": ["Protection", "SCADA"]},
+    "CWT": {"Hydroflow Contracts": ["Pumping", "Treatment"], "Tornalis Support": ["Instrumentation"]},
+    "BSR": {"Ironbark Service": ["Utilities"], "Voltara Service": ["Production"]},
+}
+IN_HOUSE = "In-house (section)"
 
 FAULTS = {
     "Traction / PS": ["HSCB tripped on overcurrent", "DC earth fault", "Rectifier diode alarm",
@@ -421,8 +430,29 @@ def seed():
                     if c != "R":
                         db.add(RosterEntry(pattern=pat, user=u, weekday=wd, shift=ShiftCode(c)))
 
+        # ---- agency register (who maintains what) ---------------------------
+        # A year's AMC for most; Coolpath's runs out within the warning window and
+        # Tornalis's ends before next month's schedule, so the board shows both.
+        ends = {"Coolpath Services": TODAY + timedelta(days=20),
+                "Tornalis Support": TODAY + timedelta(days=10)}
+        reg = {IN_HOUSE: Agency(name=IN_HOUSE, kind="in_house",
+                                note="Section staff on the duty roster")}
+        for depot, covers in AGENCY_SCOPE.items():
+            for name, systems in covers.items():
+                if name not in reg:
+                    to = ends.get(name, TODAY + timedelta(days=165))
+                    reg[name] = Agency(name=name, kind="amc",
+                                       contract_no=f"LOA/{depot}/AMC/{to.year - 1}-{to:%y}/{len(reg):02d}",
+                                       valid_from=to - timedelta(days=364), valid_to=to,
+                                       aliases=f"M/s {name.split()[0]}, {name.split()[0]} AMC")
+                for system in systems:
+                    reg[name].scopes.append(AgencyScope(system=system, depot=depot))
+        db.add_all(reg.values())
+        db.flush()
+        print(f"Agencies: {len(reg)} in the register.")
+
         # ---- planned maintenance (the Planner timeline) ---------------------
-        # Last month → next month, two outside agencies per site: on-time and late
+        # Last month → next month, in-house and the site's two AMC agencies: on-time and late
         # completions, rescheduled jobs, overdue ones, today's and upcoming. Own RNG
         # so the history above stays byte-identical.
         prng = random.Random(1118)
@@ -436,7 +466,10 @@ def seed():
             pool = [t for t in all_assets if t[1] == line]
             for k, (a, _l, si) in enumerate(prng.sample(pool, min(28, len(pool)))):
                 stn = STATIONS[line][si]
-                agency = prng.choice(agencies)
+                prng.choice(agencies)  # keeps the draw sequence of earlier seeds
+                agency = next((n for n, sy in AGENCY_SCOPE[depot].items() if a.system in sy), None)
+                # one agency's own sheet spells its name its own way
+                listed = f"M/s {agency.split()[0]}" if agency == "Voltara Service" and depot == "BSR" else agency
                 cycle = prng.choice(["Monthly", "Monthly", "Quarterly", "Half-Yearly"])
                 d = lo + timedelta(days=prng.randint(0, 27))
                 if k < 2:  # a couple due today on every site
@@ -444,7 +477,7 @@ def seed():
                 while d <= hi:
                     p = PMPlanned(asset_id=a.id, line_id=a.line_id, planned_date=d, cycle=cycle,
                                   task=f"{cycle} PM of {a.code} as per checksheet",
-                                  contractor=agency, source=f"{depot}/PM/{d:%b-%Y}".upper(),
+                                  contractor=listed, source=f"{depot}/PM/{d:%b-%Y}".upper(),
                                   created_by="seed")
                     r = prng.random()
                     if d > TODAY:
@@ -466,16 +499,35 @@ def seed():
                                      type=LogEntryType.MAINTENANCE, subtype=cycle, system=a.system,
                                      station=stn, asset=a, line_id=a.line_id,
                                      category=a.asset_class.name,
-                                     text=f"{cycle} maintenance of {a.code} carried out by {agency}.",
+                                     text=f"{cycle} maintenance of {a.code} carried out by {agency or 'section staff'}.",
                                      entered_by=prng.choice(crews[line]),
-                                     attended_by=agency)
+                                     attended_by=agency or "Section staff")
                         db.add(e)
                         db.flush()
                         p.status, p.done_on, p.log_entry_id, p.closed_by = "done", done, e.id, "seed"
                     db.add(p)
                     n_pm += 1
                     d += timedelta(days=CYCLE_DAYS[cycle])
-        print(f"Planned maintenance: {n_pm} jobs.")
+        db.flush()
+
+        # ---- the AMC agencies' shared schedules -----------------------------
+        # Each agency sends the section its fortnight's plan. Most due work is on
+        # it; about one job in ten is missing, which auto-plan reports as a gap.
+        from app.api.autoplan import _candidates
+        from app.api.agencies import Resolver
+        who, srng, n_sh = Resolver(db), random.Random(1119), 0
+        viewer = User(username="seed", full_name="seed", role=UserRole.ADMIN)
+        for j in _candidates(db, viewer, TODAY + timedelta(days=13), None, None, who):
+            if j["agency_kind"] == "in_house" or j["plan"] or srng.random() < 0.1:
+                continue
+            d = TODAY + timedelta(days=srng.randint(1, 13))
+            db.add(PMPlanned(asset_id=j["asset_id"], line_id=db.get(Asset, j["asset_id"]).line_id, planned_date=d,
+                             cycle=j["cycle"], task=f"{j['cycle']} PM of {j['asset_code']} as per checksheet",
+                             contractor=j["contractor"], source=f"AMC/{j['contractor']}/{d:%b-%Y}".upper(),
+                             created_by="seed"))
+            n_sh += 1
+            n_pm += 1
+        print(f"Planned maintenance: {n_pm} jobs ({n_sh} from the agencies' own schedules).")
 
         db.commit()
         print(f"Seeded {len(LINES)} sites, {sum(len(s) for s in STATIONS.values())} areas, "

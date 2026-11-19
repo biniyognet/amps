@@ -97,6 +97,8 @@ class Asset(Base):
     # the fine equipment location WITHIN the station (e.g. "TVS Fan Room-01,
     # Concourse"). location_id is the STATION; this is the spot inside it.
     location_detail: Mapped[str | None] = mapped_column(String(200))
+    # who maintains it, when one asset differs from its agency's scope rules
+    agency_id: Mapped[int | None] = mapped_column(ForeignKey("agencies.id"))
 
     asset_class: Mapped[AssetClass] = relationship()
     location: Mapped[Location] = relationship(
@@ -502,3 +504,46 @@ class PMPlanned(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     asset: Mapped["Asset"] = relationship()
+
+
+class Agency(Base):
+    """Who maintains what: the section's own staff, or an outside agency under
+    an AMC / OEM contract. Scope rules say which assets each one covers; an
+    asset no rule covers is the section's own (in-house) work.
+
+    Only in-house work is laid onto the roster by auto-plan. An AMC agency
+    sends its own schedule (CSV import); AMPS checks that schedule against
+    what falls due — gaps, slipped dates, dates outside the contract.
+    kind: in_house | amc | oem.
+    """
+    __tablename__ = "agencies"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    kind: Mapped[str] = mapped_column(String(16), default="amc")
+    contract_no: Mapped[str | None] = mapped_column(String(120))    # LOA / work order no.
+    valid_from: Mapped[date | None]
+    valid_to: Mapped[date | None]
+    # other spellings seen in schedules ("TVS AMC, M/s Voltara") — one per line or comma
+    aliases: Mapped[str | None] = mapped_column(Text)
+    line_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))   # None = every line
+    note: Mapped[str | None] = mapped_column(Text)
+
+    scopes: Mapped[list["AgencyScope"]] = relationship(
+        back_populates="agency", cascade="all, delete-orphan")
+
+
+class AgencyScope(Base):
+    """One coverage rule. Empty fields match anything; the rule with the most
+    fields set wins when two agencies match the same asset and cycle."""
+    __tablename__ = "agency_scopes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agency_id: Mapped[int] = mapped_column(ForeignKey("agencies.id"), index=True)
+    system: Mapped[str | None] = mapped_column(String(80))
+    depot: Mapped[str | None] = mapped_column(String(40))
+    asset_class_id: Mapped[int | None] = mapped_column(ForeignKey("asset_classes.id"))
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))   # a station
+    cycles: Mapped[str | None] = mapped_column(String(120))       # "Monthly,Quarterly"; None = all
+
+    agency: Mapped[Agency] = relationship(back_populates="scopes")

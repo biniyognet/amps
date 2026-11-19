@@ -129,26 +129,34 @@ function DoneModal({ rows, onClose, onDone }) {
   )
 }
 
-function ImportCsv({ onDone }) {
+function ImportCsv({ onDone, agencies = [] }) {
   const [file, setFile] = useState(null)
+  const [ag, setAg] = useState('')
   const [dry, setDry] = useState(null)
   const [err, setErr] = useState('')
   const run = async (commit, f = file) => {
     setErr('')
     const fd = new FormData(); fd.append('file', f)
-    const r = await fetch(`${API}/api/planned/import${commit ? '?commit=true' : ''}`, { method: 'POST', body: fd })
+    const qs = new URLSearchParams(); if (commit) qs.set('commit', 'true'); if (ag) qs.set('agency', ag)
+    const r = await fetch(`${API}/api/planned/import${qs.size ? `?${qs}` : ''}`, { method: 'POST', body: fd })
     const j = await r.json().catch(() => ({}))
     if (!r.ok) { setErr(typeof j.detail === 'string' ? j.detail : `HTTP ${r.status}`); return }
     if (commit) { setDry(null); setFile(null); onDone(`Imported ${j.created} planned rows`) } else setDry(j)
   }
   return (
     <span className="pm-import">
+      {agencies.length > 0 && (
+        <select className="pm-imp-ag" value={ag} onChange={(e) => { setAg(e.target.value); setDry(null) }}
+                aria-label="Whose schedule is this CSV" title="Tag every imported row with this agency (a contractor column in the CSV still wins)">
+          <option value="">Schedule of…</option>
+          {agencies.map((a) => <option key={a.id} value={a.name}>{a.name}{a.kind !== 'in_house' ? ` · ${KIND_LABEL[a.kind]}` : ''}</option>)}
+        </select>)}
       <label className="btn ghost sm">Import CSV
         <input type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files[0]; if (f) { setFile(f); run(false, f) } e.target.value = '' }} />
       </label>
       {dry && (
         <span className="pm-dry">
-          {dry.created} new · {dry.duplicates} already planned{dry.errors.length > 0 && <> · <b className="pc-red" title={dry.errors.map((x) => `row ${x.row}: ${x.asset_code || ''} ${x.error}`).join('\n')}>{dry.errors.length} errors</b></>}
+          {dry.created} new{ag ? ` for ${ag}` : ''} · {dry.duplicates} already planned{dry.errors.length > 0 && <> · <b className="pc-red" title={dry.errors.map((x) => `row ${x.row}: ${x.asset_code || ''} ${x.error}`).join('\n')}>{dry.errors.length} errors</b></>}
           {dry.created > 0 && <button className="mini-btn ok" type="button" onClick={() => run(true)}>Add {dry.created}</button>}
           <button className="mini-btn" type="button" onClick={() => setDry(null)}>✕</button>
         </span>
@@ -190,15 +198,35 @@ function Calendar({ month, rows, onPick, peekId }) {
   )
 }
 
-/* Per contractor over the rows on screen: planned, done on time, done late
-   (with the average slip), still overdue and still open. Skipped rows are left
-   out. Click one to filter the page to that contractor; click again to clear. */
-function tallyContractors(rows) {
+export const KIND_LABEL = { in_house: 'In-house', amc: 'AMC', oem: 'OEM' }
+const CONTRACT = { valid: ['ok', 'in contract'], open: ['ok', 'no end date'], expiring: ['warn', 'ends'],
+  expired: ['bad', 'expired'], not_started: ['warn', 'starts'] }
+
+/* AMC / OEM badge next to a contractor name; in-house work carries none. */
+export function KindBadge({ kind }) {
+  return kind && kind !== 'in_house' ? <i className={`pm-kind k-${kind}`}>{KIND_LABEL[kind] || kind}</i> : null
+}
+
+function ContractNote({ a }) {
+  const c = a && CONTRACT[a.contract_state]
+  if (!c) return null
+  const left = a.days_left ?? (a.valid_to ? Math.round((D(a.valid_to) - D(todayIso())) / 864e5) : null)
+  const when = a.contract_state === 'expiring' ? ` in ${left} d` : a.contract_state === 'not_started' ? ` ${fmt(a.valid_from)}`
+    : a.contract_state === 'valid' && a.valid_to ? ` to ${fmt(a.valid_to)}` : ''
+  return <span className={`pm-contract c-${c[0]}`} title={a.contract_no || ''}>{a.contract_no ? `${a.contract_no} · ` : ''}{c[1]}{when}</span>
+}
+
+/* Per agency over the rows on screen: planned, done on time, done late (with
+   the average slip), still overdue and still open. Skipped rows are left out.
+   Rows carry the register's name for the agency, so "M/s Voltara" and
+   "Voltara AMC" land on one line. Click one to filter; click again to clear. */
+function tallyAgencies(rows, reg) {
   const by = new Map()
   for (const r of rows) {
     if (r.state === 'skipped') continue
-    const k = r.contractor || 'No contractor'
-    const c = by.get(k) || { k, key: r.contractor || '', planned: 0, onTime: 0, late: 0, lateDays: 0, overdue: 0, open: 0 }
+    const k = r.contractor || (reg.size ? 'In-house' : 'No contractor')
+    const c = by.get(k) || { k, key: r.contractor || '', kind: r.agency_kind || (reg.size && !r.contractor ? 'in_house' : null),
+      planned: 0, onTime: 0, late: 0, lateDays: 0, overdue: 0, open: 0 }
     c.planned++
     const s = slipOf(r)
     if (s !== null) { if (s > 0) { c.late++; c.lateDays += s } else c.onTime++ }
@@ -206,18 +234,22 @@ function tallyContractors(rows) {
     else c.open++
     by.set(k, c)
   }
-  return [...by.values()].sort((a, b) => b.overdue - a.overdue || b.planned - a.planned)
+  // a contracted agency with nothing in this period is worth seeing too
+  for (const a of reg.values()) if (a.kind !== 'in_house' && a.contract_state !== 'expired' && !by.has(a.name))
+    by.set(a.name, { k: a.name, key: a.name, kind: a.kind, planned: 0, onTime: 0, late: 0, lateDays: 0, overdue: 0, open: 0 })
+  const inh = (c) => (c.kind === 'in_house' || !c.kind ? 0 : 1)
+  return [...by.values()].sort((a, b) => inh(a) - inh(b) || b.overdue - a.overdue || b.planned - a.planned)
 }
 
-function Contractors({ rows, pick, setPick, board }) {
-  const list = tallyContractors(rows)
+function Agencies({ rows, pick, setPick, board, reg }) {
+  const list = tallyAgencies(rows, reg)
   if (!list.length) return board ? <p className="dim lb-pick">Nothing planned in this period.</p> : null
   const toggle = (c) => c.key && setPick(pick === c.key ? '' : c.key)
   if (!board) return (
     <div className="pm-sum">
       {list.map((c) => (
         <button key={c.k} type="button" className={`pm-sum-c${pick && pick === c.key ? ' on' : ''}`} onClick={() => toggle(c)}>
-          <b>{c.k}</b>
+          <b>{c.k}</b> <KindBadge kind={c.kind} />
           <span><b className="dt">{c.onTime + c.late}</b>/{c.planned} done</span>
           {c.overdue > 0 && <span className="pc-red">{c.overdue} overdue</span>}
         </button>
@@ -231,23 +263,24 @@ function Contractors({ rows, pick, setPick, board }) {
         const done = c.onTime + c.late
         return (
           <button key={c.k} type="button" className={`pm-cb-r${pick && pick === c.key ? ' on' : ''}`} onClick={() => toggle(c)}
-                  aria-pressed={!!pick && pick === c.key} title={c.key ? (pick === c.key ? 'Show all contractors' : `Show only ${c.k}`) : ''}>
-            <span className="pm-cb-t"><b>{c.k}</b><span className="dt">{done}/{c.planned}</span></span>
-            <span className="pm-cb-bar" aria-hidden="true">
+                  aria-pressed={!!pick && pick === c.key} title={c.key ? (pick === c.key ? 'Show every agency' : `Show only ${c.k}`) : ''}>
+            <span className="pm-cb-t"><b>{c.k}</b><KindBadge kind={c.kind} /><span className="dt">{done}/{c.planned}</span></span>
+            {reg.get(c.k) && reg.get(c.k).kind !== 'in_house' && <ContractNote a={reg.get(c.k)} />}
+            {c.planned > 0 ? <span className="pm-cb-bar" aria-hidden="true">
               <i className="ok" style={{ width: w(c.onTime) }} /><i className="warn" style={{ width: w(c.late) }} />
               <i className="bad" style={{ width: w(c.overdue) }} />
-            </span>
-            <span className="pm-cb-n">
+            </span> : <span className="pm-cb-n"><span className="tl-t-warn">nothing on their schedule this period</span></span>}
+            {c.planned > 0 && <span className="pm-cb-n">
               <span className="tl-t-ok">{c.onTime} on time</span>
               {c.late > 0 && <span className="tl-t-warn">{c.late} late · avg +{(c.lateDays / c.late).toFixed(1)} d</span>}
               {c.overdue > 0 && <span className="pc-red">{c.overdue} overdue</span>}
               {c.open > 0 && <span className="dim">{c.open} open</span>}
-            </span>
+            </span>}
           </button>
         )
       })}
       <p className="pm-cb-key dim"><i className="ok" /> on time <i className="warn" /> late <i className="bad" /> overdue · rest open.
-        Pick a job on the left for its detail.</p>
+        {reg.size > 0 && ' In-house work goes on the roster; AMC and OEM agencies plan to their own schedule.'} Pick a job on the left for its detail.</p>
     </div>
   )
 }
@@ -281,7 +314,7 @@ function PlanPeek({ r, canWrite, onDone, onSkip, onMove }) {
         <div><dt>{r.done_on ? 'Done' : 'Originally'}</dt><dd className="dt">
           {r.done_on ? <>{fmt(r.done_on)} <span className={`tl-t-${slipCls(s)}`}>{slipTxt(s)}</span></> : r.original_date ? fmt(r.original_date) : '—'}
         </dd></div>
-        <div><dt>Contractor</dt><dd>{r.contractor || '—'}</dd></div>
+        <div><dt>Agency</dt><dd>{r.contractor || (r.agency_kind === 'in_house' || !r.agency_kind ? 'In-house' : '—')} <KindBadge kind={r.agency_kind} /></dd></div>
         <div><dt>System</dt><dd>{r.system || '—'}</dd></div>
         {r.task && <div className="rp-wide"><dt>Task</dt><dd>{r.task}</dd></div>}
         <div className="rp-wide"><dt>Source</dt><dd>{planApproval(r.source) ? <PlanApproval source={r.source} /> : (r.source || '—')}</dd></div>
@@ -434,6 +467,39 @@ function Timeline({ span, from, to, rows, canWrite, onPick, onMove, peekId }) {
    saved until the supervisor approves; unticked jobs stay unplanned. */
 const nextMonday = () => { const d = new Date(); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); return iso(d) }
 
+/* AMC / OEM work due this week, held against each agency's own schedule:
+   missing from it (gap), planned but late (slipped), or planned past the
+   contract's end. None of it goes on the roster. */
+function OutsideAgencies({ list }) {
+  const job = (j) => <li key={`${j.asset_id}|${j.cycle}`}><a className="code" href={`#/asset/${encPath(j.asset_code)}`}>{j.asset_code}</a> · {j.station} · {j.cycle}
+    {j.reason ? <small className={j.overdue_days ? ' pc-red' : ' dim'}> · {j.reason}</small> : null}</li>
+  const plan = (x, tail) => <li key={x.plan_id}><a className="code" href={`#/asset/${encPath(x.asset_code)}`}>{x.asset_code}</a> · {x.station} · {x.cycle} · planned {fmt(x.planned_date)}{tail(x)}</li>
+  return (
+    <div className="pm-out">
+      <div className="pm-out-h"><b>Outside agencies</b> <small className="dim">due on their scope, not on our roster</small></div>
+      {list.map((a) => {
+        const bad = a.gaps.length + a.slipped.length + a.out_of_contract.length
+        return (
+          <details key={a.agency} className={`pm-out-a${bad ? ' has-bad' : ''}`} open={bad > 0 && list.length <= 3}>
+            <summary>
+              <b>{a.agency}</b> <KindBadge kind={a.kind} />
+              <span className="dt">{a.scheduled}/{a.due} on their schedule</span>
+              {a.gaps.length > 0 && <span className="pc-red">{a.gaps.length} missing</span>}
+              {a.slipped.length > 0 && <span className="tl-t-warn">{a.slipped.length} slipped</span>}
+              {a.out_of_contract.length > 0 && <span className="pc-red">{a.out_of_contract.length} past contract</span>}
+              <ContractNote a={a} />
+            </summary>
+            {a.gaps.length > 0 && <><p className="pm-out-k">Not on their schedule — ask {a.agency} to plan these</p><ul>{a.gaps.slice(0, 30).map(job)}</ul></>}
+            {a.slipped.length > 0 && <><p className="pm-out-k">Planned date already passed</p><ul>{a.slipped.map((x) => plan(x, (y) => <span className="tl-t-warn"> · {y.late_days} d late</span>))}</ul></>}
+            {a.out_of_contract.length > 0 && <><p className="pm-out-k">Planned after the contract ends{a.valid_to ? ` (${fmt(a.valid_to)})` : ''}</p><ul>{a.out_of_contract.map((x) => plan(x, () => null))}</ul></>}
+            {!bad && <p className="pm-out-k dim">Everything due is on their schedule.</p>}
+          </details>
+        )
+      })}
+    </div>
+  )
+}
+
 function AutoPlan({ onClose, onApproved }) {
   const [start, setStart] = useState(nextMonday)
   const [cap, setCap] = useState('')
@@ -504,6 +570,7 @@ function AutoPlan({ onClose, onApproved }) {
               </div>
             ))}
           </div>
+          {plan.agencies?.length > 0 && <OutsideAgencies list={plan.agencies} />}
           {plan.backlog.length > 0 && (
             <details className="pm-backlog">
               <summary>{plan.backlog.length} due jobs did not fit this week's roster</summary>
@@ -511,7 +578,7 @@ function AutoPlan({ onClose, onApproved }) {
             </details>
           )}
           <p className="roadmap">Order = criticality × days overdue (A counts 3×, C 1×); a station's jobs share a day when that costs at most one day.
-            Capacity = staff on the roster's maintenance-window shift, two to a team, three jobs per team. Untick anything you don't want, then approve:
+            Capacity = staff on the roster's maintenance-window shift, two to a team, three jobs per team.{plan.register && ' Only in-house jobs are planned here; work on an AMC or OEM agency\'s scope is checked against that agency\'s own schedule instead.'} Untick anything you don't want, then approve:
             each job becomes a planned row below, done and reconciled like any contractor plan.</p>
         </>
       )}
@@ -541,6 +608,7 @@ export function PlannedView({ initialView = 'tl' }) {
   const [msg, setMsg] = useState('')
   const [auto, setAuto] = useState(false)
   const [peekId, setPeekId] = useState(null)
+  const [agencies, setAgencies] = useState([])     // [] = no register (or an older backend): plain contractor tally
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches)
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1100px)')
@@ -555,6 +623,8 @@ export function PlannedView({ initialView = 'tl' }) {
       .catch((e) => live && setError(String(e)))
     return () => { live = false }
   }, [from, to, tick])
+  useEffect(() => { getJSON('/api/agencies').then((a) => Array.isArray(a) && setAgencies(a)).catch(() => {}) }, [])
+  const reg = useMemo(() => new Map(agencies.map((a) => [a.name, a])), [agencies])
   const tally = (k) => {
     const c = new Map()
     for (const r of rows || []) if (r[k]) c.set(r[k], (c.get(r[k]) || 0) + 1)
@@ -616,7 +686,7 @@ export function PlannedView({ initialView = 'tl' }) {
               {canWrite && <th className="pm-ck"><input type="checkbox" aria-label="Select all due"
                 checked={allTick.length > 0 && allTick.every((r) => sel.has(r.id))}
                 onChange={(e) => setSel(e.target.checked ? new Set(allTick.map((r) => r.id)) : new Set())} /></th>}
-              <th>Date</th><th>Asset</th><th>Station</th><th className="pm-c-sys">System</th><th>Cycle</th><th>Contractor</th><th className="pm-c-src">Source</th><th>State</th><th />
+              <th>Date</th><th>Asset</th><th>Station</th><th className="pm-c-sys">System</th><th>Cycle</th><th>Agency</th><th className="pm-c-src">Source</th><th>State</th><th />
             </tr>
           </thead>
           <tbody>
@@ -635,7 +705,7 @@ export function PlannedView({ initialView = 'tl' }) {
                 <td>{r.station || '—'}{r.location_detail && <small className="dim pm-sub">{r.location_detail}</small>}</td>
                 <td className="pm-c-sys">{r.system || '—'}</td>
                 <td><i className="cal-freq">{CYCLE_BADGE[r.cycle] || r.cycle}</i> {r.cycle}</td>
-                <td>{r.contractor || '—'}</td>
+                <td>{r.contractor || '—'} <KindBadge kind={r.agency_kind} /></td>
                 <td className="pm-src pm-c-src" title={r.source || ''}>{planApproval(r.source) ? <PlanApproval source={r.source} /> : (r.source || '—')}</td>
                 <td><StateChip s={r.state} />
                   {r.done_on && <small className="dim pm-sub">{fmt(r.done_on)}{r.closed_by === 'reconcile' ? ' · from log' : ''}
@@ -682,14 +752,14 @@ export function PlannedView({ initialView = 'tl' }) {
         )}
         <Pick label="System" value={system} set={setSystem} opts={opts.system} />
         <Pick label="Station" value={station} set={setStation} opts={opts.station} />
-        <Pick label="Contractor" value={contractor} set={setContractor} opts={opts.contractor} />
+        <Pick label="Agency" value={contractor} set={setContractor} opts={opts.contractor} />
         <Pick label="Cycle" value={cycle} set={setCycle} opts={opts.cycle} />
         {filtered && (
           <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSystem(''); setStation(''); setContractor(''); setCycle(''); setState('all') }}>Clear</button>)}
         <span className="asset-count">{shown.length} shown</span>
         {canWrite && <span className="pm-tools">
           {!auto && !OPERATOR && <button className="btn sm" type="button" onClick={() => setAuto(true)}>Auto-plan week</button>}
-          <ImportCsv onDone={finish} />
+          <ImportCsv onDone={finish} agencies={agencies} />
         </span>}
       </div>
 
@@ -707,17 +777,17 @@ export function PlannedView({ initialView = 'tl' }) {
       {wide ? (
         <div className="reg-split wide pm-split">
           {body}
-          <aside className="card reg-peek no-print" aria-label={peek ? 'Planned job' : 'Contractors'}>
-            <div className="reg-peek-h">{peek ? 'Planned job' : `Contractors · ${periodName}`}
-              <span>{peek ? <button type="button" className="pm-peek-x" onClick={() => setPeekId(null)}>✕ contractors</button>
+          <aside className="card reg-peek no-print" aria-label={peek ? 'Planned job' : 'Agencies'}>
+            <div className="reg-peek-h">{peek ? 'Planned job' : `Agencies · ${periodName}`}
+              <span>{peek ? <button type="button" className="pm-peek-x" onClick={() => setPeekId(null)}>✕ agencies</button>
                 : contractor ? <button type="button" className="pm-peek-x" onClick={() => setContractor('')}>show all</button> : 'click to filter'}</span>
             </div>
             {peek ? <PlanPeek r={peek} canWrite={canWrite} onDone={(r) => setModal([r])} onSkip={skip} onMove={resched} />
               : rows === null ? <p className="dim lb-pick">Loading…</p>
-              : <Contractors rows={preC} pick={contractor} setPick={setContractor} board />}
+              : <Agencies rows={preC} pick={contractor} setPick={setContractor} reg={reg} board />}
           </aside>
         </div>
-      ) : <>{rows && <Contractors rows={preC} pick={contractor} setPick={setContractor} />}{body}</>}
+      ) : <>{rows && <Agencies rows={preC} pick={contractor} setPick={setContractor} reg={reg} />}{body}</>}
 
       <p className="roadmap">{view === 'tl'
         ? <>Pin = planned date (○ = the date first promised) · ● = the day it was actually logged · the bar between is the slip:

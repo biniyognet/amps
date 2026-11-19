@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.agencies import Resolver
 from app.api.assets import visible_asset
 from app.api.auth import current_writer, is_anonymous, optional_user, scope_location_ids
 from app.api.logbook import LogEntryIn, _add_one
@@ -56,7 +57,8 @@ class PlannedOut(BaseModel):
     planned_date: date
     cycle: str
     task: str | None = None
-    contractor: str | None = None
+    contractor: str | None = None     # the register name, or the schedule's own text
+    agency_kind: str | None = None    # in_house | amc | oem — None when not in the register
     source: str | None = None
     status: str
     state: str                        # today | upcoming | overdue | done | skipped
@@ -107,13 +109,22 @@ def _state(p: PMPlanned, today: date) -> str:
     return "today" if p.planned_date == today else "upcoming"
 
 
-def _out(p: PMPlanned, today: date) -> PlannedOut:
+def _out(p: PMPlanned, today: date, who: Resolver | None = None) -> PlannedOut:
+    """`who` maps the contractor text to the register; a plan with no
+    contractor is shown under the agency responsible for the asset."""
     a = p.asset
+    name, kind = p.contractor, None
+    if who:
+        name = who.canonical(p.contractor)
+        kind = who.kind_of(name)
+        if not name:
+            ag = who.who(a, p.cycle)
+            name, kind = (ag.name, ag.kind) if ag else (None, None)
     return PlannedOut(
         id=p.id, asset_id=p.asset_id, asset_code=a.code, asset_name=a.name,
         system=a.system, station=(a.location.name if a.location else None),
         location_detail=a.location_detail, planned_date=p.planned_date, cycle=p.cycle,
-        task=p.task, contractor=p.contractor, source=p.source, status=p.status,
+        task=p.task, contractor=name, agency_kind=kind, source=p.source, status=p.status,
         state=_state(p, today), original_date=p.original_date, note=p.note,
         log_entry_id=p.log_entry_id, done_on=p.done_on, closed_by=p.closed_by)
 
@@ -230,8 +241,8 @@ def list_planned(date_from: date | None = None, date_to: date | None = None,
         raise HTTPException(401, "login required")
     rows = _query(db, user, date_from, date_to, month, system, station,
                   contractor, status, cycle, q)
-    today = date.today()
-    return [_out(p, today) for p in rows]
+    today, who = date.today(), Resolver(db)
+    return [_out(p, today, who) for p in rows]
 
 
 @router.get("/facets")
@@ -241,12 +252,14 @@ def facets(db: Session = Depends(get_db), user=Depends(optional_user)):
         raise HTTPException(401, "login required")
     rows = db.scalars(_scoped(select(PMPlanned), db, user).options(
         selectinload(PMPlanned.asset).selectinload(Asset.location))).all()
+    who = Resolver(db)
+
     def uniq(vals):
         return sorted({v for v in vals if v})
     return {
         "systems": uniq(p.asset.system for p in rows),
         "stations": uniq(p.asset.location.name if p.asset.location else None for p in rows),
-        "contractors": uniq(p.contractor for p in rows),
+        "contractors": uniq(who.canonical(p.contractor) for p in rows),
         "cycles": sorted(uniq(p.cycle for p in rows), key=lambda c: SCHEDULE_FREQ.get(c, 0)),
         "months": uniq(p.planned_date.strftime("%Y-%m") for p in rows),
     }
@@ -261,10 +274,10 @@ def summary(month: str | None = None, system: str | None = None,
         raise HTTPException(401, "login required")
     month = month or date.today().strftime("%Y-%m")
     rows = _query(db, user, None, None, month, system, station, None, None, None, None)
-    today = date.today()
+    today, who = date.today(), Resolver(db)
     by = defaultdict(lambda: defaultdict(int))
     for p in rows:
-        k = p.contractor or "—"
+        k = who.canonical(p.contractor) or "—"
         by[k]["planned"] += 1
         by[k][_state(p, today)] += 1
     out = []
@@ -281,6 +294,7 @@ def summary(month: str | None = None, system: str | None = None,
 
 def _create(db: Session, rows: list[PlannedIn], user) -> dict:
     created, dupes, errors = [], 0, []
+    who = Resolver(db)          # "M/s Voltara" and "VOLTARA SERVICE" file as one agency
     for i, r in enumerate(rows, 1):
         try:
             asset = visible_asset(db, r.asset_code, user, asset_id=r.asset_id)
@@ -296,7 +310,7 @@ def _create(db: Session, rows: list[PlannedIn], user) -> dict:
             continue
         p = PMPlanned(asset_id=asset.id, line_id=asset.line_id, planned_date=r.planned_date,
                       cycle=cycle, task=(r.task or "").strip() or None,
-                      contractor=(r.contractor or "").strip()[:120] or None,
+                      contractor=(who.canonical(r.contractor) or "")[:120] or None,
                       source=(r.source or "").strip()[:200] or None,
                       created_by=user.username)
         db.add(p)
@@ -332,10 +346,12 @@ def import_sample():
 
 @router.post("/import")
 async def import_planned(file: UploadFile = File(...), commit: bool = False,
+                         agency: str | None = None,
                          db: Session = Depends(get_db), user=Depends(current_writer)):
     """CSV intake (asset_code, planned_date, cycle, contractor, source, task).
-    Without commit=1 it is a dry run — nothing is written, the counts and row
-    errors come back for review."""
+    `agency` tags an agency's own schedule: it fills rows with no contractor
+    (an `agency` column works too). Without commit=1 it is a dry run — nothing
+    is written, the counts and row errors come back for review."""
     raw = (await file.read()).decode("utf-8-sig", errors="replace")
     rows, errors = [], []
     for i, rec in enumerate(csv.DictReader(io.StringIO(raw)), 1):
@@ -345,7 +361,8 @@ async def import_planned(file: UploadFile = File(...), commit: bool = False,
                 asset_code=rec.get("asset_code") or rec.get("asset") or "",
                 planned_date=date.fromisoformat(rec.get("planned_date") or rec.get("date") or ""),
                 cycle=rec.get("cycle") or rec.get("frequency") or "",
-                contractor=rec.get("contractor"), source=rec.get("source"),
+                contractor=rec.get("contractor") or rec.get("agency") or agency,
+                source=rec.get("source"),
                 task=rec.get("task")))
         except ValueError as exc:
             errors.append({"row": i, "asset_code": rec.get("asset_code"), "error": str(exc)[:200]})
@@ -437,7 +454,7 @@ def update_planned(pid: int, body: PlannedPatch, db: Session = Depends(get_db),
     audit(db, "pm_planned", p.id, "updated",
           detail=f"{p.status} {p.planned_date}", actor=user.username)
     db.commit()
-    return _out(p, date.today())
+    return _out(p, date.today(), Resolver(db))
 
 
 @router.delete("/{pid}")

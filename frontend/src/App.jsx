@@ -4071,12 +4071,6 @@ function LineDashboard({ go, initialLine = null }) {
           <a className={`dk${openF ? ' dk-bad' : ''}`} href={failHref} title="Failures open, acknowledged or on a job card"><b>{openF}</b> open failures</a>
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
-        {!me?.line && (
-          <span className="dash-site" style={{ '--line-c': initialLine ? lineColor(initialLine) : 'var(--accent)' }}
-                title={initialLine ? `${W.Line} dashboard` : `All ${W.lines} · combined`}>
-            <SitePicker current={initialLine || ''} />
-          </span>
-        )}
         <span className="dash-clock" role="timer" aria-label="Current date and time">
           <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
           <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
@@ -5137,7 +5131,6 @@ function EstateView() {
           <span className="est-kick"><NetIcon /> {W.Network} view</span>
           <h1>Every {W.line}, at a glance</h1>
         </div>
-        <SitePicker estate />
       </header>
       <div className="est-kpis">
         {kpis.map(([v, l, c]) => <div key={l} className={`est-kpi ${c}`}><b>{v}</b><span>{l}</span></div>)}
@@ -5354,7 +5347,7 @@ export default function App() {
   // muted behind every other page).
   const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && routePath !== '/sites' && routePath !== '/dash' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
-    <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
+    <img className={`site-art${onLanding && !OPERATOR ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
   )
 
@@ -5362,7 +5355,8 @@ export default function App() {
   // view-only, and QR-scanned asset pages. Everything else routes home.
   if (anonymous) {
     if (routePath === '/login') return <>{siteArt}<LoginPage /></>
-    if (onLanding) return <>{siteArt}<Landing /><AskAmps /></> // full-screen, own chrome
+    // operator box: the landing IS the network glance, inside the normal shell
+    if (onLanding && !OPERATOR) return <>{siteArt}<Landing /><AskAmps /></> // full-screen, own chrome
     const navLine = failLine || (lineAssetsMatch ? safeDecode(lineAssetsMatch[1]) : null) || (lineMatch ? decodeURIComponent(lineMatch[1]) : null)
     return (
       <>{siteArt}
@@ -5370,9 +5364,10 @@ export default function App() {
         <header className="topbar">
   <Brand />
           <nav className="nav">
+            {!assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites' || onLanding} />}
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href={dashHref()} className={routePath === '/sites' || routePath === '/dash' || lineMatch ? 'active' : ''}>Dashboard</a>}
+              : <a href={dashHref()} className={routePath === '/sites' || routePath === '/dash' || onLanding || lineMatch ? 'active' : ''}>Dashboard</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
@@ -5380,7 +5375,7 @@ export default function App() {
           </nav>
         </header>
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
-          : routePath === '/sites' ? <EstateView />
+          : routePath === '/sites' || onLanding ? <EstateView />
           : routePath === '/dash' ? <LineDashboard go={(r) => { location.hash = r }} />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
@@ -5401,6 +5396,7 @@ export default function App() {
       <header className="topbar">
 <Brand />
         <nav className="nav">
+          {!me?.line && !assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites'} />}
           {(lineMatch || lineAssetsMatch || lineFailMatch) && navLine && (
             <LineNav line={navLine} showAllLines={!me?.line}
                      active={lineAssetsMatch ? 'assets' : lineFailMatch ? 'failures' : 'dash'} />
@@ -5463,7 +5459,7 @@ export default function App() {
         : (LIVE ? (lastSite() && !me?.line ? <Redirect to={dashHref()} /> : <LineDashboard go={go} />) : <Dashboard go={go} />)}
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
-      {LIVE && <AskAmps />}
+      {LIVE && !OPERATOR && <AskAmps />}
       <ShellFoot />
     </div>
     </>

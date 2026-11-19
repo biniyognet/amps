@@ -3861,3 +3861,34 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
   .pm-sum-c { flex: 0 0 auto; white-space: nowrap; }
   .pm-period, .pm-seg { height: 32px; }
 }
+
+/* agency register: kind badge, contract note, outside-agency check in auto-plan */
+.pm-kind { font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border-radius: 3px; vertical-align: 1px;
+  color: var(--accent); background: var(--accent-soft); }
+.pm-kind.k-oem { color: var(--ink-2); background: color-mix(in srgb, var(--border) 70%, transparent); }
+.pm-cb-t .pm-kind { align-self: center; }
+.pm-contract { font-size: 11px; color: var(--ink-2); }
+.pm-contract.c-warn { color: var(--warning); } .pm-contract.c-bad { color: var(--critical); }
+.pm-imp-ag { font: inherit; font-size: 12px; max-width: 180px; }
+.pm-out { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 12.5px; }
+.pm-out-h { margin-bottom: 6px; }
+.pm-out-a { border-left: 3px solid var(--good); padding: 4px 0 4px 10px; margin: 4px 0; }
+.pm-out-a.has-bad { border-left-color: var(--warning); }
+.pm-out-a summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.pm-out-a ul { margin: 2px 0 6px; padding-left: 18px; color: var(--ink-2); }
+.pm-out-k { margin: 6px 0 0; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+
+/* network / line picker in the top header (metro 11-19) */
+.topbar .nav > .site-pick { margin-right: 4px; }
+.topbar .site-pick .sp-back, .topbar .site-pick .sp-sel select { height: 30px; }
+.topbar .site-pick .sp-back { width: 30px; }
+.topbar .site-pick .sp-sel select { max-width: 190px; font-size: 13px; }
+@media (max-width: 700px) { .topbar .site-pick .sp-sel select { max-width: 130px; } }
+
+/* Guide: sidebar pinned to the page edge (lines up with the brand and the
+   dashboard), pages take the rest; sticky just under the topbar (metro 11-19) */
+@media (min-width: 761px) {
+  .gd { max-width: none; margin: 0; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; }
+  .gd-side { top: 62px; max-height: calc(100vh - 74px); overflow-y: auto; }
+  .gd-main.docs { max-width: 1080px; }
+}
