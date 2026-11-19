@@ -3612,3 +3612,52 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .lx-live i { animation: none; } }
 /* the hero and the network view carry their own ground; no watermark art behind them */
 body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
+
+/* ---- job cards v83: slim board, unified with the asset register + log book ---- */
+.jc-toolbar .asset-kpis { display: flex; }
+.asset-kpis .rk-stat.warn .v { color: #8a6100; }
+.asset-kpis .rk-stat.jc-turn { cursor: default; border-right: 0; border-left: 1px solid var(--border); margin-left: auto; }
+.asset-kpis .rk-stat.jc-turn:hover .k { color: var(--ink-2); }
+.cc-seg.seg-warm, .h-seg.seg-warm { background: #e0863a; }
+.h-col.seg-warm .h-cn { color: #a85a12; }
+.jc-slim { font-size: 13px; }
+.jc-slim th { padding: 8px 10px; }
+.jc-slim td { padding: 7px 10px; vertical-align: middle; line-height: 1.35; }
+.jc-slim tr.jc-row { cursor: pointer; }
+.jc-slim tr.jc-row td:first-child { box-shadow: inset 3px 0 0 var(--jc-bar, transparent); }
+.jc-slim tr.jc-open { --jc-bar: #22a355; }
+.jc-slim tr.jc-open.warm { --jc-bar: #e0863a; }
+.jc-slim tr.jc-open.hot { --jc-bar: var(--critical); background: color-mix(in srgb, var(--critical) 4%, transparent); }
+.jc-slim tr.jc-penalty { --jc-bar: var(--critical); }
+.jc-slim tr.jc-closed { --jc-bar: color-mix(in srgb, var(--good) 45%, transparent); }
+.jc-slim tr.jc-row:hover { background: var(--accent-soft); }
+.jc-slim .jc-age { min-width: 0; font-size: 12px; padding: 1px 8px; }
+.jc-slim .jc-pill { font-size: 10.5px; padding: 1px 7px; }
+.jc-slim .jc-code { font-family: var(--mono, monospace); font-weight: 700; font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+.jc-slim .lt-sub { font-size: 11px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jc-slim .jc-fault { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.jc-slim .jc-ref { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.jc-slim .jc-new { font-size: 11.5px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.jc-slim .jc-clip { margin-top: 3px; padding: 0 7px; }
+.jc-slim .jc-acts { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+.jc-slim td.td-edit .fa-rect { margin: 0; }
+@media print { .jc-slim .jc-fault, .jc-slim .lt-sub { -webkit-line-clamp: unset; display: block; white-space: normal; } }
+@media screen and (max-width: 760px) {
+  .jc-slim tr.jc-row { box-shadow: inset 3px 0 0 var(--jc-bar, transparent); }
+  .jc-slim tr.jc-row td:first-child { box-shadow: none; }
+  .jc-slim .lt-sub { white-space: normal; }
+  .asset-kpis .rk-stat.jc-turn { margin-left: 0; }
+}
+
+/* v83 (Arup 11-19): asset register list + peek = ONE boxed pane like the log book —
+   no gutter between them, a hairline divides, the peek's header strip lines up with the thead */
+.reg-peek-h { display: none; }
+@media screen and (min-width: 1100px) {
+  .reg-split.wide { gap: 0; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; }
+  .reg-split.wide > .tbl-wrap { border: 0; border-right: 1px solid var(--border); border-radius: 10px 0 0 10px; background: transparent; }
+  .reg-split.wide > .reg-peek { border: 0; border-radius: 0 10px 0 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .reg-split.wide .reg-peek-h { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px;
+    min-height: 28px; box-sizing: border-box; padding: 0 14px; background: #f1eeea; box-shadow: inset 0 -1px 0 var(--border);
+    font-size: 10.5px; font-weight: 600; line-height: 1.3; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .reg-split.wide .reg-peek-h span { margin-left: auto; font-size: 9.5px; letter-spacing: .02em; text-transform: none; font-weight: 500; }
+}

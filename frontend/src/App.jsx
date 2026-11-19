@@ -692,6 +692,7 @@ function LiveDashboard({ go, initialLine = null }) {
             </div>
             {regWide && (
               <aside className="card reg-peek no-print" aria-label="Asset detail">
+                <div className="reg-peek-h">Asset detail<span>double-click a row for the full record</span></div>
                 {peekCode ? <AssetPeek key={peekCode} code={peekCode} /> : <p className="dim lb-pick">Pick an asset on the left.</p>}
               </aside>
             )}
@@ -4238,12 +4239,13 @@ function JobCardsView({ line = '' }) {
   const [tab, setTab] = useState('open')   // open | closed | penalty | all
   const [q, setQ] = useState('')
   const [fAgency, setFAgency] = useState([])   // multi-select "Issued to" filter
+  const [fAge, setFAge] = useState([])         // open-by-age bucket filter (b1..b4)
   const [openCol, setOpenCol] = useState(null)
   const [jcAdd, setJcAdd] = useState(null)     // null | 'single' | 'bulk'
   const [sort, setSort] = useState('recent')   // newest raised first — a just-raised card lands on top
   const [assets, setAssets] = useState([])
   const [limit, setLimit] = useState(ROW_PAGE)
-  useEffect(() => setLimit(ROW_PAGE), [tab, q, fAgency, sort, line])
+  useEffect(() => setLimit(ROW_PAGE), [tab, q, fAgency, fAge, sort, line])
   const load = () => {
     const lq = line ? `&line=${encodeURIComponent(line)}` : ''
     getJSON(`/api/logbook?entry_type=failure&limit=5000${lq}`)
@@ -4287,36 +4289,51 @@ function JobCardsView({ line = '' }) {
   const line_ = me?.line || ''
   const STL = { open: ['jc-open', 'Open'], closed: ['jc-closed', 'Closed'], penalty: ['jc-penalty', 'Penalty'] }
   const STT = { open: 'Open — awaiting close-out', closed: 'Closed by agency', penalty: 'Penalty — we fixed it (agency default)' }
-  // open-card ageing buckets, the chase list at a glance
-  const BUCKETS = [['≤ 14 d', 0, 14, ''], ['15–30 d', 15, 30, ''], ['31–90 d', 31, 90, ' warm'], ['> 90 d', 91, Infinity, ' hot']]
+  // open-card ageing buckets = the chase list; same slim bar as the asset register, a click filters
+  const BUCKETS = [['b1', '≤ 14 d', 0, 14, 'seg-ok'], ['b2', '15–30 d', 15, 30, 'seg-due'], ['b3', '31–90 d', 31, 90, 'seg-warm'], ['b4', '> 90 d', 91, Infinity, 'seg-od']]
+    .map(([k, lbl, lo, hi, cls]) => [k, lbl, lo, hi, cls, open.filter((c) => c.age >= lo && c.age <= hi).length]).filter((b) => b[5] > 0)
+  const inAge = (c) => !fAge.length || BUCKETS.some(([k, , lo, hi]) => fAge.includes(k) && c.status === 'open' && c.age >= lo && c.age <= hi)
+  const view = shown.filter(inAge)
+  const ageSum = BUCKETS.reduce((n, b) => n + b[5], 0) || 1
   const issuer = (v) => (v && v !== 'unknown' && !v.endsWith('-import') && v !== '' ? v : '')
   const printAll = () => { setLimit(Infinity); setTimeout(() => window.print(), 300) }
   return (
     <>
-      <div className="page-head"><h1>Job cards {line_ && <span className="dim">· {line_}</span>}</h1></div>
-      <p className="dim" style={{ marginTop: -6 }}>Job cards raised to an agency/department, tracked from issue to close-out.</p>
-
-      <div className="kpis dash-kpis" style={{ marginBottom: 14 }}>
-        <div className={`tile${open.length ? ' alert' : ''}`}><div className="v">{open.length}</div><div className="k">Open</div><div className="note">awaiting close-out</div></div>
-        <div className={`tile${penalty.length ? ' warn' : ''}`}><div className="v">{penalty.length}</div><div className="k">Penalty</div><div className="note">we fixed — agency default</div></div>
-        <div className="tile ok"><div className="v">{closed.length}</div><div className="k">Closed by agency</div><div className="note">fulfilled</div></div>
-        <div className="tile"><div className="v">{avgTurn != null ? `${avgTurn}d` : '—'}</div><div className="k">Avg turnaround</div><div className="note">raised → closed</div></div>
-      </div>
-
-      <div className="asset-toolbar">
+      <div className="asset-toolbar jc-toolbar">
         <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-               placeholder="Search asset, fault, agency, detail…" aria-label="Search job cards" />
-        <div className="asset-filter" role="tablist" aria-label="Job card status">
+               placeholder="Search asset, fault, agency…" aria-label="Search job cards" />
+        {/* status tabs + open-by-age bar, the asset register's slim strip; avg turnaround closes it */}
+        <div className={`asset-kpis hstrip${fAge.length ? ' has-pick' : ''}`} role="group" aria-label="Job card status">
           {TABS.map(([k, lbl, list]) => (
-            <button key={k} type="button" className={`btn preset ${tab === k ? 'active' : ''}${k === 'open' && open.length ? ' has-od' : ''}`}
-                    onClick={() => setTab(k)}>{lbl} {list.length}</button>
+            <button key={k} type="button" aria-pressed={tab === k}
+                    className={`rk-stat${tab === k ? ' on' : ''}${k === 'open' && list.length ? ' bad' : k === 'penalty' && list.length ? ' warn' : ''}`}
+                    title={k === 'all' ? 'Every job card' : STT[k]} onClick={() => { setTab(k); if (k !== 'open' && k !== 'all') setFAge([]) }}>
+              <span className="v">{list.length}</span><span className="k">{lbl}</span>
+            </button>
           ))}
+          {BUCKETS.length > 0 && (tab === 'open' || tab === 'all') && (
+            <div className="h-meter" aria-label="Open job cards by age">
+              {BUCKETS.map(([k, lbl, , , cls, n], i) => (
+                <button key={k} type="button" aria-pressed={fAge.includes(k)}
+                        onClick={() => setFAge(fAge.includes(k) ? fAge.filter((x) => x !== k) : [...fAge, k])}
+                        className={`h-col ${cls}${n / ageSum < 0.1 ? ' nar' : ''}${fAge.includes(k) ? ' on' : ''}`}
+                        style={{ flex: `${n} 1 0`, '--i': i }} title={`Open ${lbl}: ${n} · click to filter`}>
+                  <span className={`h-seg cc-seg ${cls}`} />
+                  <span className="h-cn">{n}</span>
+                  <span className="h-cl">{lbl}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="rk-stat jc-turn" title="Average days from raised to closed">
+            <span className="v">{avgTurn != null ? `${avgTurn}d` : '—'}</span><span className="k">avg turnaround</span>
+          </span>
         </div>
         <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort job cards" title="Sort">
           {Object.entries(SORTS).map(([k, [lbl]]) => <option key={k} value={k}>{lbl}</option>)}
         </select>
-        {(q || fAgency.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]) }}>Clear</button>}
-        <span className="asset-count">{shown.length} shown</span>
+        {(q || fAgency.length > 0 || fAge.length > 0) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFAgency([]); setFAge([]) }}>Clear</button>}
+        <span className="asset-count">{view.length} shown{line_ && ` · ${line_}`}</span>
         <div className="asset-actions">
           {canWrite && (
             <button type="button" className={`icon-btn${jcAdd === 'single' ? ' on' : ''}`} title="Raise a job card"
@@ -4331,7 +4348,7 @@ function JobCardsView({ line = '' }) {
             </button>
           )}
           <button type="button" className="icon-btn" title="Download these job cards (CSV)" aria-label="Download job cards"
-                  onClick={() => exportJobCards(shown)}>
+                  onClick={() => exportJobCards(view)}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.4v7.2M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10" /></svg>
           </button>
           <button type="button" className="icon-btn" title="Print these job cards" aria-label="Print job cards" onClick={printAll}>
@@ -4340,34 +4357,23 @@ function JobCardsView({ line = '' }) {
         </div>
       </div>
 
-      {open.length > 0 && (tab === 'open' || tab === 'all') && (
-        <div className="jc-buckets" aria-label="Open job cards by age">
-          <span className="dim">Open by age</span>
-          {BUCKETS.map(([lbl, lo, hi, cls]) => (
-            <span key={lbl} className={`jc-age${cls}`}>{lbl} · {open.filter((c) => c.age >= lo && c.age <= hi).length}</span>
-          ))}
-        </div>
-      )}
-
       {canWrite && jcAdd && (
         <JobCardEntry assets={assets} systems={systems} defaultDate={new Date().toISOString().slice(0, 10)}
                       bulk={jcAdd === 'bulk'} onClose={() => setJcAdd(null)} onDone={() => { setJcAdd(null); load() }} />
       )}
 
-      {shown.length === 0 ? (
+      {view.length === 0 ? (
         <div className="card"><p className="dim" style={{ margin: 0 }}>{tab === 'open' ? 'No open job cards — nothing to chase. 👍' : 'None in this view.'}</p></div>
       ) : (
         <div className="card tbl-wrap">
-          <table className="jc-table fit-card">
-            {/* percentage widths so all columns fit the card at any width (no
-                1024px min-width / h-scroll); Detail flexes into the remainder */}
+          <table className="jc-table fit-card jc-slim">
+            {/* percentage widths: fits the card at any width; Fault flexes into the remainder */}
             <colgroup>
-              <col style={{ width: '5%' }} /><col style={{ width: '6%' }} />
-              <col style={{ width: '10%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col />
-              <col style={{ width: '9%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
-              {canWrite && <col style={{ width: '9%' }} />}
+              <col style={{ width: '9%' }} /><col style={{ width: '16%' }} /><col />
+              <col style={{ width: '13%' }} /><col style={{ width: '10%' }} /><col style={{ width: '14%' }} />
+              {canWrite && <col style={{ width: '11%' }} />}
             </colgroup>
-            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Days'}</th><th>Status</th><th>Asset</th><th>{W.Station}</th><th>Location</th><th>Fault</th>
+            <thead><tr><th>{tab === 'open' ? 'Pending' : 'Status'}</th><th>Asset</th><th>Fault</th>
               <th className={fAgency.length ? 'th-filtered' : ''}>Issued to
                 <ColFilter open={openCol === 'ag'} onToggle={() => setOpenCol(openCol === 'ag' ? null : 'ag')}
                            onClose={() => setOpenCol(null)} values={fAgency}
@@ -4376,37 +4382,40 @@ function JobCardsView({ line = '' }) {
               </th>
               <th>Raised</th><th>Job card</th>{canWrite && <th aria-label="Action"></th>}</tr></thead>
             <tbody>
-              {shown.slice(0, limit).map(({ f, jc, rb, status, age }) => {
+              {view.slice(0, limit).map(({ f, jc, rb, status, age }) => {
                 const fp = parseLog(f.text, f.fault_type), jp = parseLog(jc.text)
                 const ref = (jp.meta.find(([k]) => k === 'jc') || fp.meta.find(([k]) => k === 'jc'))?.[1]
                 // the card text is normally the failure text again — show it only when it says something new
                 const jcNew = jp.head && normTxt(jp.head) !== normTxt(fp.head) ? jp.head : ''
                 const by = issuer(jc.entered_by)
+                const where = [f.station || jc.station, f.category].filter(Boolean).join(' · ')
+                const go = () => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)
                 return (
-                <tr key={f.id} tabIndex={0}
-                    onClick={() => f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && f.asset_code && (location.hash = `/asset/${encodeURIComponent(f.asset_code)}`)}>
-                  <td data-l={status === 'open' ? 'Pending' : 'Turnaround'}><span className={`jc-age${status === 'open' ? ageCls(age) : ''}`}
-                      title={status === 'open' ? `open for ${age} days` : `closed in ${age} days`}>{age}d</span></td>
-                  <td data-l="Status"><span className={`jc-pill ${STL[status][0]}`} title={STT[status]}>{STL[status][1]}</span></td>
-                  <td className="code" data-l="Asset">{f.asset_code || '—'}</td>
-                  <td className="dim nobreak" data-l={W.Station}>{f.station || jc.station || '—'}</td>
-                  <td className="dim" data-l="Location">{f.category || '—'}</td>
-                  <td className="wrap-cell" data-l="Fault"><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></td>
-                  <td className="dim" data-l="Issued to">{jc.attended_by || '—'}
+                <tr key={f.id} tabIndex={0} className={`jc-row ${STL[status][0]}${status === 'open' ? ageCls(age) : ''}`}
+                    onClick={go} onKeyDown={(e) => e.key === 'Enter' && go()}>
+                  <td data-l={status === 'open' ? 'Pending' : 'Status'}>
+                    {status === 'open'
+                      ? <span className={`jc-age${ageCls(age)}`} title={`${STT.open} · ${age} days`}>{age}d</span>
+                      : <span className={`jc-pill ${STL[status][0]}`} title={`${STT[status]} · in ${age} days`}>{STL[status][1]} · {age}d</span>}
+                  </td>
+                  <td data-l="Asset"><span className="code jc-code">{f.asset_code || '—'}</span>
+                    {where && <div className="lt-sub">{where}</div>}</td>
+                  <td data-l="Fault"><div className="jc-fault" title={fp.head || f.text}><LogText text={f.text} ft={f.fault_type} skip={/^(asset|equipment|to|jc)$/} /></div></td>
+                  <td data-l="Issued to">{jc.attended_by || '—'}
                     {by && by !== jc.attended_by && <div className="lt-sub">by {by}</div>}</td>
-                  <td className="dim dt" data-l="Raised → closed">{jc.log_date}<div className="lt-sub">{rb ? `→ ${rb.log_date}` : '→ open'}</div></td>
-                  <td className="wrap-cell" data-l="Job card">
-                    {ref ? <span className="lt-jc">{ref}</span> : <span className="dim">—</span>}
-                    {jcNew && <div className="lt-head lt-sub" title={jcNew}>{jcNew}</div>}
-                    <JobCardApproval jc={jc} f={f} />
+                  <td className="dt" data-l="Raised → closed">{jc.log_date}<div className="lt-sub">{rb ? `→ ${rb.log_date}` : '→ open'}</div></td>
+                  <td data-l="Job card" onClick={(e) => e.stopPropagation()}>
+                    <div className="jc-ref">
+                      {ref ? <span className="lt-jc" title={jcNew || undefined}>{ref}</span> : jcNew ? <span className="dim jc-new" title={jcNew}>{jcNew}</span> : <span className="dim">—</span>}
+                      <JobCardApproval jc={jc} f={f} />
+                    </div>
                     <JcScan jc={jc} rb={rb} canWrite={canWrite} />
                   </td>
                   {canWrite && (
                     <td className="td-edit" data-l="Action" onClick={(e) => e.stopPropagation()}>
                       {status === 'open'
-                        ? <><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`} title="Rectify / close this job card">✓ Close</a>
-                            <a className="mini-btn muted" href={`#/log?d=${jc.log_date}&edit=${jc.id}`}>Edit</a></>
+                        ? <span className="jc-acts"><a className="fa-btn fa-rect" href={`#/log?d=${f.log_date}&edit=${f.id}&resp=rectification`} title="Rectify / close this job card">✓ Close</a>
+                            <a className="mini-btn muted" href={`#/log?d=${jc.log_date}&edit=${jc.id}`}>Edit</a></span>
                         : <EditLink id={jc.id} date={jc.log_date} label="Edit / open" />}
                     </td>
                   )}
@@ -4415,7 +4424,7 @@ function JobCardsView({ line = '' }) {
               })}
             </tbody>
           </table>
-          <MoreRows shown={Math.min(limit, shown.length)} total={shown.length} setLimit={setLimit} />
+          <MoreRows shown={Math.min(limit, view.length)} total={view.length} setLimit={setLimit} />
         </div>
       )}
     </>
