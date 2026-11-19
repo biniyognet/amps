@@ -3908,3 +3908,24 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
 /* the line picker keeps one width whatever is picked, so nothing after it shifts */
 .topbar .site-pick .sp-sel select { width: 170px; }
 @media (max-width: 700px) { .topbar .site-pick .sp-sel select { width: 130px; } }
+
+/* tablet: one-row topbar (Arup 11-20) */
+@media screen and (min-width: 681px) and (max-width: 1180px) {
+  .topbar { flex-wrap: nowrap; gap: 10px; }
+  .topbar .brand, .topbar .site-pick { flex: none; }
+  .topbar .brand-tag { display: none; }
+  .topbar .nav { flex-wrap: nowrap; gap: 0; min-width: 0; }
+  .nav a, .nav-drop { font-size: 13px; padding: 4px 7px; white-space: nowrap; }
+  .topbar .site-pick .sp-sel select { width: 132px; }
+  .nav .login-btn { padding: 6px 14px; }
+}
+@media screen and (min-width: 681px) and (max-width: 960px) {
+  .topbar .brand-lines { display: none; }
+  .nav a, .nav-drop { font-size: 12.5px; padding: 4px 5px; }
+  .topbar .site-pick .sp-sel select { width: 118px; }
+}
+@media screen and (min-width: 681px) and (max-width: 760px) {
+  .topbar { gap: 6px; }
+  .nav a, .nav-drop { font-size: 12px; padding: 4px 4px; }
+  .topbar .site-pick .sp-sel select { width: 96px; }
+}
