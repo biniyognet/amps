@@ -5300,6 +5300,26 @@ export default function App() {
     sync()
     return () => { mo.disconnect(); ro?.disconnect(); if (raf) cancelAnimationFrame(raf) }
   }, [])
+  // A sticky peek is pushed up as its split runs out (near the footer), taking its
+  // frozen header off-screen. Shrink it to the room left instead, so the header
+  // stays docked and the peek body scrolls inside.
+  useEffect(() => {
+    let raf = 0
+    const fit = () => {
+      raf = 0
+      document.querySelectorAll('.reg-split.wide > .reg-peek').forEach((p) => {
+        const top = parseFloat(getComputedStyle(p).top) || 0
+        const room = p.parentElement.getBoundingClientRect().bottom - top
+        p.style.maxHeight = `${Math.max(120, Math.min(innerHeight - top - 12, room))}px`
+      })
+    }
+    const on = () => { if (!raf) raf = requestAnimationFrame(fit) }
+    addEventListener('scroll', on, { passive: true }); addEventListener('resize', on)
+    const mo = new MutationObserver(on)
+    mo.observe(document.body, { childList: true, subtree: true })
+    fit()
+    return () => { removeEventListener('scroll', on); removeEventListener('resize', on); mo.disconnect(); if (raf) cancelAnimationFrame(raf) }
+  }, [])
   const go = (r) => { location.hash = r }
   const authOn = LIVE && me?.auth_enabled
   const signedIn = authOn && me.username !== 'viewer'
