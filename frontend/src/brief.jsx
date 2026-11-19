@@ -43,6 +43,7 @@ const SLIDES = [
   'AI drafts the plan. A supervisor approves. The Planner runs it.',
   'Gemini turns the logbook into answers, job cards and early warnings',
   'Where Gemini and Google Cloud do the work',
+  'What we build with, and what runs in the product',
   'One register for every asset, every record, every device',
   'Every site’s PM compliance, at a glance',
   'From a register to a maintenance cockpit',
@@ -83,7 +84,7 @@ const FAQ = [
 ]
 
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
-const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1119`
+const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1119b`
 
 function Deck() {
   const [i, setI] = useState(0)
@@ -109,7 +110,7 @@ function Deck() {
         <span className="br-count">{i + 1} / {SLIDES.length}</span>
         <button type="button" onClick={() => setI(Math.min(last, i + 1))} disabled={i === last}>Next ›</button>
         <button type="button" onClick={() => ref.current?.requestFullscreen?.()} title="Full screen · ← → or n / p to step">Present</button>
-        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1119`} download title="Download the deck as PDF">PDF ↓</a>
+        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1119b`} download title="Download the deck as PDF">PDF ↓</a>
       </figcaption>
     </figure>
   )
@@ -189,7 +190,7 @@ export default function Brief() {
         failure report and job card for a person to confirm. Open-source EAM for any plant, ₹0 licence.</p>
       </header>
 
-      <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-two slides</h2>
+      <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-three slides</h2>
       <Deck />
       <p className="br-note">← → or n / p to step · Full screen to present</p>
       </section>
