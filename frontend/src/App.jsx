@@ -4789,9 +4789,6 @@ function Landing() {
   return (
     <div className="lx">
       <section className="lx-hero" aria-label="AMPS">
-        <video className="lx-vid" src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
-               autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
-        <div className="lx-shade" aria-hidden="true" />
         <header className="lx-bar">
           <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
           <nav className="lx-nav">
@@ -4800,6 +4797,7 @@ function Landing() {
             <a className="lx-signin" href="#/login">Sign in</a>
           </nav>
         </header>
+        <div className="lx-main">
         <div className="lx-copy">
           <span className="lx-live"><i />Live demo · synthetic data</span>
           <h1>A failure nobody logs comes back as downtime.</h1>
@@ -4810,7 +4808,14 @@ function Landing() {
             <a className="lx-btn" href={`#/snap/${SNAP_DEMO}`}>Try Snap &amp; Report</a>
           </div>
         </div>
-        <span className="lx-cap">A real run on this demo · gemini-2.5-flash · 30 s</span>
+        <figure className="lx-stage">
+          <div className="lx-win">
+            <video className="lx-vid" src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
+                   autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
+          </div>
+          <figcaption className="lx-cap">A real run on this demo · gemini-2.5-flash · 30 s</figcaption>
+        </figure>
+        </div>
         <div className="lx-rib"><Ribbon lines={lines} /></div>
       </section>
       <section className="lx-steps" aria-label="How it works">
