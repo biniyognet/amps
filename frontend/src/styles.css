@@ -3714,3 +3714,25 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
 .asset-count.tags-cap { color: #b45309; font-weight: 600; }
 /* phone: the A4 blank no longer forces the single column wider than the screen; it scrolls in its own box */
 @media screen and (max-width: 640px) { .cs-formats { grid-template-columns: minmax(0, 1fr); } .cs-print-area { overflow-x: auto; } }
+
+/* checksheets v88 — the format picker and the sheet's print bar dock under the toolbar */
+@media screen and (min-width: 641px) {
+  .cs-formats { --cs-dock: calc(var(--topbar-h, 78px) + var(--toolbar-h, 52px) + 2px); }
+  .cs-picker { top: var(--cs-dock); z-index: 4; display: flex; flex-direction: column;
+    max-height: calc(100vh - var(--cs-dock) - 12px); box-sizing: border-box; padding: 8px 10px; }
+  .cs-pick-scroll { max-height: none; flex: 1 1 auto; min-height: 0; }
+  .cs-picker .cs-hint { flex: none; margin-top: 8px; font-size: 11px; line-height: 1.4; }
+  .cs-sheetbar { top: var(--cs-dock); z-index: 20; }
+}
+.cs-print-area { gap: 10px; }
+.cs-sheetbar { flex-wrap: nowrap; padding: 6px 8px 6px 14px; gap: 12px; min-height: 44px; border-radius: 10px;
+  box-shadow: 0 1px 0 var(--border), 0 6px 14px -12px rgba(15, 40, 60, .35); }
+.cs-sheetbar-t { flex-direction: row; align-items: baseline; gap: 8px; flex: 1 1 auto; overflow: hidden; white-space: nowrap; }
+.cs-sheetbar-t b { font-size: 14px; flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.cs-sheetbar-t .dim { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.cs-sheetbar-ctl { flex: none; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.cs-sheetbar-ctl label { flex-direction: row; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-3); }
+.cs-sheetbar-ctl select, .cs-sheetbar-ctl input { height: 28px; padding: 0 6px; box-sizing: border-box; }
+.cs-sheetbar-ctl input { width: 46px; }
+.cs-sheetbar-ctl .btn { height: 30px; padding: 0 14px; font-size: 13px; }
+@media screen and (max-width: 640px) { .cs-sheetbar { flex-wrap: wrap; } .cs-sheetbar-t b { max-width: 100%; } }
