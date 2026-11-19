@@ -4788,15 +4788,15 @@ function Landing() {
   const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
   return (
     <div className="lx">
+      <header className="lx-bar">
+        <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
+        <nav className="lx-nav">
+          <a href="#/guide">Pitch</a>
+          <a href={dashHref()}>Dashboard</a>
+          <a className="lx-signin" href="#/login">Sign in</a>
+        </nav>
+      </header>
       <section className="lx-hero" aria-label="AMPS">
-        <header className="lx-bar">
-          <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
-          <nav className="lx-nav">
-            <a href="#/guide">Pitch</a>
-            <a href={dashHref()}>Dashboard</a>
-            <a className="lx-signin" href="#/login">Sign in</a>
-          </nav>
-        </header>
         <div className="lx-main">
         <div className="lx-copy">
           <span className="lx-live"><i />Live demo · synthetic data</span>
