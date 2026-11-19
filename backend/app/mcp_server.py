@@ -61,7 +61,11 @@ def http_app():
     manager = StreamableHTTPSessionManager(app=server, stateless=True, json_response=True)
     token = os.environ.get("AMPS_MCP_TOKEN", "")
 
-    async def asgi(scope, receive, send):
+    class Asgi:  # a class, so Starlette's Route treats it as a raw ASGI app
+        async def __call__(self, scope, receive, send):
+            await guarded(scope, receive, send)
+
+    async def guarded(scope, receive, send):
         if token and scope["type"] == "http":
             got = dict(scope.get("headers") or []).get(b"authorization", b"").decode()
             if not hmac.compare_digest(got, f"Bearer {token}"):
@@ -72,7 +76,7 @@ def http_app():
                 return
         await manager.handle_request(scope, receive, send)
 
-    return asgi, manager
+    return Asgi(), manager
 
 
 # --- local (stdio) ------------------------------------------------------------

@@ -74,6 +74,9 @@ app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(snap.router, prefix="/api/snap", tags=["snap"])
 if _mcp:
+    from starlette.routing import Route
+    # exact /mcp too: the mount alone 307s it to /mcp/, and behind TLS that redirect is http://
+    app.router.routes.append(Route("/mcp", _mcp[0], methods=["GET", "POST", "DELETE"]))
     app.mount("/mcp", _mcp[0])
 
 

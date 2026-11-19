@@ -1,0 +1,85 @@
+# AMPS over MCP (buildathon F3): amps-api.binihost.com/mcp → its own pod, its own seeded SQLite.
+# amps-api, its env and the password lock are untouched; only PathPrefix /mcp is routed here
+# (priority 900, under the password lock's 1000). Read-only tools, anonymous viewer, no secrets.
+# Undo: kubectl delete -f mcp.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amps-mcp
+  namespace: amps-demo
+  labels:
+    app: amps-mcp
+    app.kubernetes.io/part-of: amps-demo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: amps-mcp
+  template:
+    metadata:
+      labels:
+        app: amps-mcp
+        app.kubernetes.io/part-of: amps-demo
+    spec:
+      imagePullSecrets:
+      - name: binihost-registry-secret
+      containers:
+      - name: api
+        image: ghcr.io/biniyognet/amps-backend:oc11200325-mcp
+        ports:
+        - containerPort: 8000
+        env:
+        - name: AMPS_MCP_HTTP
+          value: '1'
+        - name: AMPS_SEED_ON_START
+          value: '1'
+        - name: AMPS_SEED
+          value: network
+        - name: AMPS_ORG
+          value: Demo Industries Group
+        - name: AMPS_STANDARD_LINE
+          value: Metro Traction & Depot
+        - name: AMPS_AUTH
+          value: '1'
+        readinessProbe:
+          httpGet: {path: /health, port: 8000}
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: {path: /health, port: 8000}
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        resources:
+          requests: {cpu: 15m, memory: 96Mi}
+          limits: {cpu: 500m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: amps-mcp
+  namespace: amps-demo
+spec:
+  selector:
+    app: amps-mcp
+  ports:
+  - port: 8000
+    targetPort: 8000
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: amps-mcp
+  namespace: amps-demo
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`amps-api.binihost.com`) && PathPrefix(`/mcp`)
+    priority: 900
+    services:
+    - name: amps-mcp
+      port: 8000
+  tls:
+    secretName: amps-api-tls
