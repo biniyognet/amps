@@ -2848,6 +2848,12 @@ function PrintablesNav({ active }) {
           <a className="sc-item" role="menuitem" href="#/printables?t=checksheets" onClick={() => go('checksheets')}>
             <span className="sc-name">Checksheets</span><span className="sc-sub">maintenance checksheet formats — print & manage</span>
           </a>
+          {!OPERATOR && <>
+            <div className="sc-divider" />
+            <a className="sc-item" role="menuitem" href="https://metro.binihost.com" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
+              <span className="sc-name">Metro AMPS<span className="sc-live">● LIVE</span></span><span className="sc-sub">in service · Kolkata Metro power-supply ↗</span>
+            </a>
+          </>}
         </div>
       )}
     </span>
