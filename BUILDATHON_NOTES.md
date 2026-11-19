@@ -8,7 +8,7 @@
 ### Setup (MSI laptop)
 - [x] Free disk space on C: (target ≥ 25 GB) — done 20 Nov, ~161 GB free
 - [x] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026 — done 20 Nov, billing account "GDP Event Credit" (`01111C-2C89C3-9C75C9`) Active
-- [ ] Link project `gen-lang-client-0618042629` to "GDP Event Credit" — still on the personal account `01E666-…` (₹500)
+- [x] Link project `gen-lang-client-0618042629` to "GDP Event Credit" — done 20 Nov, verified (moved off the personal ₹500 account)
 - [x] Antigravity IDE: open **this** folder `C:\Arups_Wokspace\amps-buildathon` (not the parent — workspace skills load from its `.agents/skills`)
 - [x] Extension **Google Cloud Data Agent Kit** — done 20 Nov; services: BigQuery, Conversational Analytics, AlloyDB, Cloud Storage; notebook execution off. Laptop only (the server builds with `bq`/`gcloud`)
 - [x] gcloud CLI — done 20 Nov: SDK 594, signed in as arupbiswas1994 (user + ADC), project `gen-lang-client-0618042629`, 9 APIs enabled (BigQuery, BQ Storage, Cloud Run, Artifact Registry, Cloud Build, Storage, AlloyDB, Vertex AI, Gemini Data Analytics)
