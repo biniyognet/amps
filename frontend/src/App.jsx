@@ -2806,22 +2806,6 @@ function Printables({ initial = 'qr', fmtId = '' }) {
   return tab === 'qr' ? <TagSheet /> : <ChecksheetFormats initialId={fmtId} />
 }
 
-/* the shared title row of the printables — same page-head as Letters / Job cards,
-   with a QR ⇄ Checksheets switch (and any page actions) docked on the right */
-function PrintHead({ tab, title, children }) {
-  return (
-    <div className="page-head no-print">
-      <h1>{title}</h1>
-      <div className="asset-filter ph-actions" role="tablist" aria-label="Printables">
-        {children}
-        {children && <span className="crit-sep" aria-hidden="true" />}
-        <a className={`btn preset ${tab === 'qr' ? 'active' : ''}`} href="#/printables?t=qr">QR tags</a>
-        <a className={`btn preset ${tab === 'checksheets' ? 'active' : ''}`} href="#/printables?t=checksheets">Checksheets</a>
-      </div>
-    </div>
-  )
-}
-
 /* the Printables nav item: a dropdown submenu instead of a page-level tab bar */
 function PrintablesNav({ active }) {
   const [open, setOpen] = useState(false)
@@ -2893,31 +2877,33 @@ function ChecksheetFormats({ initialId = '' }) {
   if (formats === null) return <p className="dim">Loading checksheet formats…</p>
   const published = formats.filter((f) => f.status === 'published' || !f.status)
   const pending = formats.filter((f) => f.status === 'pending').length
+  // print ⇄ manage, docked at the end of the library toolbar (writers only)
+  const modeSwitch = canWrite && (
+    <div className="asset-kpis hstrip cs-mode" role="group" aria-label="Checksheet mode">
+      <button type="button" className={`rk-stat${mode === 'print' ? ' on' : ''}`} aria-pressed={mode === 'print'}
+              onClick={() => { setEditing(null); setMode('print') }}><span className="k">Print blanks</span></button>
+      <button type="button" className={`rk-stat${mode === 'manage' ? ' on' : ''}${pending ? ' bad' : ''}`} aria-pressed={mode === 'manage'}
+              title={pending ? `${pending} format${pending === 1 ? '' : 's'} awaiting approval` : 'Create, revise and approve formats'}
+              onClick={() => { setEditing(null); setMode('manage') }}>{pending ? <span className="v">{pending}</span> : null}<span className="k">Manage</span></button>
+    </div>
+  )
 
   return (
     <div>
-      <PrintHead tab="checksheets" title="Checksheets">
-        {canWrite && <>
-          <button type="button" className={`btn preset ${mode === 'print' ? 'active' : ''}`} onClick={() => { setEditing(null); setMode('print') }}>Print blanks</button>
-          <button type="button" className={`btn preset${mode === 'manage' ? ' active' : ''}${pending ? ' has-od' : ''}`} onClick={() => { setEditing(null); setMode('manage') }}>
-            Manage formats{pending ? ` · ${pending} pending` : ''}
-          </button>
-        </>}
-      </PrintHead>
       {err && <div className="card offline-note no-print">{err}</div>}
       {editing ? (
         <ChecksheetEditor initial={editing} formats={formats} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} setErr={setErr} />
       ) : mode === 'manage' && canWrite ? (
-        <ChecksheetManage formats={formats} isApprover={isApprover} onEdit={setEditing} reload={load} setErr={setErr} />
+        <ChecksheetManage formats={formats} isApprover={isApprover} onEdit={setEditing} reload={load} setErr={setErr} modeSwitch={modeSwitch} />
       ) : (
-        <ChecksheetPrint published={published} initialId={initialId} />
+        <ChecksheetPrint published={published} initialId={initialId} modeSwitch={modeSwitch} />
       )}
     </div>
   )
 }
 
 /* the library filter bar: search · system chips · cycle. Shared by print & manage. */
-function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, children }) {
+function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, modeSwitch, children }) {
   const systems = Object.entries(formats.reduce((m, f) => { const s = csSystem(f); m[s] = (m[s] || 0) + 1; return m }, {}))
     .sort(([a], [b]) => a.localeCompare(b))
   const cycles = [...new Set(formats.flatMap((f) => f.slots?.length ? [f.frequency || 'Log sheet'] : f.frequencies || []))]
@@ -2948,6 +2934,7 @@ function CsFilterBar({ formats, q, setQ, sys, setSys, cyc, setCyc, shown, childr
       {(q || sys || cyc) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setSys(''); setCyc('') }}>Clear</button>}
       <span className="asset-count">{shown} of {formats.length}</span>
       {children}
+      {modeSwitch}
     </div>
   )
 }
@@ -2961,7 +2948,7 @@ function csMatches(f, { q, sys, cyc }) {
 }
 
 /* the print-ready blank picker + A4 sheet */
-function ChecksheetPrint({ published, initialId }) {
+function ChecksheetPrint({ published, initialId, modeSwitch }) {
   const [q, setQ] = useState('')
   const [sys, setSys] = usePersistedState('cs.system', '')
   const [cyc, setCyc] = useState('')
@@ -2985,7 +2972,7 @@ function ChecksheetPrint({ published, initialId }) {
   const isLog = fmt?.slots?.length > 0
   return (
     <div>
-      <CsFilterBar formats={published} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={shown.length} />
+      <CsFilterBar formats={published} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={shown.length} modeSwitch={modeSwitch} />
       <div className="cs-formats">
         <aside className="cs-picker no-print card">
           {shown.length === 0 ? <p className="dim" style={{ margin: 4 }}>No format matches.</p> : (
@@ -3308,7 +3295,7 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
 }
 
 /* the governance surface: list every format by status, act on it */
-function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr }) {
+function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr, modeSwitch }) {
   const [histFor, setHistFor] = useState(null)
   const act = async (id, path, body) => {
     setErr('')
@@ -3338,7 +3325,7 @@ function ChecksheetManage({ formats, isApprover, onEdit, reload, setErr }) {
   const STAT_TABS = [['', 'All', formats.length], ['pending', 'Pending', counts.pending || 0], ['draft', 'Draft', counts.draft || 0], ['published', 'Published', counts.published || 0]]
   return (
     <div>
-      <CsFilterBar formats={formats} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={rows.length}>
+      <CsFilterBar formats={formats} q={q} setQ={setQ} sys={sys} setSys={setSys} cyc={cyc} setCyc={setCyc} shown={rows.length} modeSwitch={modeSwitch}>
         <div className="asset-kpis hstrip cs-stat" role="group" aria-label="Status filter">
           {STAT_TABS.filter(([k]) => k !== 'pending' || counts.pending).map(([k, lbl, v]) => (
             <button key={k} type="button" className={`rk-stat${fStatus === k ? ' on' : ''}${k === 'pending' && counts.pending ? ' bad' : ''}`}
@@ -3556,7 +3543,6 @@ function TagSheet() {
   if (all.length === 0) return <div className="card"><p className="dim" style={{ margin: 0 }}>No assets in the register yet — tags appear as assets are added.</p></div>
   return (
     <>
-      <PrintHead tab="qr" title="QR asset tags" />
       <div className="asset-toolbar" ref={toolbarRef}>
         <input className="asset-search" type="search" value={q} onChange={(e) => setQ(e.target.value)}
                placeholder="Search code, asset, class or location…" aria-label="Search assets" />
@@ -3577,7 +3563,9 @@ function TagSheet() {
           {statuses.map((s) => <option key={s} value={s}>{STATUS_LABEL[s] || s}</option>)}
         </select>
         {(q || fSystem || fClass || fLocation || fStatus) && <button type="button" className="btn ghost sm" onClick={() => { setQ(''); setFSystem(''); setFClass(''); setFLocation(''); setFStatus('') }}>Clear</button>}
-        <span className="asset-count" title="One tag per asset — scanning opens the asset's live record. Filter to the set you need, then print.">{shown.length} tag{shown.length === 1 ? '' : 's'}</span>
+        {shown.length > TAG_CAP
+          ? <span className="asset-count tags-cap" title={`Showing the first ${TAG_CAP} of ${shown.length} — refine the filter to reach the rest, then print.`}>{TAG_CAP} of {shown.length} tags</span>
+          : <span className="asset-count" title="One tag per asset — scanning opens the asset's live record. Filter to the set you need, then print.">{shown.length} tag{shown.length === 1 ? '' : 's'}</span>}
         <div className="asset-actions">
           <button type="button" className="icon-btn" title="Print these tags" aria-label="Print tags" onClick={() => window.print()}>
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -3585,8 +3573,6 @@ function TagSheet() {
           </button>
         </div>
       </div>
-      {shown.length > TAG_CAP && <p className="dim tags-note no-print" style={{ margin: '0 0 12px' }}>
-        <b>Showing the first {TAG_CAP}</b> of {shown.length} — refine the filter to reach the rest.</p>}
       {shown.length === 0
         ? <div className="card"><p className="dim" style={{ margin: 0 }}>No assets match — adjust the filters.</p></div>
         : (

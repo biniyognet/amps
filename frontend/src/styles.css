@@ -3707,3 +3707,10 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
 .fl-viz .bar-fill { border-radius: 99px; }
 .fl-viz .bar-val { font-size: 11.5px; }
 .fl-viz .viz-insight { margin-top: auto; padding-top: 5px; border-top: 0; font-size: 10.5px; line-height: 1.35; color: var(--ink-3); }
+
+/* printables v87 — QR tags + checksheets on the slim toolbar signature, no page head */
+.cs-toolbar .cs-mode { flex: none; }
+.cs-toolbar .cs-mode .rk-stat .k { max-width: none; }
+.asset-count.tags-cap { color: #b45309; font-weight: 600; }
+/* phone: the A4 blank no longer forces the single column wider than the screen; it scrolls in its own box */
+@media screen and (max-width: 640px) { .cs-formats { grid-template-columns: minmax(0, 1fr); } .cs-print-area { overflow-x: auto; } }
