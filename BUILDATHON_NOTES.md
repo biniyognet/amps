@@ -19,9 +19,9 @@
 ### Build (pick after discussion)
 - [ ] F1 Similar past failures — pgvector/ScaNN embeddings on failure remarks + logbook
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks (component, symptom, cause, action)
-- [ ] F3 AMPS MCP server — expose Ask AMPS's 6 read-only tools over MCP
+- [x] F3 AMPS MCP server — expose Ask AMPS's 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`, stdio + `/mcp`, 59 tests pass)
 - [ ] F4 Estate analytics agent — logbook/failures → BigQuery + Conversational Analytics
-- [ ] F5 AMPS Agent Skill — `.agents/skills/amps-db-guardrails/SKILL.md`
+- [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
 - [ ] F6 Failure-risk score per asset
 
 ### Submit
@@ -120,4 +120,8 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 ## 5. Decisions log
 | Time | Decision | Why |
 |---|---|---|
-| | | |
+| 20 Nov | No `agy` / Gemini CLI; Antigravity IDE on the laptop, the main build runs on the server cluster and pushes to `buildathon` | One sync point (GitHub); the IDE is for fine tuning and the demo |
+| 20 Nov | MCP hosted at `amps-api.binihost.com/mcp` (`AMPS_MCP_HTTP=1`, optional `AMPS_MCP_TOKEN`) + local stdio `python -m app.mcp_server` | Judges can connect; stdio is the offline backup |
+| 20 Nov | MCP SDK 2.x (`mcp>=2.3,<3`), imported only when `AMPS_MCP_HTTP=1` | Core API runs without the new dependency |
+| 20 Nov | Google-first: wire every referenced product (Gemini, BigQuery, AlloyDB/pgvector, Cloud Run, DAK) in the time limit; binihost stays the parallel/backup host | Buildathon = Google ecosystem; learn by comparison |
+| 20 Nov | Gemini key = Arup's own AI Studio account, project linked to the GDP Event Credit billing; audit with `scripts/gemini_audit.py` | Free-tier keys hit 429 in a live demo |
