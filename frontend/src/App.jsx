@@ -3833,9 +3833,15 @@ function LineDashboard({ go, initialLine = null }) {
     getJSON(`/api/logbook/failure-stats?days=180&months=12${lq}`).then(setStats).catch(() => {})
     getJSON(`/api/sync/status${initialLine ? `?line=${encodeURIComponent(initialLine)}` : ''}`).then(setSync).catch(() => setSync(null))
     // the sidebar feed stays live: latest entries + failures re-pulled every minute
+    // the whole-estate feed needs a sign-in; a signed-out visitor gets every
+    // site's own feed (open per site) merged newest-first instead
+    const merged = (q, n) => getJSON('/api/lines')
+      .then((ls) => Promise.all(ls.map((l) => getJSON(`/api/logbook?${q}&line=${encodeURIComponent(l.name)}`).catch(() => []))))
+      .then((all) => all.flat().sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, n))
+    const feed = (q, n) => getJSON(`/api/logbook?${q}${lq}`).catch((e) => (lq ? Promise.reject(e) : merged(q, n)))
     const pull = () => {
-      getJSON(`/api/logbook?limit=120${lq}`).then(setRecent).catch(() => {})
-      getJSON(`/api/logbook?entry_type=failure&limit=40${lq}`).then(setFails).catch(() => setFails(null))
+      feed('limit=120', 120).then(setRecent).catch(() => {})
+      feed('entry_type=failure&limit=40', 40).then(setFails).catch(() => setFails(null))
     }
     pull()
     const t = setInterval(pull, 60000)
