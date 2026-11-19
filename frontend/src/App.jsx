@@ -4064,10 +4064,16 @@ function LineDashboard({ go, initialLine = null }) {
           state's figure sitting directly under its own coloured segment (the
           legend IS the breakdown — no duplicate KPI row). */}
       <section className="hstrip">
+        {!me?.line && (
+          <div className="h-site" style={{ '--line-c': initialLine ? lineColor(initialLine) : 'var(--accent)' }}>
+            <SitePicker current={initialLine || ''} />
+            <span className="h-site-cap">{initialLine ? `${W.Line} dashboard` : `Whole ${W.Network.toLowerCase()} · every ${W.line}`}</span>
+          </div>
+        )}
         <div className="h-compl">
           <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">
-            {me?.line ? <span className="h-pk">PM compliance</span> : <SitePicker current={initialLine || ''} />}
+            <span className="h-pk">PM compliance</span>
             <span className="h-cap"><b>{compliant.toLocaleString()}</b> of <b>{inCycle.toLocaleString()}</b> in schedule · <b className="od">{lapsed.toLocaleString()}</b> overdue</span>
           </div>
         </div>
@@ -4768,12 +4774,6 @@ function AiHero() {
 
 function Landing() {
   const lines = useLines()
-  const { perLine, openByLine, net, loading, failReady } = useNetworkGlance()
-  const locations = lines ? lines.reduce((a, l) => a + l.stations, 0) : 0
-  const nf = (v) => (v == null ? '—' : v.toLocaleString())
-  const kpi = (v, k, cls) => (
-    <div className={`land-kpi${cls ? ' ' + cls : ''}`}><div className="v">{v}</div><div className="k">{k}</div></div>
-  )
   return (
     <div className="gate land">
       <div className="land-wrap">
@@ -4786,96 +4786,91 @@ function Landing() {
             <h1 className="gate-title">{ORG}</h1>
             <p className="gate-sub">Asset Maintenance &amp; Preventive Scheduling — every {W.line} at a glance</p>
           </div>
-          <a className="btn gate-signin-btn" href="#/login">Sign in</a>
+          <span className="land-acts">
+            <a className="btn ghost land-dash-btn" href={dashHref()}>{W.Lines} dashboard →</a>
+            <a className="btn gate-signin-btn" href="#/login">Sign in</a>
+          </span>
         </header>
         <Ribbon lines={lines} />
         {!OPERATOR && <AiHero />}
-
-        <div className="land-body">
-          <div className="land-tiles">
-            {lines === null ? <p className="gate-dim">Loading…</p> : lines.length === 0 ? (
-              <p className="gate-dim">No lines registered yet — the administrator adds them with the first assets.</p>
-            ) : lines.map((l) => {
-              const p = perLine[l.name] || {}
-              const open = openByLine[l.name] || 0
-              const ready = failReady && !loading
-              // mini compliance bar segments (only non-zero) — same colours as
-              // the LineDashboard hood: on-schedule / due-soon / overdue / awaiting
-              const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['grace', p.grace || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
-                .filter(([, n]) => n > 0)
-              const segTot = segs.reduce((s, [, n]) => s + n, 0) || 1
-              // a line can be onboarded (assets present) yet carry no PM schedule
-              // yet — no plans, no logs. That's "schedule pending", NOT all-clear.
-              const scheduled = (p.ok || 0) + (p.dueSoon || 0) + (p.grace || 0) + (p.overdue || 0) + (p.never || 0)
-              const pending = ready && (p.assets || l.assets) > 0 && scheduled === 0
-              const clear = ready && scheduled > 0 && !open && !p.overdue && !p.exceeded
-              return (
-                <a key={l.name} className={`land-tile${l.initiator ? ' initiator' : ''}`}
-                   href={`#/line/${encodeURIComponent(l.name)}`}
-                   style={{ '--line-c': lineColor(l.name) }}>
-                  {l.initiator && <Alpona />}
-                  <div className="lt-head">
-                    <span className="gate-line-dot" />
-                    <span className="land-tile-name">{l.name}
-                      {l.initiator && <span className="gate-initiator-chip">সূচনা · initiator</span>}
-                    </span>
-                    {p.compliance != null && (
-                      <span className={`lt-compl ${p.compliance >= 90 ? 'good' : p.compliance >= 70 ? 'warn' : 'bad'}`}>
-                        {p.compliance}%<small>compliance</small>
-                      </span>
-                    )}
-                  </div>
-                  <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations
-                    {(() => {
-                      // freshness: days since the line's latest logbook entry (amber > 7 d, red > 30 d)
-                      if (!l.last_entry) return <span className="lt-fresh bad">no entries yet</span>
-                      const d = Math.max(0, Math.round((Date.now() - new Date(l.last_entry + 'T00:00:00').getTime()) / 86400000))
-                      return <span className={`lt-fresh ${d > 30 ? 'bad' : d > 7 ? 'warn' : 'ok'}`} title={`last logbook entry ${l.last_entry}`}>
-                        last entry {d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} d ago`}</span>
-                    })()}
-                  </span>
-                  {ready && segTot > 1 && (
-                    <span className="lt-bar" aria-hidden="true">
-                      {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'grace' ? 'grace' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
-                    </span>
-                  )}
-                  {pending && (
-                    <span className="lt-bar pending" aria-hidden="true"><span className="lt-seg seg-pending" style={{ flexGrow: 1 }} /></span>
-                  )}
-                  <div className="lt-foot">
-                    <span className="lt-stats">
-                      {ready ? (pending ? <span className="lt-stat dim">schedule pending</span> : <>
-                        <span className="lt-stat od"><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
-                        <span className="lt-stat"><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
-                        {p.grace ? <span className="lt-stat"><b>{p.grace.toLocaleString()}</b> records awaited</span> : null}
-                        {open ? <span className="lt-stat al"><b>{open}</b> open</span> : null}
-                        {clear && <span className="land-hchip ok">All clear</span>}
-                      </>) : <span className="lt-stat dim">loading…</span>}
-                    </span>
-                    <span className="land-tile-go">View →</span>
-                  </div>
-                </a>
-              )
-            })}
-          </div>
-
-          {/* right rail: the network-wide figures, tucked over the train art so
-              the right side reads as a balanced "at a glance" panel */}
-          <aside className="land-glance">
-            <div className="land-glance-h">{W.Network} at a glance</div>
-            <div className="land-kpis">
-              {kpi(lines ? lines.length : '—', W.Lines)}
-              {kpi(loading ? '—' : nf(net.assets), 'Assets')}
-              {kpi(nf(locations), 'Locations')}
-              {kpi(net.open == null ? '—' : nf(net.open), 'Open failures', net.open ? 'alert' : '')}
-              {kpi(loading ? '—' : nf(net.overdue), 'PM overdue', net.overdue ? 'warn' : '')}
-              {kpi(loading ? '—' : nf(net.exceeded), 'Exceeded life', net.exceeded ? 'warn' : '')}
-            </div>
-          </aside>
-        </div>
         <div className="gate-foot"><AmpsLink /> · MIT © 2026 <SignatureMark /></div>
       </div>
     </div>
+  )
+}
+
+/* Every site as a tile (compliance, freshness, PM bar, counts) — the estate
+   overview the site bar's back chevron opens. Click a tile = that site's dashboard. */
+function SiteTiles() {
+  const lines = useLines()
+  const { perLine, openByLine, loading, failReady } = useNetworkGlance()
+  return (
+    <div className="land-tiles">
+    {lines === null ? <p className="gate-dim">Loading…</p> : lines.length === 0 ? (
+      <p className="gate-dim">No lines registered yet — the administrator adds them with the first assets.</p>
+    ) : lines.map((l) => {
+      const p = perLine[l.name] || {}
+      const open = openByLine[l.name] || 0
+      const ready = failReady && !loading
+      // mini compliance bar segments (only non-zero) — same colours as
+      // the LineDashboard hood: on-schedule / due-soon / overdue / awaiting
+      const segs = [['ok', p.ok || 0], ['due', p.dueSoon || 0], ['grace', p.grace || 0], ['od', p.overdue || 0], ['never', p.never || 0]]
+        .filter(([, n]) => n > 0)
+      const segTot = segs.reduce((s, [, n]) => s + n, 0) || 1
+      // a line can be onboarded (assets present) yet carry no PM schedule
+      // yet — no plans, no logs. That's "schedule pending", NOT all-clear.
+      const scheduled = (p.ok || 0) + (p.dueSoon || 0) + (p.grace || 0) + (p.overdue || 0) + (p.never || 0)
+      const pending = ready && (p.assets || l.assets) > 0 && scheduled === 0
+      const clear = ready && scheduled > 0 && !open && !p.overdue && !p.exceeded
+      return (
+        <a key={l.name} className={`land-tile${l.initiator ? ' initiator' : ''}`}
+           href={`#/line/${encodeURIComponent(l.name)}`}
+           style={{ '--line-c': lineColor(l.name) }}>
+          {l.initiator && <Alpona />}
+          <div className="lt-head">
+            <span className="gate-line-dot" />
+            <span className="land-tile-name">{l.name}
+              {l.initiator && <span className="gate-initiator-chip">সূচনা · initiator</span>}
+            </span>
+            {p.compliance != null && (
+              <span className={`lt-compl ${p.compliance >= 90 ? 'good' : p.compliance >= 70 ? 'warn' : 'bad'}`}>
+                {p.compliance}%<small>compliance</small>
+              </span>
+            )}
+          </div>
+          <span className="land-tile-sub">{l.assets.toLocaleString()} assets · {l.stations} locations
+            {(() => {
+              // freshness: days since the line's latest logbook entry (amber > 7 d, red > 30 d)
+              if (!l.last_entry) return <span className="lt-fresh bad">no entries yet</span>
+              const d = Math.max(0, Math.round((Date.now() - new Date(l.last_entry + 'T00:00:00').getTime()) / 86400000))
+              return <span className={`lt-fresh ${d > 30 ? 'bad' : d > 7 ? 'warn' : 'ok'}`} title={`last logbook entry ${l.last_entry}`}>
+                last entry {d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} d ago`}</span>
+            })()}
+          </span>
+          {ready && segTot > 1 && (
+            <span className="lt-bar" aria-hidden="true">
+              {segs.map(([c, n]) => <span key={c} className={`lt-seg seg-${c === 'od' ? 'od' : c === 'due' ? 'due' : c === 'grace' ? 'grace' : c === 'never' ? 'never' : 'ok'}`} style={{ flexGrow: n }} />)}
+            </span>
+          )}
+          {pending && (
+            <span className="lt-bar pending" aria-hidden="true"><span className="lt-seg seg-pending" style={{ flexGrow: 1 }} /></span>
+          )}
+          <div className="lt-foot">
+            <span className="lt-stats">
+              {ready ? (pending ? <span className="lt-stat dim">schedule pending</span> : <>
+                <span className="lt-stat od"><b>{(p.overdue || 0).toLocaleString()}</b> overdue</span>
+                <span className="lt-stat"><b>{(p.dueSoon || 0).toLocaleString()}</b> due soon</span>
+                {p.grace ? <span className="lt-stat"><b>{p.grace.toLocaleString()}</b> records awaited</span> : null}
+                {open ? <span className="lt-stat al"><b>{open}</b> open</span> : null}
+                {clear && <span className="land-hchip ok">All clear</span>}
+              </>) : <span className="lt-stat dim">loading…</span>}
+            </span>
+            <span className="land-tile-go">View →</span>
+          </div>
+        </a>
+      )
+    })}
+  </div>
   )
 }
 
@@ -4901,13 +4896,20 @@ function LoginPage() {
 
 /* Site switcher for viewers who see every site (no own line): a back chevron to
    the whole estate plus a dropdown of the sites — lives in the totals row. */
+const SITE_KEY = 'amps.site'
+const lastSite = () => { try { return localStorage.getItem(SITE_KEY) || '' } catch { return '' } }
+const keepSite = (v) => { try { localStorage.setItem(SITE_KEY, v || '') } catch { /* private mode */ } }
+/* where "the dashboard" opens: the last site picked, else every site */
+const dashHref = () => (lastSite() ? `#/line/${encodeURIComponent(lastSite())}` : '#/sites')
+
 function SitePicker({ current = '' }) {
   const lines = useLines()
-  const pick = (v) => { location.hash = v ? `#/line/${encodeURIComponent(v)}` : '#/' }
+  useEffect(() => { keepSite(current) }, [current])
+  const pick = (v) => { keepSite(v); location.hash = v ? `#/line/${encodeURIComponent(v)}` : '#/sites' }
   return (
     <span className="site-pick">
       {current && (
-        <a className="sp-back" href="#/" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
+        <a className="sp-back" href="#/sites" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
           <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </a>
       )}
@@ -4919,6 +4921,40 @@ function SitePicker({ current = '' }) {
         </select>
       </span>
     </span>
+  )
+}
+
+/* The site bar: its own slim section above a dashboard — back to every site's
+   stats, a dropdown to jump to one site, and (on the estate view) the totals. */
+function SiteBar({ current = '' }) {
+  const { net, loading } = useNetworkGlance()
+  const lines = useLines()
+  const nf = (v) => (v == null || loading ? '—' : v.toLocaleString())
+  return (
+    <section className="card site-bar" style={{ '--line-c': current ? lineColor(current) : 'var(--accent)' }}>
+      <SitePicker current={current} />
+      <span className="sb-title">{current ? 'Dashboard' : `${W.Network} · every ${W.line}`}</span>
+      {!current && (
+        <span className="dash-kpis sb-kpis">
+          <span className="dk"><b>{lines ? lines.length : '—'}</b> {W.lines}</span>
+          <span className="dk"><b>{nf(net.assets)}</b> assets</span>
+          <span className={`dk${net.open ? ' dk-bad' : ''}`}><b>{net.open == null ? '—' : net.open.toLocaleString()}</b> open failures</span>
+          <span className={`dk${net.overdue ? ' dk-bad' : ''}`}><b>{nf(net.overdue)}</b> PM overdue</span>
+          {net.exceeded > 0 && <span className="dk dk-warn"><b>{nf(net.exceeded)}</b> past codal life</span>}
+        </span>
+      )}
+    </section>
+  )
+}
+
+/* #/sites — every site's stats in one view; click a tile to open that site. */
+function EstateView() {
+  return (
+    <main className="estate">
+      <h1 className="sr-only">{W.Network} overview</h1>
+      <SiteBar current="" />
+      <SiteTiles />
+    </main>
   )
 }
 
@@ -4945,7 +4981,7 @@ function LineNav({ line, active, showAllLines }) {
   return (
     <span className="line-nav">
       {showAllLines && (
-        <a className="ln-btn ln-back" href="#/" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
+        <a className="ln-btn ln-back" href="#/sites" title={`All ${W.lines}`} aria-label={`All ${W.lines}`}>
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
         </a>
       )}
@@ -4970,6 +5006,12 @@ function FailuresRedirect({ me }) {
     if (to) location.replace(`#/line/${encodeURIComponent(to)}/failures`)
   }, [me, lines])
   return <p className="dim">Opening the failures board…</p>
+}
+
+/* signed-in home with a remembered site: reopen it */
+function Redirect({ to }) {
+  useEffect(() => { location.replace(to) }, [to])
+  return null
 }
 
 function ChangePasswordModal({ onClose }) {
@@ -5106,7 +5148,7 @@ export default function App() {
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && routePath !== '/sites' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
@@ -5126,7 +5168,7 @@ export default function App() {
           <nav className="nav">
             {navLine && !assetMatch
               ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href="#/" className={!navLine ? 'active' : ''}>{W.Lines}</a>}
+              : <a href={dashHref()} className={routePath === '/sites' || lineMatch ? 'active' : ''}>{W.Lines}</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
@@ -5134,6 +5176,7 @@ export default function App() {
           </nav>
         </header>
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
+          : routePath === '/sites' ? <EstateView />
           : failLine ? <LineFailures name={failLine} />
           : assetMatch ? <LiveAssetDetail code={assetCode} />
           : snapMatch ? <SnapReport code={safeDecode(snapMatch[1])} />
@@ -5211,7 +5254,8 @@ export default function App() {
         : routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
         : routePath === '/about' ? <AboutPage />
         : routePath === '/assets' ? (LIVE ? <LiveDashboard go={go} /> : <Dashboard go={go} />)
-        : (LIVE ? <LineDashboard go={go} /> : <Dashboard go={go} />)}
+        : routePath === '/sites' && LIVE ? <EstateView />
+        : (LIVE ? (lastSite() && !me?.line ? <Redirect to={dashHref()} /> : <LineDashboard go={go} />) : <Dashboard go={go} />)}
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
       {LIVE && <AskAmps />}
