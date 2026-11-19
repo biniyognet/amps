@@ -118,6 +118,12 @@ export default function AskAmps() {
   }, [])
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [msgs, busy])
   useEffect(() => { if (open) input.current?.focus() }, [open])
+  // other screens (the landing's AI band) open the panel, optionally with a question typed in
+  useEffect(() => {
+    const h = (e) => { setOpen(true); if (e.detail?.q) setQ(e.detail.q) }
+    window.addEventListener('amps:ask', h)
+    return () => window.removeEventListener('amps:ask', h)
+  }, [])
 
   if (!status?.enabled) return null
 

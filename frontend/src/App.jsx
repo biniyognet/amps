@@ -4619,6 +4619,46 @@ function useNetworkGlance() {
   return { perLine, openByLine, net, loading, failReady: fail !== null }
 }
 
+/* Public demo only: the first screen leads with the problem, then the AI fix.
+   The clip is a real 30 s run on this demo (gemini-2.5-flash read the photo),
+   muted and looping; every claim here can be opened live from this page. */
+const SNAP_DEMO = 'MTD-CEN-HSC-01'
+function AiHero() {
+  const pitch = `${import.meta.env.BASE_URL}pitch/`
+  const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
+  return (
+    <section className="ai-hero" aria-label="Snap & Report with Gemini">
+      <div className="ai-hero-copy">
+        <div className="ai-hero-kick">The problem</div>
+        <h2 className="ai-hero-hook">A failure nobody logs comes back as downtime.</h2>
+        <p className="ai-hero-why">A breaker trips, it is reset, nothing is written down, and the same fault returns.
+          AMPS makes the record the quickest thing to do.</p>
+        <div className="ai-hero-kick fix">The AI fix · Snap &amp; Report</div>
+        <ol className="ai-steps">
+          <li><b>Scan</b> the QR tag on the asset</li>
+          <li><b>Snap</b> a photo, add a rough note</li>
+          <li><b>Gemini drafts</b> the failure report and job card; a person checks and submits</li>
+        </ol>
+        <div className="ai-hero-cta">
+          <a className="btn" href={`#/snap/${SNAP_DEMO}`}>Open Snap &amp; Report →</a>
+          <a className="ai-hero-link" href="#/guide">Pitch deck</a>
+        </div>
+        <ul className="ai-more">
+          <li><button type="button" onClick={() => ask('Which assets are overdue for maintenance?')}><b>✦ Ask AMPS</b></button>
+            plain-language questions; Gemini picks from 6 tools over the live records (English, हिन्दी, বাংলা)</li>
+          <li><b>AI maintenance plans</b> Gemini drafts the PM plan, a supervisor approves it before anything is saved</li>
+        </ul>
+      </div>
+      <figure className="ai-hero-clip">
+        <video src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
+               autoPlay muted loop playsInline preload="metadata" controls
+               aria-label="30 second run: scan, photo, Gemini draft, job card, planner" />
+        <figcaption>A real run on this demo · gemini-2.5-flash · 30 s · synthetic data. Submitting needs a sign-in.</figcaption>
+      </figure>
+    </section>
+  )
+}
+
 function Landing() {
   const lines = useLines()
   const { perLine, openByLine, net, loading, failReady } = useNetworkGlance()
@@ -4642,6 +4682,7 @@ function Landing() {
           <a className="btn gate-signin-btn" href="#/login">Sign in</a>
         </header>
         <Ribbon lines={lines} />
+        {!OPERATOR && <AiHero />}
 
         <div className="land-body">
           <div className="land-tiles">

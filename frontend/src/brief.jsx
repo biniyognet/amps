@@ -38,7 +38,11 @@ const COMPARE = [
 // one deck, two forms. Titles double as alt text.
 const SLIDES = [
   'AMPS',
-  'Critical equipment is still maintained from paper registers',
+  'A failure nobody logs comes back as downtime',
+  'Snap & Report: a photo becomes a job card',
+  'AI drafts the plan. A supervisor approves. The Planner runs it.',
+  'Gemini turns the logbook into answers, job cards and early warnings',
+  'Where Gemini and Google Cloud do the work',
   'One register for every asset, every record, every device',
   'Every site’s PM compliance, at a glance',
   'From a register to a maintenance cockpit',
@@ -46,9 +50,6 @@ const SLIDES = [
   'Scan this code with your phone',
   'One system, sixteen working parts',
   'Every role has its place in the record',
-  'Gemini turns the logbook into answers, job cards and early warnings',
-  'AI drafts the maintenance plan. A supervisor approves it.',
-  'Snap & Report: a photo becomes a job card',
   'Running today on the power system of a metro railway in India',
   'Next-generation EAM, without the legacy weight',
   'The framework is free forever. Services pay the bills.',
@@ -61,13 +62,13 @@ const SLIDES = [
 ]
 // Live demo entry points — every link opens the real app on synthetic data.
 const TRY = [
+  ['#/snap/MTD-CEN-HSC-01', 'Snap & Report', 'Photo + a rough note → Gemini drafts the failure report and job card (sign-in to submit)'],
   ['#/', 'Network dashboard', 'Every site’s PM compliance, overdue work and failures on one screen'],
   ['#/line/Metro%20Traction%20%26%20Depot', 'A site, close up', 'One line’s schedule: on time, due soon, overdue, by system'],
   ['#/assets', 'Asset register', 'Filter by site, class, criticality; every row opens its history'],
   ['#/asset/MTD-CEN-TTR-01', 'What a QR tag opens', 'One transformer: details, PM history, failures, job cards'],
   ['#/log', 'Log book', 'Preventive maintenance entries by date and cycle'],
   ['#/failures', 'Failures', 'Breakdowns, rectification, downtime and MTTR'],
-  ['#/snap/MTD-CEN-HSC-01', 'Snap & Report', 'Photo + a rough note → Gemini drafts the failure report and job card (sign-in to submit)'],
   ['#/job-cards', 'Job cards', 'Agency work tracked from issue to closure'],
   ['#/printables', 'Printables', 'QR tags and per-class checksheets, ready to print'],
 ]
@@ -82,7 +83,7 @@ const FAQ = [
 ]
 
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
-const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1118`
+const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1119`
 
 function Deck() {
   const [i, setI] = useState(0)
@@ -108,7 +109,7 @@ function Deck() {
         <span className="br-count">{i + 1} / {SLIDES.length}</span>
         <button type="button" onClick={() => setI(Math.min(last, i + 1))} disabled={i === last}>Next ›</button>
         <button type="button" onClick={() => ref.current?.requestFullscreen?.()} title="Full screen · ← → or n / p to step">Present</button>
-        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1118`} download title="Download the deck as PDF">PDF ↓</a>
+        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1119`} download title="Download the deck as PDF">PDF ↓</a>
       </figcaption>
     </figure>
   )
@@ -183,12 +184,12 @@ export default function Brief() {
       <section className="br-main">
       <header className="br-head">
       <p className="br-kick">BRIEF · AMPS · OPEN-SOURCE EAM · {new Date().getFullYear()}</p>
-      <h1>AMPS — maintenance records that run themselves</h1>
-      <p className="br-dek">A next-generation alternative to SAP PM / Maximo-class EAM for any plant: QR-first, phone-first,
-        live in weeks, ₹0 licence. Already running the power-system maintenance of a metro railway in India.</p>
+      <h1>AMPS — scan, snap, and Gemini drafts the job card</h1>
+      <p className="br-dek">A failure nobody logs comes back as downtime. Scan the asset’s QR, take a photo, and Gemini drafts the
+        failure report and job card for a person to confirm. Open-source EAM for any plant, ₹0 licence.</p>
       </header>
 
-      <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-one slides</h2>
+      <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-two slides</h2>
       <Deck />
       <p className="br-note">← → or n / p to step · Full screen to present</p>
       </section>
@@ -238,7 +239,7 @@ export default function Brief() {
       <p className="br-note">A comparison of product approach, not of any vendor’s pricing.</p>
 
       <h2><span>§5</span>Open-core model</h2>
-      <p>The framework is free forever under MIT — self-host it, fork it, keep it. Revenue comes from hosting,
+      <p><b>Free licence. Paid hosting, support and Gemini AI, per site.</b> The framework is free forever under MIT — self-host it, fork it, keep it. Revenue comes from hosting,
         onboarding (asset tagging, migration of old registers), and support or custom features, delivered by biniDev.</p>
 
       <h2><span>§6</span>Who it's for</h2>

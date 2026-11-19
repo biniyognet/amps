@@ -1994,6 +1994,45 @@ body:has(.gate) {
   width: 12px; height: 12px; border-radius: 50%;
   background: var(--line-c, #93A7B5); margin-bottom: 5px;
 }
+/* public demo: problem → AI fix band above the tiles (copy | 30 s clip) */
+.ai-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(16px, 2.4vw, 30px);
+  align-items: center; margin: 0 0 clamp(14px, 2.4vh, 24px); position: relative; z-index: 1;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: clamp(14px, 2.2vh, 22px) clamp(16px, 2vw, 26px);
+  backdrop-filter: var(--card-blur); -webkit-backdrop-filter: var(--card-blur);
+  box-shadow: 0 1px 2px rgba(11,42,63,.04), 0 10px 30px -20px rgba(11,42,63,.22);
+}
+.ai-hero-kick { font-size: 11px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--critical); }
+.ai-hero-kick.fix { color: var(--accent); margin-top: clamp(8px, 1.6vh, 14px); }
+.ai-hero-hook { font-size: clamp(19px, 2.3vh, 25px); line-height: 1.2; margin: 3px 0 4px; font-weight: 800; letter-spacing: -0.01em; text-transform: none; color: var(--ink); text-wrap: balance; }
+/* with the band in, the landing grows past one screen: tiles keep their height and the gate scrolls */
+.land-wrap:has(.ai-hero) .land-body { flex: none; }
+.land-wrap:has(.ai-hero) .gate-foot { margin-top: 18px; }
+.ai-hero-why { font-size: 13.5px; line-height: 1.5; color: var(--ink-2); margin: 0; max-width: 60ch; }
+.ai-steps { margin: 6px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 4px; }
+.ai-steps li { counter-increment: s; font-size: 13.5px; color: var(--ink); display: flex; gap: 9px; align-items: baseline; }
+.ai-steps li::before {
+  content: counter(s); flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11px; font-weight: 800; color: #fff; background: var(--accent); transform: translateY(-1px);
+}
+.ai-hero-cta { display: flex; align-items: center; gap: 16px; margin-top: clamp(10px, 1.8vh, 16px); flex-wrap: wrap; }
+.ai-hero-link { font-size: 13px; font-weight: 650; color: var(--accent); }
+.ai-more { margin: clamp(10px, 1.8vh, 14px) 0 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--border); display: grid; gap: 5px; }
+.ai-more li { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.ai-more b { color: var(--ink); margin-right: 6px; }
+.ai-more button { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.ai-more button b { color: var(--accent); }
+.ai-more button:hover b { text-decoration: underline; }
+.ai-hero-clip { margin: 0; min-width: 0; }
+.ai-hero-clip video {
+  display: block; width: 100%; max-height: clamp(180px, 31vh, 340px); aspect-ratio: 16 / 9; object-fit: contain;
+  background: #0B2A3F; border-radius: var(--r-md); border: 1px solid var(--border);
+}
+.ai-hero-clip figcaption { font-size: 11px; color: var(--ink-3); margin-top: 6px; }
+@media screen and (max-width: 900px) {
+  .ai-hero { grid-template-columns: 1fr; }
+}
 /* network glance: line tiles on the left, the aggregate KPI panel on the
    right rail (over the train art) so the layout reads balanced */
 .land-body {
