@@ -7,22 +7,23 @@
 
 ### Setup (MSI laptop)
 - [x] Free disk space on C: (target ≥ 25 GB) — done 20 Nov, ~161 GB free
-- [x] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026 — done 20 Nov, billing account "GDP Event Credit" Active, $0 spent
-- [ ] Antigravity IDE: open **this** folder `C:\Arups_Wokspace\amps-buildathon` (not the parent — workspace skills load from its `.agents/skills`)
-- [ ] Install extension **Google Cloud Data Agent Kit** (Extensions → search) 
-      CLI: `agy plugin install https://github.com/GoogleCloudPlatform/data-agent-kit-plugin`
-- [ ] Install gcloud CLI + `gcloud auth login`
-- [ ] Start Docker Desktop (needed to run AMPS locally)
-- [ ] Codelab 1: https://codelabs.developers.google.com/getting-started-with-antigravity-skills
-- [ ] Codelab 2: https://codelabs.developers.google.com/data-agents-in-agy-and-bq
+- [x] Claim Google Cloud credits → https://g.dev/credits/startup-buildathon-india-2026 — done 20 Nov, billing account "GDP Event Credit" (`01111C-2C89C3-9C75C9`) Active
+- [ ] Link project `gen-lang-client-0618042629` to "GDP Event Credit" — still on the personal account `01E666-…` (₹500)
+- [x] Antigravity IDE: open **this** folder `C:\Arups_Wokspace\amps-buildathon` (not the parent — workspace skills load from its `.agents/skills`)
+- [x] Extension **Google Cloud Data Agent Kit** — done 20 Nov; services: BigQuery, Conversational Analytics, AlloyDB, Cloud Storage; notebook execution off. Laptop only (the server builds with `bq`/`gcloud`)
+- [x] gcloud CLI — done 20 Nov: SDK 594, signed in as arupbiswas1994 (user + ADC), project `gen-lang-client-0618042629`, 9 APIs enabled (BigQuery, BQ Storage, Cloud Run, Artifact Registry, Cloud Build, Storage, AlloyDB, Vertex AI, Gemini Data Analytics)
+- [x] Gemini key — done 20 Nov, project above at Tier 1; audit: `gemini-3.5-flash-lite` 8/8 0.85 s (default), `gemini-3.5-flash` 0.7–1.8 s, `gemini-pro-latest` 3/3 3.4 s; 2.5 models closed to new keys
+- [x] Start Docker Desktop (needed to run AMPS locally)
+- [ ] Codelab 2 (**do this one**, ~30 min = F4): https://codelabs.developers.google.com/data-agents-in-agy-and-bq
+- [ ] Codelab 1 (optional skim, F5 covers it): https://codelabs.developers.google.com/getting-started-with-antigravity-skills
 
-### Build (pick after discussion)
-- [ ] F1 Similar past failures — pgvector/ScaNN embeddings on failure remarks + logbook
-- [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks (component, symptom, cause, action)
-- [x] F3 AMPS MCP server — expose Ask AMPS's 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`, stdio + `/mcp`, 59 tests pass)
-- [ ] F4 Estate analytics agent — logbook/failures → BigQuery + Conversational Analytics
+### Build (order: F4 → F1 → F2 → F6; each ships with its screen)
+- [x] F3 AMPS MCP server — 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`; local stdio + https://amps-api.binihost.com/mcp, pod `amps-mcp`; Cloud Run next)
 - [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
-- [ ] F6 Failure-risk score per asset
+- [ ] F4 Estate analytics agent — logbook/failures → BigQuery + Conversational Analytics · UI: "Estate insights" tab (question → chart)
+- [ ] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
+- [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
+- [ ] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list
 
 ### Submit
 - [ ] Demo runs end to end (with a pre-loaded backup table, in case the venue Wi-Fi is slow)
