@@ -5169,6 +5169,21 @@ function LineNav({ line, active, showAllLines }) {
   )
 }
 
+/* signed-out nav: Dashboard / Assets / Failures always in the same three slots;
+   with no line picked, Assets and Failures open the first line */
+function AnonLineNav({ line, active }) {
+  const lines = useLines()
+  const to = line || (lines && lines[0] && lines[0].name) || ''
+  const enc = encodeURIComponent(to)
+  return (
+    <span className="line-nav">
+      <a href={line ? `#/line/${enc}` : dashHref()} className={`ln-btn${active === 'dash' ? ' active' : ''}`}>Dashboard</a>
+      <a href={to ? `#/line/${enc}/assets` : '#/assets'} className={`ln-btn${line && active === 'assets' ? ' active' : ''}`}>Assets</a>
+      <a href={to ? `#/line/${enc}/failures` : '#/failures'} className={`ln-btn${line && active === 'failures' ? ' active' : ''}`}>Failures</a>
+    </span>
+  )
+}
+
 /* one line's failures board — reached at /line/<name>/failures */
 function LineFailures({ name }) {
   return <LiveFailures line={name} />
@@ -5398,9 +5413,7 @@ export default function App() {
   <Brand />
           <nav className="nav">
             {!assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites' || onLanding} />}
-            {navLine && !assetMatch
-              ? <LineNav line={navLine} showAllLines active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : 'dash'} />
-              : <a href={dashHref()} className={routePath === '/sites' || routePath === '/dash' || onLanding || lineMatch ? 'active' : ''}>Dashboard</a>}
+            <AnonLineNav line={assetMatch ? null : navLine} active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : (routePath === '/sites' || routePath === '/dash' || onLanding || lineMatch) ? 'dash' : ''} />
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>

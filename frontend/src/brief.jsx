@@ -206,7 +206,7 @@ export default function Brief() {
       </div>
 
       <h2><span>Try</span>Open the live demo</h2>
-      <p className="br-note">Same code as production · synthetic data · no login to look around</p>
+      <p className="br-note">Same code as production · synthetic data · sign in with <b>admin</b> / <b>admin</b> to look around</p>
       <nav className="br-try">{TRY.map(([href, t, d]) => <a key={href} href={href}><b>{t} →</b><span>{d}</span></a>)}</nav>
 
       <h2><span>§1</span>Problem</h2>

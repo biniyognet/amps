@@ -99,7 +99,7 @@ a { color: inherit; text-decoration: none; }
 .nav-drop.active { color: var(--accent); background: var(--accent-soft); font-weight: 650; }
 .nav-drop .caret { font-size: 9px; transition: transform .15s; }
 .nav-drop.open .caret { transform: rotate(180deg); }
-.nav .showcase .showcase-menu { left: 0; right: auto; }
+.nav .showcase .showcase-menu { left: auto; right: 0; max-width: calc(100vw - 24px); }  /* More sits near the right edge: open leftward, stay in view */
 .cs-freq-print { min-width: 130px; }
 .cs-freq-print select { padding: 5px; border: 1px solid var(--border); border-radius: 7px; }
 
