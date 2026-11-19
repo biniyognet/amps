@@ -3409,7 +3409,9 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .h-site .sp-sel select { width: 100%; }
 .h-site-cap { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 700px) { .hstrip { flex-wrap: wrap; } .h-site { flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--border-2, #EAF1F6); } }
+/* site picker docks on the right of the strip, compliance leads on the left */
+.hstrip .h-site { order: 2; border-right: 0; border-left: 1px solid var(--border-2, #EAF1F6); box-shadow: inset -3px 0 0 var(--line-c); }
+@media (max-width: 700px) { .hstrip .h-site { order: -1; border-left: 0; } .hstrip { flex-wrap: wrap; } .h-site { flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--border-2, #EAF1F6); } }
 
 /* network-view icon beside the site dropdown */
 .sp-net { color: var(--accent); }
