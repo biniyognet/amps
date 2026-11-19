@@ -4781,11 +4781,31 @@ function AiHero() {
 
 /* Public demo landing: a full-screen hero over the real 30 s Snap run, then
    the three steps. The operator build keeps its own branded landing. */
+const LxIcon = ({ d }) => (
+  <svg className="lx-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor"
+       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>)
+const CAPS = [
+  ['#/assets', 'Asset register', 'Every panel, pump and breaker with its QR tag, codal life and history.', 'M4 6h16M4 12h16M4 18h10'],
+  ['#/planner', 'PM planner', 'Schedules by cycle, what is due this week and what is already overdue.', 'M4 5h16v15H4zM4 9h16M9 3v4M15 3v4'],
+  ['#/failures', 'Failure log', 'Every breakdown with cause, downtime and MTTR, per site and per asset.', 'M12 4l9 16H3zM12 10v4M12 17v.5'],
+  ['#/job-cards', 'Job cards', 'Raised from a failure or a PM, closed with the work done and parts used.', 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h3'],
+  ['#/log', 'Shift log book', 'The daily register of work done, readings and handovers, searchable.', 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM9 9h6M9 13h6'],
+  ['#/printables', 'QR tags & printables', 'Print tag sheets and checklists straight from the register.', 'M7 8V3h10v5M5 8h14v8h-2v4H7v-4H5zM9 14h6'],
+]
 function Landing() {
   if (OPERATOR) return <OperatorLanding />
   const lines = useLines()
   const pitch = `${import.meta.env.BASE_URL}pitch/`
   const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
+  const { net, loading } = useNetworkGlance()
+  const nf = (v) => (v == null || loading ? '—' : v.toLocaleString())
+  const stats = [
+    [lines ? lines.length : '—', W.lines, ''],
+    [nf(net.assets), 'assets on record', ''],
+    [nf(net.open), 'open failures', net.open ? 'bad' : ''],
+    [nf(net.overdue), 'PM overdue', net.overdue ? 'bad' : ''],
+    [nf(net.dueSoon), 'due in 7 days', net.dueSoon ? 'warn' : ''],
+  ]
   return (
     <div className="lx">
       <header className="lx-bar">
@@ -4818,19 +4838,83 @@ function Landing() {
         </div>
         <div className="lx-rib"><Ribbon lines={lines} /></div>
       </section>
-      <section className="lx-steps" aria-label="How it works">
-        <ol>
-          <li><b>Scan</b><span>the QR tag on the asset opens its full record, no sign-in</span></li>
-          <li><b>Snap</b><span>a photo and a rough note, in any language</span></li>
-          <li><b>Gemini drafts</b><span>the failure report and job card; a person checks and submits</span></li>
-        </ol>
-        <div className="lx-more">
-          <button type="button" onClick={() => ask('Which assets are overdue for maintenance?')}>
-            <b>✦ Ask AMPS</b><span>plain-language questions over the live records, in English, हिन्दी or বাংলা</span></button>
-          <a href="#/guide"><b>AI maintenance plans</b><span>Gemini drafts the PM plan; a supervisor approves before anything is saved</span></a>
+      <section className="lx-stats" aria-label="Live numbers">
+        <div className="lx-wrap">
+          <span className="lx-kick">Live from this demo</span>
+          <dl>
+            {stats.map(([v, l, c]) => <div key={l} className={c}><dt>{l}</dt><dd>{v}</dd></div>)}
+          </dl>
         </div>
       </section>
-      <footer className="lx-foot"><AmpsLink /> · MIT © 2026 <SignatureMark /></footer>
+      <section className="lx-sec lx-light" aria-labelledby="lx-how">
+        <div className="lx-wrap">
+          <header className="lx-head">
+            <span className="lx-kick">How it works</span>
+            <h2 id="lx-how">From the fault on the floor to a job card, in under a minute</h2>
+            <p>No app to install. The fitter's phone camera is the whole kit.</p>
+          </header>
+          <ol className="lx-steps">
+            <li><LxIcon d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2M18 14v2M14 18h2v2M20 18v2" />
+              <b>Scan</b><span>The QR tag on the asset opens its full record: plan, history, open failures. No sign-in.</span></li>
+            <li><LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+              <b>Snap</b><span>A photo and a rough note, typed or spoken, in English, हिन्दी or বাংলা.</span></li>
+            <li><LxIcon d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
+              <b>Gemini drafts</b><span>The failure report and job card come back filled in. A person checks and submits.</span></li>
+          </ol>
+          <a className="lx-link" href={`#/snap/${SNAP_DEMO}`}>Try it on HSCB Panel 1 →</a>
+        </div>
+      </section>
+      <section className="lx-sec lx-dark" aria-labelledby="lx-ai">
+        <div className="lx-wrap">
+          <header className="lx-head">
+            <span className="lx-kick">AI, with a person in the loop</span>
+            <h2 id="lx-ai">Gemini does the paperwork. People make the calls.</h2>
+            <p>Every answer is looked up in the register, PM schedule and failure log. Nothing is saved until someone approves it.</p>
+          </header>
+          <div className="lx-cards">
+            <a className="lx-card" href={`#/snap/${SNAP_DEMO}`}>
+              <LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+              <b>Snap &amp; Report</b><span>Photo plus note in, a drafted failure report and job card out, marked AI-drafted.</span><em>Open Snap →</em></a>
+            <button type="button" className="lx-card" onClick={() => ask('Which assets are overdue for maintenance?')}>
+              <LxIcon d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5" />
+              <b>Ask AMPS</b><span>Plain-language questions over the live records, with the sources it looked up shown.</span><em>Ask a question →</em></button>
+            <a className="lx-card" href="#/guide">
+              <LxIcon d="M5 3h10l4 4v14H5zM9 11h6M9 15h6M9 7h3" />
+              <b>AI maintenance plans</b><span>Gemini drafts the PM plan for a {W.line}; a supervisor approves each change.</span><em>See how →</em></a>
+          </div>
+        </div>
+      </section>
+      <section className="lx-sec lx-light" aria-labelledby="lx-cap">
+        <div className="lx-wrap">
+          <header className="lx-head">
+            <span className="lx-kick">One record per asset</span>
+            <h2 id="lx-cap">Everything maintenance needs, in one place</h2>
+          </header>
+          <div className="lx-grid">
+            {CAPS.map(([href, t, d, ic]) => (
+              <a key={href} href={href}><LxIcon d={ic} /><b>{t}</b><span>{d}</span></a>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="lx-band" aria-label="Get started">
+        <div className="lx-wrap">
+          <div><h2>See every {W.line} at a glance</h2><p>Open the live demo. Synthetic data, nothing to set up.</p></div>
+          <div className="lx-cta">
+            <a className="lx-btn pri" href={dashHref()}>Open the dashboard →</a>
+            <a className="lx-btn" href="#/guide">Read the pitch</a>
+          </div>
+        </div>
+      </section>
+      <footer className="lx-foot">
+        <div className="lx-wrap">
+          <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS</a>
+          <nav aria-label="Footer">
+            <a href={dashHref()}>Dashboard</a><a href="#/sites">{W.Network}</a><a href="#/guide">Pitch</a><a href="#/about">About</a><a href="#/login">Sign in</a>
+          </nav>
+          <small><AmpsLink /> · MIT © 2026 <SignatureMark /></small>
+        </div>
+      </footer>
     </div>
   )
 }
