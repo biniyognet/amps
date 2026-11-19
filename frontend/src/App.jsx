@@ -4048,6 +4048,12 @@ function LineDashboard({ go, initialLine = null }) {
           <a className={`dk${openF ? ' dk-bad' : ''}`} href={failHref} title="Failures open, acknowledged or on a job card"><b>{openF}</b> open failures</a>
           {exceeded > 0 && <a className="dk dk-warn" href={regHref} title="Assets past their codal life"><b>{exceeded}</b> past codal life</a>}
         </span>
+        {!me?.line && (
+          <span className="dash-site" style={{ '--line-c': initialLine ? lineColor(initialLine) : 'var(--accent)' }}
+                title={initialLine ? `${W.Line} dashboard` : `All ${W.lines} · combined`}>
+            <SitePicker current={initialLine || ''} />
+          </span>
+        )}
         <span className="dash-clock" role="timer" aria-label="Current date and time">
           <span className="dc-date">{now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</span>
           <span className="dc-time">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
@@ -4071,12 +4077,6 @@ function LineDashboard({ go, initialLine = null }) {
           state's figure sitting directly under its own coloured segment (the
           legend IS the breakdown — no duplicate KPI row). */}
       <section className="hstrip">
-        {!me?.line && (
-          <div className="h-site" style={{ '--line-c': initialLine ? lineColor(initialLine) : 'var(--accent)' }}>
-            <SitePicker current={initialLine || ''} />
-            <span className="h-site-cap">{initialLine ? `${W.Line} dashboard` : `All ${W.lines} · combined`}</span>
-          </div>
-        )}
         <div className="h-compl">
           <Ring pct={compliance} cls={complClass} size={44} stroke={5} label={`PM compliance ${compliance}%`} />
           <div className="h-txt">

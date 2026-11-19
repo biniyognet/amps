@@ -3409,9 +3409,15 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .h-site .sp-sel select { width: 100%; }
 .h-site-cap { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* site picker docks on the right of the strip, compliance leads on the left */
-.hstrip .h-site { order: 2; border-right: 0; border-left: 1px solid var(--border-2, #EAF1F6); box-shadow: inset -3px 0 0 var(--line-c); }
-@media (max-width: 700px) { .hstrip .h-site { order: -1; border-left: 0; } .hstrip { flex-wrap: wrap; } .h-site { flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--border-2, #EAF1F6); } }
+/* compact site picker in the toolbar, beside the clock */
+.dash-site { margin-left: auto; display: inline-flex; align-items: center; min-width: 0; max-width: 260px;
+  padding-left: 8px; box-shadow: inset 3px 0 0 var(--line-c); border-radius: 2px; }
+.dash-site + .dash-clock { margin-left: 0; }
+.dash-site .sp-back, .dash-site .sp-sel select { height: 28px; }
+.dash-site .sp-back { width: 28px; }
+.dash-site .sp-sel select { max-width: 180px; }
+@media (min-width: 701px) { .dash-toolbar:has(.dash-site) { flex-wrap: nowrap; } .dash-toolbar:has(.dash-site) .dash-kpis { flex: 1 1 auto; } }
+@media (max-width: 700px) { .hstrip { flex-wrap: wrap; } .h-site { flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--border-2, #EAF1F6); } }
 
 /* network-view icon beside the site dropdown */
 .sp-net { color: var(--accent); }
