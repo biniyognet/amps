@@ -14,13 +14,14 @@
 - [x] gcloud CLI — done 20 Nov: SDK 594, signed in as arupbiswas1994 (user + ADC), project `gen-lang-client-0618042629`, 9 APIs enabled (BigQuery, BQ Storage, Cloud Run, Artifact Registry, Cloud Build, Storage, AlloyDB, Vertex AI, Gemini Data Analytics)
 - [x] Gemini key — done 20 Nov, project above at Tier 1; audit: `gemini-3.5-flash-lite` 8/8 0.85 s (default), `gemini-3.5-flash` 0.7–1.8 s, `gemini-pro-latest` 3/3 3.4 s; 2.5 models closed to new keys
 - [x] Start Docker Desktop (needed to run AMPS locally)
+- [ ] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin)
 - [ ] Codelab 2 (**do this one**, ~30 min = F4): https://codelabs.developers.google.com/data-agents-in-agy-and-bq
 - [ ] Codelab 1 (optional skim, F5 covers it): https://codelabs.developers.google.com/getting-started-with-antigravity-skills
 
 ### Build (order: F4 → F1 → F2 → F6; each ships with its screen)
 - [x] F3 AMPS MCP server — 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`; local stdio + https://amps-api.binihost.com/mcp, pod `amps-mcp`; Cloud Run next)
 - [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
-- [ ] F4 Estate analytics agent — logbook/failures → BigQuery + Conversational Analytics · UI: "Estate insights" tab (question → chart)
+- [~] F4 Estate analytics agent — data loaded 20 Nov: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart)
 - [ ] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [ ] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list
