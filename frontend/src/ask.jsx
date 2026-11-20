@@ -5,13 +5,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { API, useMe } from './api'
 
+// Three starters, each lands on a seeded demo story. The tools filter by site (not
+// by location) and need a code for one asset's history, so the chips name both.
 const SUGGEST = [
-  'Which site has the most overdue maintenance?',
-  'Which assets keep failing?',
-  'What is the MTTR at Eastern Grid?',
-  'Vital assets past their design life',
-  'Draft a maintenance plan for Eastern Grid',
-  'কোন সাইটে সবচেয়ে বেশি ব্রেকডাউন?',
+  'Which assets are overdue for preventive maintenance?',
+  'पंप मोटर 1 (CWT-AM-MTR-01) का इतिहास बताइए',
+  'Open failures at City Water Treatment Plant',
 ]
 
 const TOOL_LABEL = {
