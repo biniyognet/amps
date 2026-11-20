@@ -147,3 +147,20 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | AI hub steps 2–6: Ask chips + Snap history strip · F6 risk · F2 AI.EXTRACT · F1 embeddings | build | in that order |
 | Backend default model in `backend/app/api/ai.py` and the k8s manifest still say `gemini-2.5-flash` | build | change with the next amps-api roll (not part of the buildathon frontend work) |
 | Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | before 21 Nov 09:00 |
+
+## 7. Crew lanes (20 Nov 09:30 — freya leads, merges into `buildathon`)
+
+Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wires the hub card, ticks here. Laptop pulls `buildathon` every 2 min.
+
+| Step | Seat | Branch | Hub card | State |
+|------|------|--------|----------|-------|
+| 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · laptop needs frontend rebuild |
+| 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-snap-strip` | Ask, Snap | ⏳ |
+| 3 F6 risk badge | builder-2 | `builder-2/f6-risk` | Risk badge | ⏳ |
+| 4 BigQuery reload + AI.EXTRACT + asset_risk | floki | `floki/bq-reload` | Fault fields, Estate agent | ⏳ |
+| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ⏳ |
+| Cloud Run amps-mcp + safety watch | ragnar | `ragnar/cloudrun-mcp` | MCP (URL) | ⏳ |
+| Pitch script + judge Q&A | nefario | `nefario/pitch` | — | ⏳ |
+| Day-1 run sheet | minion | `minion/runsheet` | — | ⏳ |
+
+Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes never touch amps.binihost.com / amps-api. A "coming" card flips to live only after its branch is merged AND it works on :8081.
