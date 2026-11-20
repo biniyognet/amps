@@ -83,6 +83,7 @@ const FAQ = [
   ['What does it cost?', 'The software is free (MIT). You pay only for what you choose: hosting, onboarding and tagging, support or custom features.'],
 ]
 
+const SHOW_DECK = false
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
 const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1119b`
 
@@ -189,9 +190,12 @@ export default function Brief() {
         failure report and job card for a person to confirm.<span className="br-dek-x"> Open-source EAM for any plant, ₹0 licence.</span></p>
       </header>
 
+      {/* Deck hidden until the new two-layer deck's slides replace public/pitch/ */}
+      {SHOW_DECK && <>
       <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-three slides</h2>
       <Deck />
       <p className="br-note">← → or n / p to step · Full screen to present</p>
+      </>}
       </section>
 
       <aside className="br-side">

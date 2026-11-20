@@ -760,10 +760,13 @@ const codalExpiry = (a) => {
 }
 const codalExceeded = (a) => { const e = codalExpiry(a); return e != null && e < new Date() }
 
+// The Snap & Report clip (public/pitch/snap-clip.mp4) is off until the demo film is reshot.
+const SNAP_CLIP = false
+
 /* Lines named after colours get their colour as the chip dot — free for any
    org that names lines that way; everyone else gets a neutral dot. */
 const LINE_COLORS = {
-  green: '#1c7a44', blue: '#2b5c99', teal: '#0e7c86', amber: '#b7791f', indigo: '#4c51bf', ruby: '#b4234a', metro: '#0e7c86', substation: '#4c51bf', water: '#2b6cb0', factory: '#b7791f', purple: '#5b3fbf', yellow: '#b98a00',
+  green: '#1c7a44', blue: '#2b5c99', teal: '#0e7c86', amber: '#b7791f', indigo: '#4c51bf', ruby: '#b4234a', line: '#0e7c86', substation: '#4c51bf', water: '#2b6cb0', factory: '#b7791f', purple: '#5b3fbf', yellow: '#b98a00',
   red: '#a32e2e', orange: '#c2571a', pink: '#b83280', grey: '#52525b', gray: '#52525b',
 }
 const lineColor = (name) => {
@@ -4737,7 +4740,7 @@ const Ribbon = ({ lines }) => {
     const c = lineColor(l.name)
     return `${c} ${(i / n) * 100 + blend}%, ${c} ${((i + 1) / n) * 100 - blend}%`
   }).join(', ')
-  return <div className="metro-ribbon" aria-hidden="true"
+  return <div className="line-ribbon" aria-hidden="true"
               style={{ background: `linear-gradient(90deg, ${stops})` }} />
 }
 
@@ -4797,7 +4800,7 @@ function AiHero() {
   const pitch = `${import.meta.env.BASE_URL}pitch/`
   const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
   return (
-    <section className="ai-hero" aria-label="Snap & Report with Gemini">
+    <section className={SNAP_CLIP ? 'ai-hero' : 'ai-hero no-clip'} aria-label="Snap & Report with Gemini">
       <div className="ai-hero-copy">
         <div className="ai-hero-kick">The problem</div>
         <h2 className="ai-hero-hook">A failure nobody logs comes back as downtime.</h2>
@@ -4819,12 +4822,12 @@ function AiHero() {
           <li><b>AI maintenance plans</b> Gemini drafts the PM plan, a supervisor approves it before anything is saved</li>
         </ul>
       </div>
-      <figure className="ai-hero-clip">
+      {SNAP_CLIP && <figure className="ai-hero-clip">
         <video src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
                autoPlay muted loop playsInline preload="metadata" controls
                aria-label="30 second run: scan, photo, Gemini draft, job card, planner" />
         <figcaption>A real run on this demo · Gemini Flash · 30 s · synthetic data. Submitting needs a sign-in.</figcaption>
-      </figure>
+      </figure>}
     </section>
   )
 }
@@ -4886,7 +4889,7 @@ function Landing() {
         </nav>
       </header>
       <section className="lx-hero" aria-label="AMPS">
-        <div className="lx-main">
+        <div className={SNAP_CLIP ? 'lx-main' : 'lx-main no-clip'}>
         <div className="lx-copy">
           <div className="lx-tags">
             <span className="lx-live"><i />Live demo · synthetic data</span>
@@ -4900,13 +4903,13 @@ function Landing() {
             <a className="lx-btn" href={`#/snap/${SNAP_DEMO}`}>Try Snap &amp; Report</a>
           </div>
         </div>
-        <figure className="lx-stage">
+        {SNAP_CLIP && <figure className="lx-stage">
           <div className="lx-win">
             <video className="lx-vid" src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
                    autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
           </div>
           <figcaption className="lx-cap">A real run on this demo · Gemini Flash · 30 s</figcaption>
-        </figure>
+        </figure>}
         </div>
         <div className="lx-rib"><Ribbon lines={lines} /></div>
       </section>

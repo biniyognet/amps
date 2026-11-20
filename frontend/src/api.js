@@ -19,9 +19,9 @@ export const OPERATOR = LIVE && import.meta.env.VITE_AMPS_BRAND !== 'neutral'
 export const ORDER_REF = (import.meta.env.VITE_AMPS_ORDER_REF || '').trim()
 export const ORDER_EXTRACT = (import.meta.env.VITE_AMPS_ORDER_EXTRACT || '').trim()
 export const ORG_ALIASES = [ORG, ...(import.meta.env.VITE_AMPS_ORG_ALIASES || '').split('|')]
+  .map((a) => a.split(',')[0].trim()).filter(Boolean)
 // VITE_AMPS_PILOT_URL: a live pilot site linked from the shortcuts menu; unset = no link.
 export const PILOT_URL = (import.meta.env.VITE_AMPS_PILOT_URL || '').trim()
-  .map((a) => a.split(',')[0].trim()).filter(Boolean)
 // Words for the top grouping and its places. A rail network says line / station / depot;
 // the neutral demo is a multi-industry estate, so it says site / area / unit.
 export const W = LIVE && !OPERATOR

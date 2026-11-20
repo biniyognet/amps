@@ -1894,7 +1894,7 @@ tbody tr:hover .edit-link { color: var(--accent); }
 
 /* ---- entry pages: landing (line tiles) + standalone sign-in ----
    Light, warm and deliberate: paper ground, pastel line tiles carrying the
-   colour story, a metro-map ribbon as the running signature, and the alpona
+   colour story, a line-map ribbon as the running signature, and the alpona
    motif on the initiator line. */
 .gate {
   position: fixed; inset: 0; z-index: 60; overflow: auto;
@@ -1910,8 +1910,8 @@ body:has(.gate) {
     #faf8f3;
 }
 
-/* the metro-map ribbon: one continuous blended band of the line colours */
-.metro-ribbon { height: 4px; border-radius: 99px; overflow: hidden; }
+/* the line-map ribbon: one continuous blended band of the line colours */
+.line-ribbon { height: 4px; border-radius: 99px; overflow: hidden; }
 
 /* landing — one screen, no scroll: header / ribbon / tiles+art / foot
    share the viewport, heights breathing with vh so short displays fit */
@@ -1953,7 +1953,7 @@ body:has(.gate) {
   padding: 11px 26px; font-size: 15px; flex: none;
 }
 .gate-signin-btn:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent); }
-.land .metro-ribbon { margin: clamp(12px, 2.2vh, 20px) 0 clamp(12px, 2.4vh, 22px); }
+.land .line-ribbon { margin: clamp(12px, 2.2vh, 20px) 0 clamp(12px, 2.4vh, 22px); }
 /* tiles fill the left column; the glance panel (and train) take the right.
    The grid soaks up the leftover height and centers in it */
 .land-tiles {
@@ -1991,6 +1991,7 @@ body:has(.gate) {
   background: var(--line-c, #93A7B5); margin-bottom: 5px;
 }
 /* public demo: problem → AI fix band above the tiles (copy | 30 s clip) */
+.ai-hero.no-clip { grid-template-columns: 1fr; }
 .ai-hero {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(16px, 2.4vw, 30px);
   align-items: center; margin: 0 0 clamp(14px, 2.4vh, 24px); position: relative; z-index: 1;
@@ -2124,7 +2125,7 @@ body:has(.gate) {
   overflow: hidden;
 }
 .gate-auth { padding: 30px 28px 26px; display: flex; flex-direction: column; }
-.gate-auth .metro-ribbon { margin-bottom: 22px; }
+.gate-auth .line-ribbon { margin-bottom: 22px; }
 .gate-auth-brand { font-size: 17px; font-weight: 800; letter-spacing: 0.2px; margin-bottom: 6px; }
 .gate-auth-brand .bolt { color: var(--accent); }
 .gate-auth-sub { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin: 0 0 18px; }
@@ -2174,8 +2175,8 @@ body:has(.gate) {
 @keyframes artFloat { from { transform: translateY(0) } to { transform: translateY(-8px) } }
 
 /* a light streak runs the ribbon like a train on the map */
-.metro-ribbon { position: relative; }
-.metro-ribbon::after {
+.line-ribbon { position: relative; }
+.line-ribbon::after {
   content: ""; position: absolute; top: 0; bottom: 0; width: 64px; left: -70px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
   animation: ribbonTrain 5.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
@@ -2205,7 +2206,7 @@ body:has(.gate) {
   .site-art { width: min(46vh, 42vw, 320px); opacity: 0.5; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .site-art, .metro-ribbon::after, .land-tile, .land-tile.initiator .alpona { animation: none; transition: none; }
+  .site-art, .line-ribbon::after, .land-tile, .land-tile.initiator .alpona { animation: none; transition: none; }
 }
 
 
@@ -3492,6 +3493,7 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .lx { position: relative; z-index: 0; background: var(--bg); }
 .lx-hero { position: relative; min-height: calc(100svh - 60px); display: flex; flex-direction: column; overflow: hidden; color: #fff; isolation: isolate;
   background: radial-gradient(900px 520px at 78% 45%, rgba(96,204,240,.16), transparent 70%), linear-gradient(160deg, #0B2A3F 0%, #06161F 100%); }
+.lx-main.no-clip { grid-template-columns: minmax(0, 760px); }
 .lx-main { flex: 1; display: grid; grid-template-columns: minmax(300px, 4fr) 9fr; align-items: center; gap: clamp(24px, 4vw, 72px);
   padding: clamp(12px, 3vh, 40px) clamp(16px, 4vw, 64px) clamp(20px, 4vh, 48px); }
 .lx-stage { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; }
@@ -3524,7 +3526,7 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .lx-btn.pri:hover { background: #8BDcF5; color: #0B2A3F; }
 .lx-cap { align-self: flex-start; font-size: 11px; letter-spacing: .04em; color: rgba(255,255,255,.6); }
 .lx-rib { padding: 0 clamp(16px, 4vw, 64px) 18px; }
-.lx-rib .metro-ribbon { opacity: .9; }
+.lx-rib .line-ribbon { opacity: .9; }
 /* ---- landing: sections below the hero, alternating navy / mist bands ---- */
 .lx-wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 64px); box-sizing: border-box; }
 .lx-kick { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #1E8DB8; }
