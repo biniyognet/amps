@@ -26,7 +26,7 @@ TRIAL=${ALLOYDB_TRIAL:-0}            # 1 = AlloyDB free-trial cluster (one per p
 AR=$R-docker.pkg.dev/$P/amps
 TAG=${TAG:-$(git rev-parse --short HEAD)}
 API=amps-api; WEB=amps-web; JOB=amps-seed
-ORG="Demo Industries Group"; LINE="Metro Traction & Depot"
+ORG="Demo Industries Group"
 MODEL=${AMPS_GEMINI_MODEL:-gemini-3.5-flash-lite}
 g() { gcloud --project="$P" --quiet "$@"; }
 secret_put() {  # name; value on stdin. Creates the secret or adds a version.
@@ -95,7 +95,7 @@ step_image() {
   docker push "$AR/amps-backend:$TAG"; docker push "$AR/amps-frontend:$TAG"
 }
 
-api_env="^|^AMPS_AUTH=1|AMPS_SEED=network|AMPS_ORG=$ORG|AMPS_STANDARD_LINE=$LINE|AMPS_AI_PROVIDER=gemini|AMPS_GEMINI_MODEL=$MODEL"
+api_env="^|^AMPS_AUTH=1|AMPS_SEED=network|AMPS_ORG=$ORG|AMPS_AI_PROVIDER=gemini|AMPS_GEMINI_MODEL=$MODEL"
 api_secrets() {
   local s="DATABASE_URL=amps-db-url:latest,AMPS_ADMIN_PASSWORD=amps-admin-pass:latest"
   if has_secret amps-gemini-key; then s="$s,AMPS_GEMINI_API_KEY=amps-gemini-key:latest"; fi
