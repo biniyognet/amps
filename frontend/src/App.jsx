@@ -2156,7 +2156,14 @@ function LiveFailures({ line = '' }) {
     const jobs = [getJSON(`/api/logbook/failure-stats?days=${days}&months=${months}${lq}`)]
     if (!anon) jobs.push(getJSON(`/api/logbook?entry_type=failure&limit=5000${lq}`))
     Promise.all(jobs)
-      .then(([s, l]) => { if (alive) { setStats(s); setRows(l || []) } })
+      .then(([s, l]) => {
+        if (!alive) return
+        setStats(s); setRows(l || [])
+        // a site with nothing open opened on an empty "No open failures" card;
+        // land on the first tab that has rows instead (open → ack → job card → resolved)
+        if (l && l.length) setState((cur) => (l.some((r) => r.state === cur) ? cur
+          : ['open', 'acknowledged', 'job_card', 'resolved'].find((t) => l.some((r) => r.state === t)) || cur))
+      })
       .catch((e) => alive && setError(String(e)))
     return () => { alive = false }
   }, [days, months, anon, line, meLoading])
