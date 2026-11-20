@@ -28,7 +28,7 @@
 - [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
 - [x] AI demo stories seeded — 85fd3d5 `backend/seed_network.py` `STORIES`: 10 failures on 5 assets (Pump Motor 1 repeat seal leak past codal life, HSCB Panel 1 trips, PTR 1 oil-temp trend, বাংলা + हिन्दी + shorthand remarks); 178 failures on a fresh DB
 - [~] **AI hub** `#/ai` + ✦ AI nav link — plan: `crew/freya/out/buildathon-ai-hub-ui-plan.md`; step 1 (page, 8 cards: 4 live, 4 coming) on the branch 20 Nov, steps 2–6 below
-- [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart). Reloaded 20 Nov from the laptop DB with the stories (JARVIS): assets 1,874 · log_entries 14,416 · `asset_risk` view 1,874; sandbox project, tables expire in 59 days
+- [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11; HELD until billing is on, pitch fallback `bigquery/agent/pitch.sh` ready), then UI "Estate insights" tab (question → chart). Reloaded 20 Nov from the laptop DB with the stories (JARVIS): assets 1,874 · log_entries 14,416 · `asset_risk` view 1,874; sandbox project, tables expire in 59 days
 - [x] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [x] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list (merged; live after the laptop rebuild)
@@ -86,7 +86,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Agent access | Ask AMPS = 6 read-only tools inside the app | **F3 MCP server** exposes the same 6 tools to any agent (Antigravity, Claude, Gemini CLI) | Wrapper, no logic change |
 | Guardrails | Code-level (read-only tools, human submits) | **F5 SKILL.md**: rules an agent must follow on AMPS data | New doc file |
 | Analytics | Dashboard counts/charts | **F4** logbook/failures → BigQuery + Conversational Analytics (ask in English) | New export job + Google console |
-| Hosting | binihost k3s + Ensign | Same. **Cloud Run** copy only if we want a "deployed on Google" line | Optional mirror |
+| Hosting | binihost k3s + Ensign | Same, plus Google and local Postgres kept ready as alternate production hosts (§8) | Additional hosts, kept ready |
 | Data | Metro data stays on the Metro box | Demo runs on the **Demo Industries** demo dataset | No change |
 
 ### What each feature needs (to choose what to build)
@@ -137,6 +137,9 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov | One laptop stack, compose project `amps-buildathon` on :8081 (was `amps-demo`, which made a second stack) | One set of volumes; the same command always reuses it |
 | 20 Nov | Buildathon model = `gemini-3.5-flash-lite`, set by compose.demo (`AMPS_GEMINI_MODEL`); key only in git-ignored `deploy/.env` | 2.5 models are closed to new keys; key never in git |
 | 20 Nov | AI hub `#/ai`: one page, 8 cards, each opens a seeded example in 1–2 clicks and names its Google product | Judges find every AI feature without a tour |
+| 20 Nov | F4 agent creation HELD: the event billing account auto-closed (credit expired); nothing is created in GCP until Arup says billing is on. Fallback = `bigquery/agent/pitch.sh` (Q1/Q3/Q4 from the same verified SQL, sandbox, read only) | The pitch still shows the three answers without the agent |
+| 20 Nov (Arup) | Keep **three hosting paths ready** as alternate economic production hosting: local Postgres, Google (AlloyDB / BigQuery / Cloud SQL), binihost. See §8 | No lock-in; pick the cheapest host that works per client |
+| 20 Nov (Arup) | This file is **the tracker**: every buildathon change updates it in the same branch | One place to see the state |
 
 ## 6. Open items (20 Nov evening)
 | Item | Owner | Next |
@@ -144,7 +147,8 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Laptop AI stories | JARVIS | ✅ done e658bd6: `seed_network.py --stories` added 10 stories, data kept (no `down -v`, ever) |
 | Gemini key in laptop `deploy/.env` | Arup (the key) · JARVIS (re-run compose) | not there yet; then `/api/ai/status` = enabled |
 | BigQuery `amps_demo` reload | JARVIS | ✅ reloaded from the laptop DB: assets 1,874 · log_entries 14,416 · asset_risk view 1,874. Project is a BigQuery **sandbox**, so tables expire after 59 days |
-| BigQuery F2 `failure_fields` (AI.GENERATE) + data agent (Codelab 2 steps 6–11) | Arup | needs billing on the project |
+| BigQuery F2 `failure_fields` (AI.GENERATE) + data agent (Codelab 2 steps 6–11) | Arup | needs billing on the project · the event billing account auto-closed (credit expired), Arup is sorting it with the mentors · meanwhile the pitch uses `bigquery/agent/pitch.sh` (JARVIS runs it on the laptop) |
+| Hosting paths ready (§8) | crew | local PG ✅ · binihost ✅ · BigQuery ✅ data (sandbox) · AlloyDB = step 9 · Cloud SQL = not started · Cloud Run = step 10 |
 | AI hub steps 2–6 | crew | see §7 |
 | Backend default model in `backend/app/api/ai.py` and the k8s manifest still say `gemini-2.5-flash` | build | change with the next amps-api roll (not part of the buildathon frontend work) |
 | Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | before 21 Nov 09:00 |
@@ -167,3 +171,15 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 | 10 Cloud Run (billing-gated) | ragnar | `ragnar/<topic>` | MCP (URL) | ⏳ |
 
 Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes never touch amps.binihost.com / amps-api. A "coming" card flips to live only after its branch is merged AND it works on :8081.
+
+## 8. Hosting — three paths kept ready (Arup, 20 Nov)
+
+AMPS must be able to run in production on any of these, so each client can get the cheapest host that works. All three use the same code; the database is picked by `DATABASE_URL` (`backend/app/db.py`).
+
+| Path | What runs where | State | Next |
+|---|---|---|---|
+| Local Postgres | `deploy/compose.yaml` (Postgres 16 + API + frontend) on the client's own box or the laptop | ✅ the laptop stack :8081 | — |
+| binihost | k3s + Ensign (`deploy/k8s/`), amps.binihost.com · amps-api · amps-mcp | ✅ live (production) | no buildathon roll |
+| Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Cloud Run** for the API/MCP | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 · Cloud Run = step 10 · Cloud SQL not started | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same image on Cloud Run |
+
+Rule: nothing is tied to one host. A feature that only works on one of them says so here.
