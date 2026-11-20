@@ -10,7 +10,7 @@ Dataset `amps_demo` (project `gen-lang-client-0618042629`), fictional Demo Indus
 | `remote_model.sql` | remote model `gemini` on the Vertex AI connection `amps_vertex` | BigQuery ML remote model → Vertex AI |
 | `failure_fields_ml.sql` | table `failure_fields_ml`: the same columns as `failure_fields`, through the remote model | `ML.GENERATE_TEXT` + `JSON_VALUE` |
 | `gemini_go.sh` | the billing-day switch: connection + IAM, remote model, both F2 tables, F6, read-back, Vertex AI live check | `gcloud` + `bq` |
-| `agent/` | F4 estate agent: config to paste + 6 verified questions (`load.sh --agent` reads them back) | BigQuery data agent (Conversational Analytics) |
+| `agent/` | F4 estate agent: config to paste + 6 verified questions (`load.sh --agent` reads them back) · `agent/pitch.sh` = Q1/Q3/Q4 fallback page, no agent needed | BigQuery data agent (Conversational Analytics) |
 | `load.sh` | reloads the 6 tables from `scripts/bq_export.py` output, then runs the three files above | `bq` CLI |
 
 ```bash
