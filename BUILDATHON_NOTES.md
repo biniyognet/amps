@@ -87,7 +87,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Guardrails | Code-level (read-only tools, human submits) | **F5 SKILL.md**: rules an agent must follow on AMPS data | New doc file |
 | Analytics | Dashboard counts/charts | **F4** logbook/failures → BigQuery + Conversational Analytics (ask in English) | New export job + Google console |
 | Hosting | binihost k3s + Ensign | Same. **Cloud Run** copy only if we want a "deployed on Google" line | Optional mirror |
-| Data | Metro data stays on the Metro box | Demo uses **Demo Industries** seed data only, never Metro data | No change |
+| Data | Metro data stays on the Metro box | Demo runs on the **Demo Industries** demo dataset | No change |
 
 ### What each feature needs (to choose what to build)
 | F | Feature | Needs | Effort | Demo wow |
