@@ -1,16 +1,17 @@
 # AMPS × Startup Buildathon India 2026 — Notes & Checklist
 
 > Kolkata · 20–21 Nov 2026 · submission closes **21 Nov, 08:00 IST sharp** (final criteria, Arup 02:55) · branch `buildathon`
+> 🔗 **LIVE LINK (submit this): https://amps-web-1078527281407.asia-south1.run.app** (Google Cloud Run + Cloud SQL) · backup: https://amps-demo.binihost.com · deck slide 8 carries both. Change one → change the other.
 > Final criteria: (1) prototype link **deployed on Google Cloud / Cloud Run / Firebase**, (2) deck in the shared template, (3) demo video as backup.
 > Goal: integrate Google AI + data features into AMPS and make it as powerful as we can.
 > Audited 20 Nov (freya) against `buildathon` 5b40544 and every pushed lane branch. Laptop: JARVIS rebuilt :8081 at 512e0b1, 20 Nov 12:00 (data kept, no `down -v`): app 200, `/api/risk` 200.
 > Refreshed 21 Nov 00:45 (JARVIS): Cloud Run dropped everywhere, F1 = EmbeddingGemma on-prem, deck v12 + PDF re-export, submit checklist.
 
-## 0. Where we are — 21 Nov 02:40 IST (submission closes 09:00)
+## 0. Where we are — 21 Nov 03:55 IST (submission closes 08:00)
 | Item | Status | Next |
 |---|---|---|
-| Prototype amps-demo.binihost.com | ✅ live: app 200, `/api/risk` 200, 5/5 pods Running (api, worker, frontend, db, redis) | keep up until evaluation ends · no rolls after 08:00 |
-| Google Slides submission deck | ✅ updated 01:06: EmbeddingGemma + Gemma 3 4B, prototype link, judge login · backup kept · ✅ **Team Name: AMPS** (02:35, same files.update path, PDF refreshed) | Arup reviewing now; his edits go straight onto the Google file · ⬜ **video link** after the PPT is final |
+| Backup prototype amps-demo.binihost.com | ✅ live (03:50 200): app 200, `/api/risk` 200, 5/5 pods Running (api, worker, frontend, db, redis) | keep up until evaluation ends · no rolls after 08:00 |
+| Google Slides submission deck | ✅ updated 01:06: EmbeddingGemma + Gemma 3 4B, prototype link, judge login · backup kept · ✅ **Team Name: AMPS** (02:35, same files.update path, PDF refreshed) | ✅ 03:45 slide 8 → Google link https://amps-web-1078527281407.asia-south1.run.app (backup amps-demo) + Drive PDF refreshed (9 pages) · Arup reviewing; his edits go straight onto the Google file · ⬜ **video link** after the PPT is final |
 | Deck PDF | ✅ `deck/AMPS_pitch_deck.pdf` (claude.ai v12, 11 pages) · ✅ Drive "Idea Submission.pdf" refreshed from the Google deck | Arup picks which one to upload (the Google deck is the Hack2skill template) |
 | AI features on the judges' stack | ✅ 6 live: Snap & Report, Ask AMPS, AI PM plan, MCP server, Similar failures (EmbeddingGemma), Risk badge · 2 "coming" (Fault fields, Estate agent) | none before submit |
 | BigQuery | ✅ data loaded (sandbox) · ⚠️ BQML model eval degenerate · F2 + data agent wait on billing | after submit, only if billing comes back |
@@ -22,6 +23,16 @@
 | **Hack2skill submit** | ⬜ | **Arup on the dashboard before 08:00**: Google prototype link + deck/PDF (+ video if any) |
 | After judging | GPU free → ragnar resumes user_docs embed · nomic delete last | — |
 
+### 0b. Before the PPT is final (audit 03:55, Google deck export)
+| # | Slide | Unchecked | Owner |
+|---|---|---|---|
+| 1 | 8 | `[video link]` still a placeholder → fill after the video, or drop the line if no video | Arup + Nilanjan |
+| 2 | 4 Architecture | only binihost k3s as the app host; the submitted prototype runs on **Cloud Run + Cloud SQL + Secret Manager + Cloud Build** → add one line | JARVIS on Arup's go |
+| 3 | 5 Google AI Tools | Google Cloud card lists BigQuery / Vertex but not Cloud Run / Cloud SQL / Secret Manager / Cloud Build | JARVIS on Arup's go |
+| 4 | 4, 5 | say "Gemini on Vertex AI"; today the app calls Gemini via the AI Studio key (Vertex = next) → soften to "AI Studio now, Vertex next" | Arup's call |
+| 5 | 7 AI Test Report | run on amps-demo.binihost.com at 02:40; Google stack uses gemini-embedding-001 for similar search → optional hosting-comparison slide (PDF sent 03:43) | Arup's call |
+| 6 | 9 | blank slide (template end slide?) → keep or delete | Arup |
+| 7 | all | final PDF export ≤5 MB (now 0.77 MB, 9 pages) after the last edit | JARVIS |
 
 ## 1. Checklist
 
@@ -55,7 +66,7 @@
 ### Submit (Hack2skill guide email, 20 Nov)
 > Window: opens **20 Nov 23:00**, closes **21 Nov 09:00**, no extension. One submission per team, on the participant dashboard.
 > 21 Nov agenda: mentor evaluation 10:00–13:00 · showcase 14:00–17:30 · results 18:00.
-- [x] Working prototype link — **amps-demo.binihost.com** (ns `amps-judges`, one-click judge login); stays live until evaluation ends
+- [x] Working prototype link — **https://amps-web-1078527281407.asia-south1.run.app** (Google Cloud Run, final rule); backup **amps-demo.binihost.com** (ns `amps-judges`, one-click judge login); both stay live until evaluation ends
 - [ ] **Hack2skill submission deck = Google Slides** https://docs.google.com/presentation/d/1IQdBwCr11AwtRYKYjVSp0SHhAV7PH9IL_AjGdiS8mv0/edit (owner arupbiswas1994; SA jarvis-drive can edit). JARVIS edits it directly and keeps it in sync with the claude.ai Slides deck. Edited copy `deck/AMPS_submission_deck.pptx` (EmbeddingGemma + Gemma 3 4B, prototype link, judge login) sent on TG 21 Nov. Google file UPDATED in place 21 Nov 01:06 IST (Drive files.update of the edited pptx onto the same ID, same path as 20 Nov 21:14), and companion Drive PDF refreshed. Team Name AMPS filled 21 Nov 02:35. Still blank: video link
 - [x] Pitch deck PDF < 10 MB — `deck/AMPS_pitch_deck.pdf` re-exported 21 Nov 00:40 from Slides v12: 11 slides, 1920×1080, 0.48 MB · Arup uploads it on the dashboard
 - [ ] Demo video (optional) ≤ 3 min, public Google Drive or YouTube link
@@ -216,7 +227,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 |---|---|---|
 | Laptop AI stories | JARVIS | ✅ done e658bd6: `seed_network.py --stories` added 10 stories, data kept (no `down -v`, ever) |
 | Gemini key in laptop `deploy/.env` | Arup (the key) · JARVIS (re-run compose) | ✅ done 20 Nov 14:06, key tested (AI Studio 200) |
-| Prototype link for the submission | Arup | ✅ amps-demo.binihost.com (ns `amps-judges`) |
+| Prototype link for the submission | Arup | ✅ https://amps-web-1078527281407.asia-south1.run.app (Cloud Run) · backup amps-demo.binihost.com (ns `amps-judges`) |
 | BigQuery ML `failure_risk_model` (layer 2) | JARVIS | trained 14:01; eval degenerate (no positives in the eval split) → fix the label window, retrain, record metrics here |
 | Deck PDF | JARVIS | ✅ `deck/AMPS_pitch_deck.pdf` from Slides v12, 11 pages, 0.48 MB · Arup uploads it on the dashboard |
 | BigQuery `amps_demo` reload | JARVIS | ✅ reloaded from the laptop DB: assets 1,874 · log_entries 14,416 · asset_risk view 1,874. Project is a BigQuery **sandbox**, so tables expire after 59 days |
@@ -224,7 +235,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Hosting paths ready (§8) | crew | local PG ✅ · binihost ✅ · BigQuery ✅ data (sandbox) · AlloyDB = step 9 (merged fa1a6f6, not run on GCP) · Cloud SQL = not started · Cloud Run = dropped (§5, 20 Nov final) |
 | AI hub steps 2–6 | crew | see §7 |
 | Backend default model in `backend/app/api/ai.py` and the amps.binihost.com k8s manifest still say `gemini-2.5-flash` | build | judges' stack already runs `gemini-3.5-flash-lite` via env (`stack.yaml`); change the code default after the event |
-| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | deck ✅ v12, placeholders filled, PDF ✅ · video optional · **submit on the dashboard before 21 Nov 09:00** (prototype link + PDF) |
+| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | deck ✅ v12, placeholders filled, PDF ✅ · video optional · **submit on the dashboard before 21 Nov 08:00** (Google prototype link + PDF) |
 
 ## 7. Crew lanes (20 Nov 09:30 — freya leads, merges into `buildathon`)
 
@@ -256,7 +267,7 @@ Admin login (Arup, 20 Nov): a simple admin key is fine for the prototype on **lo
 |---|---|---|---|
 | Local Postgres | `deploy/compose.yaml` (Postgres 16 + API + frontend) on the client's own box or the laptop | ✅ the laptop stack :8081 | — |
 | binihost | k3s + Ensign (`deploy/k8s/`), amps.binihost.com · amps-api · amps-mcp | ✅ live (production) | no buildathon roll |
-| binihost (judges) | ns `amps-judges`: amps-demo.binihost.com, frontend + api + worker + Redis + Postgres/pgvector + Gemma via Ollama (`deploy/k8s/judges/stack.yaml`) | ✅ live | prototype link for the evaluation |
+| binihost (judges) | ns `amps-judges`: amps-demo.binihost.com, frontend + api + worker + Redis + Postgres/pgvector + Gemma via Ollama (`deploy/k8s/judges/stack.yaml`) | ✅ live | backup link for the evaluation (Google Cloud Run is the submitted link, §0) |
 | Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Gemini / Vertex** for AI, **GKE Autopilot** when an estate outgrows k3s | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 (`deploy/gcp/`, merged fa1a6f6, not run on GCP) · **Cloud Run + Cloud SQL ✅ live 21 Nov 03:40** (Day-2 credit; §0) | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same images on GKE |
 
 Rule: nothing is tied to one host. A feature that only works on one of them says so here.
