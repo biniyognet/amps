@@ -10,7 +10,8 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (agencies, ai, assets, auth, autoplan, checksheets, correspondence,
-                     drawings, failures, logbook, maintenance, planned, qr, roster, snap, sync, tenders)
+                     drawings, failures, logbook, maintenance, planned, qr, risk, roster, snap, sync,
+                     tenders)
 from app.db import init_db
 
 # AMPS over MCP (hosted): opt-in, so the core API runs without the mcp package.
@@ -73,6 +74,7 @@ app.include_router(drawings.router, prefix="/api/drawings", tags=["drawings"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(snap.router, prefix="/api/snap", tags=["snap"])
+app.include_router(risk.router, prefix="/api/risk", tags=["assets"])
 if _mcp:
     from starlette.routing import Route
     # exact /mcp too: the mount alone 307s it to /mcp/, and behind TLS that redirect is http://

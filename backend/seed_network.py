@@ -601,6 +601,8 @@ def _stories(db, crews) -> int:
             continue
         if a.code.endswith("MTR-01") and a.codal_life_years:   # the repeat offender is past its life
             a.commissioned_on = TODAY.replace(year=TODAY.year - a.codal_life_years - 3)
+        if a.code.endswith("PTR-01"):   # the grid's main transformer is vital (risk badge amber)
+            a.criticality = Criticality.A
         line = next(l for l in crews if db.get(Location, a.line_id).name == l)
         d = TODAY - timedelta(days=ago)
         start = _at(d, srng.randint(6, 20))

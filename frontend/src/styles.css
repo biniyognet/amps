@@ -575,6 +575,13 @@ td .chip.d-none { color: var(--ink-3); }
 .codal-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 7px;
   background: var(--warning, #e6a417); vertical-align: middle; }
 
+/* F6 risk dot on register rows — red / amber / green, reasons in the tooltip */
+.risk-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px;
+  vertical-align: middle; background: var(--good); opacity: .45; cursor: help; flex: none; }
+.risk-dot.r-amber { background: var(--warning); opacity: 1; }
+.risk-dot.r-red { background: var(--critical); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--critical) 22%, transparent); }
+.risk-sort.active { color: var(--accent); border-color: var(--accent-line); }
+
 /* consumables / consumed line on a log entry */
 .le-consumables, .le-action, .le-station { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; }
 .le-action .lc-tag { color: #1a5c3a; background: #e5f4ec; border-color: #c6e6d3; }
@@ -656,7 +663,7 @@ td .chip.d-none { color: var(--ink-3); }
     white-space: normal; overflow-wrap: break-word; word-break: normal; }
   .reg-table .wrap-cell { min-width: 0; max-width: none; white-space: normal; }
   /* drop on-screen affordances that only waste ink */
-  .reg-table .fault-actions, .reg-table .fault-badge, .reg-table .codal-dot { display: none !important; }
+  .reg-table .fault-actions, .reg-table .fault-badge, .reg-table .codal-dot, .reg-table .risk-dot { display: none !important; }
   .reg-table .th-lbl { cursor: default; }
   /* status renders as plain text, PM matrix squares stay but shrink */
   .reg-table .chip { border: none !important; background: none !important; padding: 0 !important; color: #000 !important; }
