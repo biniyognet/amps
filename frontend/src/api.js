@@ -13,6 +13,13 @@ export const ORG = import.meta.env.VITE_AMPS_ORG || 'Demo Industries'
 // VITE_AMPS_BRAND=neutral: live data, but no operator branding or operator-only
 // modules (letters, tenders, drawings) — the public demo runs this way.
 export const OPERATOR = LIVE && import.meta.env.VITE_AMPS_BRAND !== 'neutral'
+// The operator's own details come from the office's untracked build env, never git:
+// VITE_AMPS_ORDER_REF (the adopting office order), VITE_AMPS_ORDER_EXTRACT (its quoted
+// clause), VITE_AMPS_ORG_ALIASES ('|'-separated names stripped from letter addressees).
+export const ORDER_REF = (import.meta.env.VITE_AMPS_ORDER_REF || '').trim()
+export const ORDER_EXTRACT = (import.meta.env.VITE_AMPS_ORDER_EXTRACT || '').trim()
+export const ORG_ALIASES = [ORG, ...(import.meta.env.VITE_AMPS_ORG_ALIASES || '').split('|')]
+  .map((a) => a.split(',')[0].trim()).filter(Boolean)
 // Words for the top grouping and its places. A rail network says line / station / depot;
 // the neutral demo is a multi-industry estate, so it says site / area / unit.
 export const W = LIVE && !OPERATOR

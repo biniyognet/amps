@@ -11,7 +11,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, OPERATOR, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
+import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -2776,21 +2776,13 @@ function AboutPage() {
           deployment this states the operator's ownership (per the departmental
           order); on the public demo the operator stays unnamed (no consent to name it). */}
       <div className="card about-dept">
-        {OPERATOR ? (
+        {OPERATOR && ORDER_REF ? (
           <>
             <h3>Departmental deployment</h3>
-            <p>
-              Deployed under Metro Railway office order
-              No.&nbsp;MRK/CPD/E&amp;M/Co-Ord/6746, dated 22&nbsp;July&nbsp;2026:
-            </p>
-            <blockquote className="about-extract">
-              “The licence files and notices of the open-source components shall
-              remain intact within the source code. All user-facing screens shall
-              display the name of Metro Railway, Kolkata, and all departmental
-              data, records and configuration entered in the application shall
-              remain the property of Metro Railway.”
-              <cite>— office order No.&nbsp;6746, 22.07.2026</cite>
-            </blockquote>
+            <p>Deployed under {ORG} office order {ORDER_REF}{ORDER_EXTRACT ? ':' : '.'}</p>
+            {ORDER_EXTRACT && (
+              <blockquote className="about-extract">“{ORDER_EXTRACT}”</blockquote>
+            )}
           </>
         ) : (
           <>
@@ -3132,6 +3124,7 @@ function CsFlatTable({ items }) {
 const CS_HEAD = { 'Half-Yearly': 'Half-Yearly', 'As Required': 'As Req.', '1000 operations': '1000 ops', '10000 operations': '10000 ops' }
 const CS_SPLIT_ROWS = 60
 const CS_PAGE_H_MM = 297 - 2 * 12.7        // A4 minus Word "Narrow" margins — keep in step with @page cs-std
+const csOrgKey = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
 const csTitleCase = (s) => s.toLowerCase().replace(/(^|[\s(,/-])(\w)/g, (m, a, b) => a + b.toUpperCase())
 
 function csStdRows(items) {
@@ -3243,7 +3236,9 @@ function ChecksheetSheet({ fmt, printFreq = '', layout = 'standard' }) {
   const rows = csStdRows(items)
   const split = (mode === 'standard' || mode === 'log') && rows.length > CS_SPLIT_ROWS
   const fullTitle = fmt.title || fmt.label
-  const m = fullTitle.match(/^(METRO RAILWAY[^—]*?)\s*—\s*(.*)$/i)
+  // "ORG — TITLE": split the org head off when it is this deployment's org (or an alias)
+  const m0 = fullTitle.match(/^([^—]+?)\s*—\s*(.*)$/)
+  const m = m0 && ORG_ALIASES.some((a) => csOrgKey(m0[1]).startsWith(csOrgKey(a))) ? m0 : null
   const org = csTitleCase(m ? m[1] : ORG).replace(/\s*,\s*/g, ', ')
   const title = (m ? m[2] : fullTitle).toUpperCase()
   const shown = mode === 'standard' ? sections : cols

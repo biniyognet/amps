@@ -2,7 +2,7 @@
    docked toolbar (search · mode stat-strip that filters · From · To), and each
    row carries an icon for its mode and for the people / offices on it. */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getJSON, useMe } from './api.js'
+import { ORG_ALIASES, getJSON, useMe } from './api.js'
 import { PdfPane } from './tenders.jsx'
 import { DWG_CSS, ViewControls } from './drawings.jsx'
 
@@ -11,6 +11,8 @@ const docUrl = (id) => `${API}/api/correspondence/${id}/file`
 export const letterHref = (id) => `#/letters/view?id=${id}`
 const isDrive = (l) => /drive\.google|docs\.google/.test(l || '')
 
+// the operator's own name (and aliases) trails many addressees — drop it from the key
+const ORG_TAIL = new RegExp(`\\s*(${ORG_ALIASES.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}).*$`, 'i')
 const DESIG = /((?:[Dd][Yy]\.?\s?|[Ss][Rr]\.?\s?|[Cc][Hh]\.?\s?)?\b[A-Z]{2,5}(?:\s?\/\s?[A-Za-z0-9&.\-]+){1,2})/
 const JUNK = /^=|^-+$|^_+$/
 
@@ -34,7 +36,7 @@ export function partyOf(raw) {
       if (!person && /^[A-Za-z. ]{4,40}$/.test(before)) person = before
     } else key = t.split(/[,;\n]/)[0].trim()
   }
-  key = key.replace(/\/(GREEN|GL)\b.*/i, '/GL').replace(/\s*(Metro Rail(way)?|Central Park Depot).*$/i, '')
+  key = key.replace(/\/(GREEN|GL)\b.*/i, '/GL').replace(ORG_TAIL, '')
     .toUpperCase().replace(/^M\/S\b/, 'M/s').slice(0, 30).trim()
   if (!key) return null
   return { key, person: person.replace(/\s+/g, ' ').trim(), label: t }

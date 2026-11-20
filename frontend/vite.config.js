@@ -24,19 +24,24 @@ const demoUnbrand = {
   name: 'amps-demo-unbrand',
   apply: 'build',
   transformIndexHtml: (html) => (!NEUTRAL ? html : html.replace('/operator-logo.svg', '/amps-bolt.svg')),
-  // neutral builds carry the org name, not the operator's, on checksheet titles
-  transform(code, id) {
-    if (!NEUTRAL || !/checksheets\.js$/.test(id)) return null
-    return code.replace(/METRO RAILWAY,\s*KOLKATA/g, ORG_UP)
-  },
   writeBundle(opts) {
     if (!NEUTRAL) return
     for (const f of DEMO_DROP) rmSync(resolve(opts.dir, f), { force: true, recursive: true })
   },
 }
 
+// checksheet titles carry an {{ORG}} token; the org name comes from VITE_AMPS_ORG
+// at build time (the office sets it in its untracked env), in dev and build alike
+const orgTitles = {
+  name: 'amps-org-titles',
+  transform(code, id) {
+    if (!/checksheets\.js$/.test(id)) return null
+    return code.replaceAll('{{ORG}}', ORG_UP)
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), demoUnbrand],
+  plugins: [react(), demoUnbrand, orgTitles],
   server: {
     proxy: {
       '/api': api,

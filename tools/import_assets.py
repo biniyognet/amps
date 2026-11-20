@@ -8,7 +8,7 @@ row passes the same validation and audit trail as manual entry.
 CSV columns (header row required, extra columns ignored, order free):
     code, name, asset_class, location                  required
     line, system, make_model, criticality, status      optional
-(`line` groups locations under a parent site — e.g. a metro line.)
+(`line` groups locations under a parent site — e.g. a rail line.)
 
 Example:
     python3 tools/import_assets.py register.csv --base-url http://localhost:8080

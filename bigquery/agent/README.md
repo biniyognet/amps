@@ -32,7 +32,7 @@ the live answers back: `bigquery/load.sh --agent`.
 | Q3 ★ | Failures by site and month | stacked bar / line | 178 failures, Jun 2025 → Nov 2026, four sites |
 | Q4 ★ | How many failures are still open, by station? | table | 19 open across 15 stations; Booster Station, Cable Gallery, Feeder Bay East, HV Yard North = 2 each |
 | Q5 | Which asset class takes longest to fix (MTTR)? | bar chart | Exhaust Fan 138 h, RTU 129 h, Raw Water Pump 95 h (1 not fixed, left out) |
-| Q6 | Per site: preventive maintenance done vs failures in the last 90 days | table | Eastern Grid 8 PM per failure (253 / 31) vs Metro 154 (1,078 / 7): the grid gets the least PM per failure |
+| Q6 | Per site: preventive maintenance done vs failures in the last 90 days | table | Eastern Grid 8 PM per failure (253 / 31) vs City Traction & Depot 154 (1,078 / 7): the grid gets the least PM per failure |
 
 ★ = the three pitch questions for the AI hub card.
 

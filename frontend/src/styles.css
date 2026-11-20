@@ -8,7 +8,7 @@
   /* Biniyog brand palette — shared with biniyog.net, biniSuite and
      biniCampaign. Anchors sampled from biniyog_logo_trademarked.png:
      #60CCF0 light · #0078B4 deep · #0B2A3F navy.
-     Was warm stone + amber; moved 2026-07-30 so AMPS/Metro sit in the
+     Was warm stone + amber; moved 2026-07-30 so AMPS sits in the
      same family as the rest of the ecosystem. */
   --bg: #F7FAFC;
   --surface: #ffffff;
@@ -3892,7 +3892,7 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
 .pm-out-a ul { margin: 2px 0 6px; padding-left: 18px; color: var(--ink-2); }
 .pm-out-k { margin: 6px 0 0; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
 
-/* network / line picker in the top header (metro 11-19) */
+/* network / line picker in the top header (11-19) */
 .topbar .nav > .site-pick { margin-right: 4px; }
 .topbar .site-pick .sp-back, .topbar .site-pick .sp-sel select { height: 30px; }
 .topbar .site-pick .sp-back { width: 30px; }
@@ -3900,7 +3900,7 @@ body:has(.lx) .site-art, body:has(.estate) .site-art { display: none; }
 @media (max-width: 700px) { .topbar .site-pick .sp-sel select { max-width: 130px; } }
 
 /* Guide: sidebar pinned to the page edge (lines up with the brand and the
-   dashboard), pages take the rest; sticky just under the topbar (metro 11-19) */
+   dashboard), pages take the rest; sticky just under the topbar (11-19) */
 @media (min-width: 761px) {
   .gd { max-width: none; margin: 0; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; }
   .gd-side { top: 62px; max-height: calc(100vh - 74px); overflow-y: auto; }

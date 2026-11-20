@@ -2,7 +2,7 @@
    presentation deck for the GM. Sub-pages are /guide?s=<id>; the deck is
    /guide?s=gm (arrow keys / buttons step the slides). */
 import { useEffect, useState } from 'react'
-import { LIVE, ORG, OPERATOR, getJSON, useMe } from './api.js'
+import { LIVE, ORG, OPERATOR, ORDER_REF, getJSON, useMe } from './api.js'
 import Brief from './brief.jsx'
 
 const SECTIONS = [
@@ -16,7 +16,7 @@ const SECTIONS = [
     ['users', 'Users & their access'],
   ]],
   ['Documents', [
-    ['order', 'Office order 6746 / 6747'],
+    ['order', 'Office order'],
     ['data', 'What AMPS records'],
   ]],
   ['Presentation', [
@@ -187,11 +187,10 @@ function Users() {
 
 function OrderDoc() {
   return (<>
-    <h1 className="docs-h1">Office order 6746 / 6747</h1>
+    <h1 className="docs-h1">Office order</h1>
     <section className="card docs-sec">
-      <p>AMPS was adopted for the department by office order
-        No.&nbsp;MRK/CPD/E&amp;M/Co-Ord/6746 (and 6747), dated 22&nbsp;July&nbsp;2026, which asks every line to bring
-        its assets and maintenance records on to it.</p>
+      <p>AMPS was adopted for the department by {ORG} office order {ORDER_REF || '(set VITE_AMPS_ORDER_REF)'},
+        which asks every line to bring its assets and maintenance records on to it.</p>
       <p><a href="#/about">Read the About page →</a></p>
     </section>
   </>)
@@ -294,7 +293,7 @@ function Deck() {
         <li>Daily logging by every depot, so dashboards reflect the real position.</li>
         <li>Per-person logins for every supervisor and technician who records work.</li>
       </ul>
-      <p className="gd-sub">Adopted by office order No. 6746 / 6747, dated 22.07.2026</p>
+      {ORDER_REF && <p className="gd-sub">Adopted by office order {ORDER_REF}</p>}
     </div>,
   ]
   const n = slides.length
