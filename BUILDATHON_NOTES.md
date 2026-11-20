@@ -190,6 +190,8 @@ Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes 
 
 AMPS must be able to run in production on any of these, so each client can get the cheapest host that works. All three use the same code; the database is picked by `DATABASE_URL` (`backend/app/db.py`).
 
+Admin login (Arup, 20 Nov): a simple admin key is fine for the prototype on **local and the laptop only**. Any public URL (Cloud Run, binihost) uses a generated password kept in Secret Manager, never the simple one.
+
 | Path | What runs where | State | Next |
 |---|---|---|---|
 | Local Postgres | `deploy/compose.yaml` (Postgres 16 + API + frontend) on the client's own box or the laptop | ✅ the laptop stack :8081 | — |
