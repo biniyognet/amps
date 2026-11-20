@@ -31,7 +31,7 @@ const COMPARE = [
   ['Rollout', 'Months, with an implementation partner', 'Weeks · import the old registers'],
   ['Field use', 'Desktop-first, built for planners', 'QR-first, any phone, built for technicians'],
   ['Your data', "In the vendor's format", 'Yours, in open PostgreSQL'],
-  ['AI', 'Add-on modules, if any', 'Gemini answers, photo → job card, AI maintenance plans'],
+  ['AI', 'Add-on modules, if any', 'Gemini answers, photo → job card, AI plans · Gemma on-prem fallback'],
 ]
 
 // The pitch deck as slide images (public/pitch/), stepped in the page.
@@ -42,7 +42,7 @@ const SLIDES = [
   'Snap & Report: a photo becomes a job card',
   'AI drafts the plan. A supervisor approves. The Planner runs it.',
   'Gemini turns the logbook into answers, job cards and early warnings',
-  'Where Gemini and Google Cloud do the work',
+  'Where Gemini, Gemma and Google Cloud do the work',
   'What we build with, and what runs in the product',
   'One register for every asset, every record, every device',
   'Every site’s PM compliance, at a glance',
@@ -78,7 +78,7 @@ const FAQ = [
   ['Do we need new hardware?', 'No. AMPS runs on one ordinary server or a small VM; staff use the phones and PCs they already have. Viewing needs no login.'],
   ['What happens to our old registers?', 'They are imported. Excel and scanned registers are migrated in during onboarding, so history starts on day one, not from zero.'],
   ['Where does our data live?', 'In your own PostgreSQL database, on your premises or your cloud. Nothing is locked in a vendor format; export is a SQL dump away.'],
-  ['Is the AI optional?', 'Yes. Every register, schedule and report works without it. Ask AMPS uses Gemini today; an on-premises model is an option for sites where no record may leave the building.'],
+  ['Is the AI optional?', 'Yes. Every register, schedule and report works without it. Gemini runs it in the cloud; Gemma runs on our own servers as a free fallback and for private search, so a site where no record may leave the building can keep the AI on-premises.'],
   ['How long does a rollout take?', 'Weeks, not months: import the old registers, tag the assets, start logging. No implementation partner needed.'],
   ['What does it cost?', 'The software is free (MIT). You pay only for what you choose: hosting, onboarding and tagging, support or custom features.'],
 ]
@@ -230,30 +230,38 @@ export default function Brief() {
           history and drafts the failure report and job card; the technician ticks what to raise and picks the agency.</li>
       </ul>
 
-      <h2><span>§3</span>Proof</h2>
+      <h2><span>§3</span>Hybrid AI</h2>
+      <p><b><i>Our Kubernetes runs the plant. Google is the brain. Gemma keeps it running on-prem.</i></b></p>
+      <ul>
+        <li><b>Gemini 3.5 Flash-Lite</b> (cloud) — reasoning, photo reading and function calls over the live records, at about $0.0003 a click.</li>
+        <li><b>Gemma 3 4B</b> (on-prem, Ollama on our own k3s GPU) — takes over free when Gemini errors or runs out of quota, so the AI never goes dark.</li>
+        <li><b>EmbeddingGemma</b> (on-prem) — 768-dim private search for similar past failures, in 100+ languages including Bengali; no record leaves the site.</li>
+      </ul>
+
+      <h2><span>§4</span>Proof</h2>
       <p>AMPS is not a prototype. It runs in production on a pilot power system in India: over 7,900 assets across five lines and
         230+ locations registered and tagged, and six years of maintenance and failure records (33,000+) migrated in.
         Overdue work and assets past design life are visible network-wide, the day they happen. The operator paid nothing for licences.
         This site runs the same code against four synthetic plant sites — City Traction &amp; Depot, Eastern Grid 132 kV Substation, City Water Treatment Plant and Bengal Steel &amp; Rolling Mill
         {net?.lines?.length ? <> ({n(net.lines.reduce((s, l) => s + (l.assets || 0), 0))} assets)</> : null}.</p>
 
-      <h2><span>§4</span>Legacy EAM (SAP PM-class) vs AMPS</h2>
+      <h2><span>§5</span>Legacy EAM (SAP PM-class) vs AMPS</h2>
       <table className="br-cmp"><thead><tr><th /><th>Legacy EAM</th><th>AMPS</th></tr></thead>
         <tbody>{COMPARE.map(([k, a, b]) => <tr key={k}><td>{k}</td><td>{a}</td><td>{b}</td></tr>)}</tbody></table>
       <p className="br-note">A comparison of product approach, not of any vendor’s pricing.</p>
 
-      <h2><span>§5</span>Open-core model</h2>
+      <h2><span>§6</span>Open-core model</h2>
       <p><b>Free licence. Paid hosting, support and Gemini AI, per site.</b> The framework is free forever under MIT — self-host it, fork it, keep it. Revenue comes from hosting,
         onboarding (asset tagging, migration of old registers), and support or custom features, delivered by biniDev.</p>
 
-      <h2><span>§6</span>Who it's for</h2>
+      <h2><span>§7</span>Who it's for</h2>
       <p>Transit (urban rail, rail depots, traction substations) · utilities (power, water, distribution) · factories ·
         large campuses — anyone with equipment that must not fail.</p>
 
-      <h2><span>§7</span>Questions buyers ask</h2>
+      <h2><span>§8</span>Questions buyers ask</h2>
       <dl className="br-faq">{FAQ.map(([q, a]) => <div key={q}><dt>{q}</dt><dd>{a}</dd></div>)}</dl>
 
-      <h2><span>§8</span>Team &amp; ask</h2>
+      <h2><span>§9</span>Team &amp; ask</h2>
       <p>Built by <b>Arup Biswas</b>, delivered by biniDev: <b>Arup Biswas</b>, Founder · <b>Nilanjan Chakraborty</b>, Co-founder ·
         Full-stack Developer. Supported by biniyog (partner).</p>
       <ul>
