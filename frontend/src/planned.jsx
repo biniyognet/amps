@@ -586,7 +586,7 @@ function AutoPlan({ onClose, onApproved }) {
   )
 }
 
-export function PlannedView({ initialView = 'tl' }) {
+export function PlannedView({ initialView = 'tl', initialAuto = false }) {
   const { canWrite } = useMe()
   const [cursor, setCursor] = useState(todayIso)
   const [span, setSpan] = useState('month')
@@ -606,7 +606,7 @@ export function PlannedView({ initialView = 'tl' }) {
   const [sel, setSel] = useState(() => new Set())
   const [modal, setModal] = useState(null)
   const [msg, setMsg] = useState('')
-  const [auto, setAuto] = useState(false)
+  const [auto, setAuto] = useState(initialAuto && !OPERATOR) // #/planner?auto=1 from the AI hub
   const [peekId, setPeekId] = useState(null)
   const [agencies, setAgencies] = useState([])     // [] = no register (or an older backend): plain contractor tally
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches)

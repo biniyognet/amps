@@ -31,6 +31,7 @@ import { GuideView } from './guide.jsx'
 import SnapReport, { SnapPrint, rememberNext } from './snap.jsx'
 import { LettersView, LetterViewer } from './letters.jsx'
 import { PlannedView } from './planned.jsx'
+import AiHub from './aihub.jsx'
 import { JobCardApproval } from './approval.jsx'
 
 const STATUS_LABEL = {
@@ -4608,6 +4609,7 @@ const NAV = LIVE ? [
   ['/failures', 'Failures'],
   ['/job-cards', 'Job cards'],
   ['/printables', 'More'],
+  ...(OPERATOR ? [] : [['/ai', '✦ AI']]),
   ['/guide', OPERATOR ? 'Guide' : 'Pitch'],
 ] : [
   ['/', 'Assets'],
@@ -4765,7 +4767,7 @@ function useNetworkGlance() {
 }
 
 /* Public demo only: the first screen leads with the problem, then the AI fix.
-   The clip is a real 30 s run on this demo (gemini-2.5-flash read the photo),
+   The clip is a real 30 s run on this demo (Gemini Flash read the photo),
    muted and looping; every claim here can be opened live from this page. */
 const SNAP_DEMO = 'MTD-CEN-HSC-01'
 function AiHero() {
@@ -4798,7 +4800,7 @@ function AiHero() {
         <video src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
                autoPlay muted loop playsInline preload="metadata" controls
                aria-label="30 second run: scan, photo, Gemini draft, job card, planner" />
-        <figcaption>A real run on this demo · gemini-2.5-flash · 30 s · synthetic data. Submitting needs a sign-in.</figcaption>
+        <figcaption>A real run on this demo · Gemini Flash · 30 s · synthetic data. Submitting needs a sign-in.</figcaption>
       </figure>
     </section>
   )
@@ -4854,6 +4856,7 @@ function Landing() {
       <header className="lx-bar">
         <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
         <nav className="lx-nav">
+          <a href="#/ai">✦ AI</a>
           <a href="#/guide">Pitch</a>
           <a href={dashHref()}>Dashboard</a>
           <a className="lx-signin" href="#/login">Sign in</a>
@@ -4879,7 +4882,7 @@ function Landing() {
             <video className="lx-vid" src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
                    autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
           </div>
-          <figcaption className="lx-cap">A real run on this demo · gemini-2.5-flash · 30 s</figcaption>
+          <figcaption className="lx-cap">A real run on this demo · Gemini Flash · 30 s</figcaption>
         </figure>
         </div>
         <div className="lx-rib"><Ribbon lines={lines} /></div>
@@ -4930,7 +4933,7 @@ function Landing() {
           </div>
           <ol className="lx-flow" aria-label="How a Snap travels">
             <li><small>Phone</small><b>Photo + rough note</b></li>
-            <li className="gem"><small><GemStar size={12} /> Google AI</small><b>gemini-2.5-flash</b></li>
+            <li className="gem"><small><GemStar size={12} /> Google AI</small><b>gemini-3.5-flash-lite</b></li>
             <li><small>Schema JSON</small><b>Report + job card</b></li>
             <li><small>Person</small><b>Checks and submits</b></li>
           </ol>
@@ -5395,7 +5398,7 @@ export default function App() {
   // The train artwork is mounted once, outside the page switch — it never
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
-  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && routePath !== '/sites' && routePath !== '/dash' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
+  const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && routePath !== '/ai' && routePath !== '/sites' && routePath !== '/dash' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
   const siteArt = (
     <img className={`site-art${onLanding && !OPERATOR ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
@@ -5416,6 +5419,7 @@ export default function App() {
           <nav className="nav">
             {!assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites' || onLanding} />}
             <AnonLineNav line={assetMatch ? null : navLine} active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : (routePath === '/sites' || routePath === '/dash' || onLanding || lineMatch) ? 'dash' : ''} />
+            {!OPERATOR && <a href="#/ai" className={routePath === '/ai' ? 'active' : ''}>✦ AI</a>}
             <a href="#/guide" className={routePath === '/guide' ? 'active' : ''}>{OPERATOR ? 'Guide' : 'Pitch'}</a>
             <a href="#/login" className="btn login-btn" title="Sign in" aria-label="Sign in">
               <svg className="li-ico" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
@@ -5423,6 +5427,7 @@ export default function App() {
           </nav>
         </header>
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
+          : routePath === '/ai' ? <AiHub />
           : routePath === '/sites' || onLanding ? <EstateView />
           : routePath === '/dash' ? <LineDashboard go={(r) => { location.hash = r }} />
           : failLine ? <LineFailures name={failLine} />
@@ -5476,7 +5481,8 @@ export default function App() {
         : letterMatch ? (LIVE ? <NotYet /> : <ProposalLetter prId={letterMatch[1]} />)
         : csMatch ? (LIVE ? <NotYet /> : <Checksheet kind={csMatch[1]} a1={csMatch[2]} a2={csMatch[3]} />)
         : jcMatch ? (LIVE ? <NotYet /> : <JobCard jcId={jcMatch[1]} />)
-        : routePath === '/planner' ? (LIVE ? <PlannedView initialView={routeQuery.get('view')} /> : <Planner />)
+        : routePath === '/planner' ? (LIVE ? <PlannedView initialView={routeQuery.get('view')} initialAuto={routeQuery.get('auto') === '1'} /> : <Planner />)
+        : routePath === '/ai' ? (LIVE ? <AiHub /> : <NotYet />)
         : routePath === '/roster' ? (LIVE ? <NotYet /> : <DutyRoster />)
         : routePath === '/log' ? <LogBook editId={routeQuery.get('edit')} focusDate={routeQuery.get('d')} initialResp={routeQuery.get('resp')} initialAsset={routeQuery.get('asset')} />
         /* legacy top-level /failures now redirects to the signed-in line's board */
