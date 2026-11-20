@@ -35,7 +35,7 @@
 
 ### Submit
 - [ ] Demo runs end to end (with a pre-loaded backup table, in case the venue Wi-Fi is slow)
-- [ ] Pitch deck + demo video/link
+- [~] Pitch deck ✅ drafted 20 Nov, 11 slides in rubric order (private claude.ai Slides link, Arup shares it; fill [team members] · [demo URL] · [contact]) · demo video/link still open
 - [ ] Submit on Hack2skill before 21 Nov 09:00
 
 ## 1b. Evaluation parameters & weightage (Hack2skill AI Evaluation slide, 20 Nov 11:06)
@@ -164,7 +164,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Hosting paths ready (§8) | crew | local PG ✅ · binihost ✅ · BigQuery ✅ data (sandbox) · AlloyDB = step 9 (merged fa1a6f6, not run on GCP) · Cloud SQL = not started · Cloud Run = step 10 |
 | AI hub steps 2–6 | crew | see §7 |
 | Backend default model in `backend/app/api/ai.py` and the k8s manifest still say `gemini-2.5-flash` | build | change with the next amps-api roll (not part of the buildathon frontend work) |
-| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | before 21 Nov 09:00 |
+| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | deck ✅ drafted 20 Nov (11 slides: cover, problem, solution, product 30%, Google AI 20%, architecture 20%, hosting, UX 10%, what is new 5%, demo, next) · Arup fills the 3 placeholders, shares the link, exports PDF if Hack2skill wants a file · video + submit before 21 Nov 09:00 |
 
 ## 7. Crew lanes (20 Nov 09:30 — freya leads, merges into `buildathon`)
 
