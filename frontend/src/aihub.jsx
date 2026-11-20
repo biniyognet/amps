@@ -28,9 +28,9 @@ const MCP_CONFIG = `{
 }`
 
 const ASK_CHIPS = [
-  'Which assets are overdue for maintenance?',
-  'पंप मोटर 1 का इतिहास बताइए',
-  'Open failures at Intake Pump House',
+  'Which assets are overdue for preventive maintenance?',
+  'पंप मोटर 1 (CWT-AM-MTR-01) का इतिहास बताइए',
+  'Open failures at City Water Treatment Plant',
 ]
 
 const Ico = ({ d }) => (
