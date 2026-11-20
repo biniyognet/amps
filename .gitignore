@@ -15,3 +15,6 @@ backend/app/data/
 bq_out/
 bq_out*.tgz
 pitch_out/
+
+# office-local overrides hold secrets — never commit
+deploy/compose.local.yaml
