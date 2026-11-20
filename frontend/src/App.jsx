@@ -188,9 +188,16 @@ function usePersistedState(key, initial) {
 
 // codes repeat across lines — schedule & failure lookups are keyed by line|code
 const assetKey = (a) => `${a.line || ''}|${a.code}`
+// F6 risk dot — red / amber / green, the top 3 reasons in the tooltip (no row from /api/risk = green)
+const RISK_WORD = { red: 'High risk', amber: 'Watch', green: 'Low risk' }
+function RiskDot({ r }) {
+  const lv = r?.level || 'green'
+  const why = r?.reasons?.length ? ` (score ${r.score}):\n· ${r.reasons.slice(0, 3).join('\n· ')}` : ' — no failures, in life, PM on time'
+  return <span className={`risk-dot r-${lv}`} role="img" aria-label={RISK_WORD[lv]} title={`${RISK_WORD[lv]}${why}`} />
+}
 
 function LiveDashboard({ go, initialLine = null }) {
-  const { assets: all, sched, openFail, loading, schedLoading, error } = useLiveAssets()
+  const { assets: all, sched, openFail, risk, loading, schedLoading, error } = useLiveAssets()
   const { me, canWrite } = useMe()
   const [line, setLine] = useState(initialLine)
   // multi-select state filter: an array of active bucket keys; empty = All.
@@ -211,6 +218,7 @@ function LiveDashboard({ go, initialLine = null }) {
   const [fDepot, setFDepot] = usePersistedState('reg.depot', '')
   const [fCritR, setFCrit] = usePersistedState('reg.crit', [])   // criticality quick chips A/B/C
   const fCrit = asArr(fCritR)
+  const [fRisk, setFRisk] = usePersistedState('reg.risk', '')   // F6 risk filter: '' | red | amber | hot (red+amber)
   const [sortKey, setSortKey] = usePersistedState('reg.sortKey', null)  // null = register order
   const [sortDir, setSortDir] = usePersistedState('reg.sortDir', 'asc')
   const [page, setPage] = useState(0)   // register pages 150 rows/page for speed
@@ -305,6 +313,7 @@ function LiveDashboard({ go, initialLine = null }) {
   // the sort accessor per column; PM columns read the derived schedule
   const sortVal = (a, k) => k === 'next_due' ? (sched[assetKey(a)]?.next_due || '9999')
     : k === 'pm' ? (SEV_RANK[dispState(a)] ?? 3)
+    : k === 'risk' ? -(risk[assetKey(a)]?.score || 0)   // ▲ = riskiest first
     : (a[k] || '')
   // base = everything the search + dropdown filters allow (state chip excluded),
   // so the chip counts reflect the current view and update as you filter
@@ -325,6 +334,11 @@ function LiveDashboard({ go, initialLine = null }) {
   const critN = { A: 0, B: 0, C: 0 }
   base.forEach((a) => { if (a.criticality in critN) critN[a.criticality] += 1 })
   if (fCrit.length) base = base.filter((a) => fCrit.includes(a.criticality))
+  // risk counts the view before its own filter too, like the criticality chips
+  const riskLv = (a) => risk[assetKey(a)]?.level || 'green'
+  const riskN = { red: 0, amber: 0 }
+  base.forEach((a) => { const l = riskLv(a); if (l in riskN) riskN[l] += 1 })
+  if (fRisk) base = base.filter((a) => fRisk === 'hot' ? riskLv(a) !== 'green' : riskLv(a) === fRisk)
   const overdueAll = base.filter((a) => stateOf(a) === 'overdue')
   const neverDone = overdueAll.filter((a) => dispState(a) === 'never')  // never once maintained
   const overdue = overdueAll.filter((a) => dispState(a) !== 'never')    // lapsed only (Overdue = overdue − never-done)
@@ -369,7 +383,7 @@ function LiveDashboard({ go, initialLine = null }) {
   // SL (serial) numbering — absolute position in the filtered set, so a printout
   // of a paged view still numbers continuously
   const rowOffset = printAll ? 0 : pageSafe * REG_PAGE
-  useEffect(() => { setPage(0) }, [filters.join(','), q, fSystem, fClass, fLocation, fStatus, fLocDet.join(','), fCrit.join(','), fCode, fName, sortKey, sortDir]) // eslint-disable-line
+  useEffect(() => { setPage(0) }, [filters.join(','), q, fSystem, fClass, fLocation, fStatus, fLocDet.join(','), fCrit.join(','), fRisk, fCode, fName, sortKey, sortDir]) // eslint-disable-line
 
   const toggleSort = (k) => {
     if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -547,6 +561,17 @@ function LiveDashboard({ go, initialLine = null }) {
                 <option key={k} value={k}>{`${k} · ${t} (${critN[k].toLocaleString()})`}</option>
               ))}
             </select>
+            <select className="crit-select risk-select" value={fRisk} aria-label="Filter by risk"
+                    title="Risk · failures in 12 months, open breakdown, age vs codal life, PM overdue"
+                    onChange={(e) => setFRisk(e.target.value)}>
+              <option value="">All risk</option>
+              <option value="red">{`● High (${riskN.red.toLocaleString()})`}</option>
+              <option value="amber">{`● Watch (${riskN.amber.toLocaleString()})`}</option>
+              <option value="hot">{`High + Watch (${(riskN.red + riskN.amber).toLocaleString()})`}</option>
+            </select>
+            <button type="button" className={`btn ghost sm risk-sort${sortKey === 'risk' ? ' active' : ''}`}
+                    title="Sort riskiest first (open breakdowns still float to the top)"
+                    onClick={() => toggleSort('risk')}>Risk{sortArrow('risk') || ' ⇅'}</button>
             {/* Class · Location · System · Status filters now live in the table
                 column headers (▾). Only depot stays here — it has no column. */}
             {depotsList.length > 0 && !me?.depot && (
@@ -555,9 +580,9 @@ function LiveDashboard({ go, initialLine = null }) {
                 {depotsList.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
-            {(fSystem.length || fClass.length || fLocation.length || fStatus.length || fLocDet.length || fCrit.length || fCode || fName || fDepot || q || filters.length || sortKey) && (
+            {(fSystem.length || fClass.length || fLocation.length || fStatus.length || fLocDet.length || fCrit.length || fRisk || fCode || fName || fDepot || q || filters.length || sortKey) && (
               <button type="button" className="btn ghost sm" onClick={() => {
-                setFSystem([]); setFClass([]); setFLocation([]); setFStatus([]); setFLocDet([]); setFCrit([]); setFCode(''); setFName(''); setFDepot(''); setQ(''); setFilter([]); setSortKey(null)
+                setFSystem([]); setFClass([]); setFLocation([]); setFStatus([]); setFLocDet([]); setFCrit([]); setFRisk(''); setFCode(''); setFName(''); setFDepot(''); setQ(''); setFilter([]); setSortKey(null)
               }}>Clear</button>
             )}
             <span className="asset-count">{shown.length} shown</span>
@@ -668,7 +693,7 @@ function LiveDashboard({ go, initialLine = null }) {
                           onKeyDown={(e) => e.key === 'Enter' && (regWide && a.code !== peekCode ? setPeek(a.code) : go(`/asset/${encodeURIComponent(a.code)}`))}>
                         <td className="sl-col">{rowOffset + i + 1}</td>
                         <td className="code" data-l="Code">{a.code}</td>
-                        <td data-l="Asset">{a.name}
+                        <td data-l="Asset"><RiskDot r={risk[assetKey(a)]} />{a.name}
                           {nOpen > 0 && <span className="fault-badge" title={`${nOpen} open breakdown${nOpen > 1 ? 's' : ''} — unresolved, no response logged yet`}>⚠ {nOpen} open</span>}
                           {nAck > 0 && <span className="fault-badge amber" title={`${nAck} acknowledged — noted (demand/mail) but STILL to be rectified`}>{nAck} acknowledged · to rectify</span>}
                           {nJob > 0 && <span className="fault-badge yellow" title={`${nJob} job card${nJob > 1 ? 's' : ''} raised — STILL to be rectified`}>{nJob} job card · to rectify</span>}

@@ -110,7 +110,7 @@ export function useLiveAssets() {
   // gate `schedLoading` — the list is browsable/searchable/sortable at once,
   // and PM-state columns + counts fill in a moment later. Aggregate views
   // (dashboards) wait on `schedLoading` since their numbers need the schedule.
-  const [state, set] = useState({ assets: [], sched: {}, openFail: {}, loading: LIVE, schedLoading: LIVE, error: null })
+  const [state, set] = useState({ assets: [], sched: {}, openFail: {}, risk: {}, loading: LIVE, schedLoading: LIVE, error: null })
   useEffect(() => {
     if (!LIVE) return undefined
     let alive = true
@@ -125,10 +125,12 @@ export function useLiveAssets() {
     Promise.all([
       getJSON('/api/maintenance/schedule').catch(() => []),
       getJSON('/api/logbook/open-failures-by-asset').catch(() => ({})),
-    ]).then(([sched, openFail]) => alive && set((s) => ({
+      getJSON('/api/risk').catch(() => []),   // F6 badge — only scored assets come back; no row = green
+    ]).then(([sched, openFail, risk]) => alive && set((s) => ({
       ...s,
       sched: Object.fromEntries(sched.map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
       openFail: openFail || {},
+      risk: Object.fromEntries((risk || []).map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
       schedLoading: false,
     })))
     return () => { alive = false }
