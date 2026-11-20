@@ -586,6 +586,8 @@ class AskOut(BaseModel):
     answer: str
     tools: list[dict]   # each lookup the model made: {tool, args} — shown under the answer
     model: str
+    provider: str          # who answered: "gemini" (AI Studio / Vertex) · "openai" · "gemma-onprem" (fallback)
+    fallback: bool = False # True when the primary model failed and the on-prem fallback answered
     plan: dict | None = None   # a maintenance-plan draft awaiting approval, if one was made
 
 
@@ -604,6 +606,7 @@ def ask(body: AskIn, request: Request, db: Session = Depends(get_db), user=Depen
     _throttle(ip)
     trace: list[dict] = []
     model = _model()
+    provider, fallback = ("gemini" if gemini_on() else PROVIDER), False
     try:
         if gemini_on():
             answer = _gemini(body.question, body.history, db, user, trace)
@@ -615,7 +618,7 @@ def ask(body: AskIn, request: Request, db: Session = Depends(get_db), user=Depen
             raise HTTPException(429 if code == 429 else 502,
                                 "The AI service is busy — please try again shortly.")
         trace.clear()
-        model = FALLBACK_MODEL
+        model, provider, fallback = FALLBACK_MODEL, "gemma-onprem", True
         try:
             answer = _openai(FALLBACK_URL, FALLBACK_MODEL, body.question, body.history, db, user, trace)
         except Exception:
@@ -630,7 +633,7 @@ def ask(body: AskIn, request: Request, db: Session = Depends(get_db), user=Depen
             plan = {"id": did, "scope": d["scope"], "count": len(d["changes"]),
                     "changes": [{k: v for k, v in r.items() if k != "asset_id"}
                                 for r in d["changes"][:60]]}
-    return AskOut(answer=answer, tools=trace, model=model, plan=plan)
+    return AskOut(answer=answer, tools=trace, model=model, provider=provider, fallback=fallback, plan=plan)
 
 
 @router.post("/plan/{draft_id}/apply")
