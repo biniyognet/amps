@@ -15,6 +15,7 @@ compose/k8s service either way.
 """
 import json
 import logging
+import os
 import signal
 import time
 
@@ -27,6 +28,27 @@ HB_TTL = 30
 POLL_TIMEOUT = 5
 
 _stop = False
+_blocking = None
+
+
+def _blocking_client():
+    """Own Redis client for BRPOP. The shared events client has a 1s socket
+    timeout (right for publish/cache), which a 5s BRPOP always overruns: every
+    poll raised "Timeout reading from socket", and a job the server handed out
+    as the client gave up could be lost. Read timeout here = poll + 5s."""
+    global _blocking
+    url = os.environ.get("AMPS_REDIS_URL")
+    if not url:
+        return None
+    if _blocking is None:
+        try:
+            import redis
+            _blocking = redis.Redis.from_url(url, socket_timeout=POLL_TIMEOUT + 5,
+                                             socket_connect_timeout=2)
+        except Exception as e:  # noqa: BLE001
+            log.warning("redis unavailable (%s)", e)
+            return None
+    return _blocking
 
 
 def _on_term(signum, frame):
@@ -63,7 +85,7 @@ def main():
     signal.signal(signal.SIGINT, _on_term)
     log.info("amps worker started (queue=%s)", QUEUE)
     while not _stop:
-        r = events.redis_client()
+        r = _blocking_client()
         if r is None:
             if int(time.time()) % 60 < POLL_TIMEOUT:  # don't spam the log every 5s
                 log.warning("AMPS_REDIS_URL not set/reachable — idling, nothing to pop")
