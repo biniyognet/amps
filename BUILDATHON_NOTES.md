@@ -169,6 +169,7 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 | 8 Gemini in BigQuery + Vertex, ready for billing | master-builder | `master-builder/vertex-bq` | Fault fields | ✅ merged 0551552 · billing day = `bigquery/gemini_go.sh --dry`, then `bigquery/gemini_go.sh` (refuses while billing is off); app: `AMPS_AI_PROVIDER=vertex` + `AMPS_VERTEX_PROJECT` in `deploy/.env`, add `-f deploy/compose.vertex.yaml` · not yet run against GCP · Fault fields flips after `failure_fields` runs |
 | 9 AlloyDB | minion | `minion/<topic>` | Similar (scale-up path) | ⏳ |
 | 10 Cloud Run (billing-gated) | ragnar | `ragnar/<topic>` | MCP (URL) | ⏳ |
+| 11 Demo wording sweep (Demo Industries demo dataset) | builder-1, master-builder | `builder-1/demo-wording`, `master-builder/demo-wording` | — | ✅ merged 2e87e43 (frontend + docs, `operator-logo.svg`) · 205f3ae `deploy/compose.local.yaml` out of git + ignored (a pull deletes the local copy, so back it up first) · 8c5b273 backend prose; checksheet titles headed by `AMPS_ORG`, new seeds only · branch names, README bio, seed line name wait for Arup |
 
 Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes never touch amps.binihost.com / amps-api. A "coming" card flips to live only after its branch is merged AND it works on :8081.
 
