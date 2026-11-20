@@ -13,5 +13,5 @@ Slide order follows the eval weights: product 30% · Google AI 20% · architectu
 | Architecture | Event-driven: every write and every sensor breach is an event; screens update live over a websocket, no polling. Growth path in-process → Redis → Pub/Sub/Kafka | `app/events.py`, `/api/ws` |
 | Product / new | ampsTalk: sensors, PLC gateways and meters talk to AMPS directly (HTTP or Pub/Sub push); an out-of-band reading files the failure itself | `backend/app/api/talk.py` |
 | Hosting | "Our Kubernetes runs the plant, Google is the brain": frontend + api + worker + Postgres/pgvector + Redis on binihost 3-node HA k3s at a fixed cost; Gemini (Vertex) thinks on every click, BigQuery/BQML learns from history every night; scores flow back live. Moves to GKE/AlloyDB with no code change | NOTES §5 (final) |
-| Economy | Flash-Lite for every click, BQ scans in MB, Cloud Run $0 idle; the whole build ran inside a $5 budget | NOTES §5 |
+| Economy | Flash-Lite for every click (~$0.0003), BQ in MB inside the free tier, free load jobs, compute on our fixed-cost cluster; the whole build ran inside a $5 budget | NOTES §5 |
 | Proof | In daily use at Kolkata Metro (decision B, 20 Nov) | — |
