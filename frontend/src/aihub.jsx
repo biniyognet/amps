@@ -4,7 +4,8 @@
 
 /* AI hub (#/ai): every AI feature on one page, each opening on a seeded
    example in one or two clicks and naming the Google product that does the
-   work. Four are live; four are planned for the buildathon and say so.
+   work. Seven are live; two are planned and say so. Voice chat sits on top:
+   ask in English, Bengali or Hindi by speaking, hear the answer back.
    The two-layer strip on top says which technique each feature uses and why
    it is the cheapest one that does the job. */
 import { useEffect, useState } from 'react'
@@ -45,6 +46,14 @@ const ASK_CHIPS = [
   'Open failures at City Water Treatment Plant',
 ]
 
+// say-it starters for the voice band: one per language, each a seeded story
+const VOICE_CHIPS = [
+  ['EN', 'Which asset fails the most?'],
+  ['বাং', 'কোন পাম্পের রক্ষণাবেক্ষণ বাকি আছে?'],
+  ['हिं', 'सिटी वॉटर में कौन से ब्रेकडाउन खुले हैं?'],
+]
+const GC = ['blue', 'red', 'yellow', 'green']
+
 const Ico = ({ d }) => (
   <svg className="aih-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor"
        strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>)
@@ -53,11 +62,12 @@ const Ico = ({ d }) => (
 // batch and gets better as the log book grows.
 const LAYERS = [
   { n: 1, name: 'Every click', sub: 'fast · cheap · explainable',
-    tech: ['RAG', 'Deterministic rules', 'Small model (Flash-Lite)', 'Voice to text', 'OCR / vision'],
+    tech: ['RAG', 'Deterministic rules', 'Small model (Flash-Lite)', 'Voice in + out', 'OCR / vision'],
     rows: [
+      ['Voice chat', 'Speak en / bn / hi, answer read back; speech stays in the browser'],
       ['Snap & Report', 'OCR / vision + voice + Flash-Lite'],
       ['Ask AMPS', 'RAG over our own records + Flash-Lite function calling'],
-      ['Similar past failures', 'RAG: Gemini embeddings, cosine match'],
+      ['Similar past failures', 'RAG: Gemini / EmbeddingGemma embeddings, cosine match'],
       ['PM plan', 'Deterministic scheduler; Gemini only explains it'],
       ['Risk badge', 'Deterministic rule score, three reasons'],
     ],
@@ -119,7 +129,7 @@ function Arch() {
       </header>
       <div className="aih-arch-map">
         <div className="aih-zone home">
-          <small>binihost · 3-node Kubernetes, high availability · fixed cost</small>
+          <small>binihost · 3-node Kubernetes, high availability · fixed cost · Gemma on-prem fallback</small>
           <div className="aih-row"><span>CDN · screens</span></div>
           <div className="aih-row"><span>api ×N <em>stateless</em></span><span className="bus">Redis · cache · queue · events</span><span>worker ×N <em>AI jobs</em></span></div>
           <div className="aih-row"><span>Postgres + pgvector <em>primary + replicas</em></span></div>
@@ -130,7 +140,8 @@ function Arch() {
         </div>
         <div className="aih-zone ggl">
           <small>Google · pay per use</small>
-          <div className="aih-row"><span>Gemini <em>Vertex AI · RAG · vision · voice · drafts</em></span></div>
+          <div className="aih-row"><span>Gemini 3.5 Flash-Lite <em>Gemini API · function calling · vision · drafts</em></span></div>
+          <div className="aih-row"><span>Cloud Run + Cloud SQL <em>this prototype · Secret Manager · Cloud Build</em></span></div>
           <div className="aih-row"><span>BigQuery + BQML <em>cleansed history · failure-risk model</em></span></div>
         </div>
       </div>
@@ -146,9 +157,9 @@ function Arch() {
   )
 }
 
-function Card({ icon, title, product, line, status, layer, children }) {
+function Card({ icon, title, product, line, status, layer, tone = 'blue', children }) {
   return (
-    <article className={`aih-card${status === 'coming' ? ' coming' : ''}`}>
+    <article className={`aih-card g-${tone}${status === 'coming' ? ' coming' : ''}`}>
       <header>
         <Ico d={icon} />
         {layer && <span className="aih-lt">L{layer}</span>}
@@ -159,6 +170,30 @@ function Card({ icon, title, product, line, status, layer, children }) {
       <p className="aih-line">{line}</p>
       <div className="aih-act">{children}</div>
     </article>
+  )
+}
+
+function VoiceBand({ on }) {
+  const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+  return (
+    <section className="aih-voice" aria-label="Voice chat">
+      <div className="aih-voice-mic" aria-hidden="true"><span /><span /><span /><span /></div>
+      <div className="aih-voice-txt">
+        <span className="aih-ln">New · Voice chat</span>
+        <h2>Talk to your plant. In your own language.</h2>
+        <p>Tap 🎤 in Ask AMPS, pick EN, বাং or हिं and just say it. Gemini looks the answer up in the live records
+          and AMPS reads it back. On the floor, with gloves on, nobody has to type. The Snap remark mic speaks all three too.</p>
+        <div className="aih-voice-chips">
+          {VOICE_CHIPS.map(([l, q]) => (
+            <button key={q} type="button" className="aih-chip" disabled={!on} onClick={() => ask(q)}><b>{l}</b> {q}</button>
+          ))}
+        </div>
+        <small className="aih-voice-note">
+          {SR ? 'Speech-to-text and read-aloud run in this browser (Web Speech API); only the text goes to Gemini.'
+            : 'This browser has no speech recogniser; open in Chrome on Android or desktop to speak. Typing works everywhere.'}
+        </small>
+      </div>
+    </section>
   )
 }
 
@@ -182,9 +217,10 @@ export default function AiHub() {
       <style>{AIH_CSS}</style>
       <header className="aih-head">
         <div>
-          <span className="aih-kick">✦ Built on Google AI</span>
+          <span className="aih-kick">✦ Built on Google AI · Gemini · Cloud Run</span>
           <h1>AI in AMPS</h1>
-          <p>Pick any feature. Each one opens on a real example from this demo, and says which Google product does the work.</p>
+          <p>Pick any feature. Each one opens on a real example from this demo and names the Google product doing the work.
+            AI drafts; a person signs.</p>
         </div>
         <div className={`aih-model${on ? '' : ' off'}`} role="status">
           <small>Model on this server</small>
@@ -193,50 +229,51 @@ export default function AiHub() {
         </div>
       </header>
 
+      <VoiceBand on={on} />
       <Layers />
 
       <section className="aih-grid" aria-label="AI features">
-        <Card status="live" layer={1} title="Snap & Report" product="Flash-Lite · OCR / vision + voice"
+        <Card tone="blue" status="live" layer={1} title="Snap & Report" product="Flash-Lite · OCR / vision + voice (EN · বাং · हिं)"
               icon="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
               line="Photo and a rough note in; a drafted failure report and job card out. A person submits.">
           <a className="aih-btn pri" href={`#/snap/${SNAP_DEMO}`}>Try on HSCB Panel 1 →</a>
         </Card>
-        <Card status="live" layer={1} title="Ask AMPS" product="RAG + function calling · 6 read-only tools"
+        <Card tone="red" status="live" layer={1} title="Ask AMPS" product="RAG + function calling · 6 tools · 🎤 voice"
               icon="M4 5h16v11H9l-5 4zM8 9h8M8 12h5"
-              line="Plain questions in English, हिन्दी or বাংলা. It looks the records up and shows which ones it used.">
+              line="Type or speak plain questions in English, हिन्दी or বাংলা. It looks the records up, shows which ones it used, and can read the answer aloud.">
           <div className="aih-chips">
             {ASK_CHIPS.map((q) => <button key={q} type="button" className="aih-chip" disabled={!on} onClick={() => ask(q)}>{q}</button>)}
           </div>
         </Card>
-        <Card status="live" layer={1} title="PM plan" product="Deterministic scheduler · Gemini explains"
+        <Card tone="yellow" status="live" layer={1} title="PM plan" product="Deterministic scheduler · Gemini explains"
               icon="M4 5h16v15H4zM4 9h16M9 3v4M15 3v4M8 14l2 2 4-4"
               line="Lays due and overdue PM onto the week and finds the gaps. The supervisor approves each change.">
           <a className="aih-btn pri" href={planHref} onClick={() => { if (!signedIn) rememberNext('/planner?auto=1') }}>
             {signedIn ? 'Draft this week →' : 'Sign in to draft →'}</a>
         </Card>
-        <Card status="live" layer={1} title="MCP server" product="Model Context Protocol · Agent Skills"
+        <Card tone="green" status="live" layer={1} title="MCP server" product="Model Context Protocol · Agent Skills"
               icon="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"
               line="Any agent, Antigravity or others, can use AMPS through the same six tools, read-only.">
           <button type="button" className="aih-btn pri" aria-expanded={mcp} onClick={() => setMcp((v) => !v)}>
             {mcp ? 'Hide the tools' : 'See the 6 tools'}</button>
         </Card>
 
-        <Card status="live" layer={1} title="Similar past failures" product="RAG · gemini-embedding-001"
+        <Card tone="blue" status="live" layer={1} title="Similar past failures" product="RAG · gemini-embedding-001 · EmbeddingGemma on-prem"
               icon="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"
               line="Before the panel is opened, AMPS shows what fixed the same fault last time. Example: Pump Motor 1.">
           <a className="aih-btn pri" href={`#/asset/${SIMILAR_DEMO}`}>Seen before on Pump Motor 1 →</a>
         </Card>
-        <Card status="coming" layer={2} title="Fault fields" product="BigQuery AI.EXTRACT · Flash-Lite"
+        <Card tone="red" status="coming" layer={2} title="Fault fields" product="BigQuery AI.EXTRACT · Flash-Lite"
               icon="M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3"
               line="Free-text remarks in three languages become columns you can count: component, symptom, cause, action.">
           <span className="aih-btn ghost" aria-disabled="true">10 remarks · coming</span>
         </Card>
-        <Card status="coming" layer={2} title="Estate agent" product="BigQuery Conversational Analytics"
+        <Card tone="yellow" status="coming" layer={2} title="Estate agent" product="BigQuery Conversational Analytics"
               icon="M4 20V10M10 20V4M16 20v-7M22 20H2"
               line="Managers ask the whole estate in English and get charts back, from the amps_demo dataset.">
           <span className="aih-btn ghost" aria-disabled="true">Open agent ↗ · coming</span>
         </Card>
-        <Card status="live" layer={1} title="Risk badge" product="Deterministic rule score · BigQuery ML next"
+        <Card tone="green" status="live" layer={1} title="Risk badge" product="Deterministic rule score · BigQuery ML next"
               icon="M12 3l9 16H3zM12 9v4M12 16v.5"
               line="Red means old, failing again and PM late, with the three reasons why. Example: Pump Motor 1 red, PTR 1 amber.">
           <a className="aih-btn pri" href="#/assets" onClick={openAtRisk}>See the assets at risk →</a>
@@ -378,4 +415,52 @@ const AIH_CSS = `
   .aih-head h1 { font-size: 24px; }
   .aih-model { max-width: none; width: 100%; }
 }
+/* Google palette: each card / layer carries one of the four colours */
+.aih { --g-blue: #1A73E8; --g-red: #EA4335; --g-yellow: #FBBC04; --g-green: #34A853;
+  --g-blue-t: rgba(26,115,232,.10); --g-red-t: rgba(234,67,53,.10); --g-yellow-t: rgba(251,188,4,.14); --g-green-t: rgba(52,168,83,.11);
+  --g-blue-i: #1967D2; --g-red-i: #C5221F; --g-yellow-i: #B06000; --g-green-i: #188038; }
+.aih-kick { background: linear-gradient(90deg, var(--g-blue), var(--g-red) 35%, var(--g-yellow) 65%, var(--g-green)); -webkit-background-clip: text; background-clip: text; }
+.aih-card.g-blue { --gc: var(--g-blue); --gt: var(--g-blue-t); --gi: var(--g-blue-i); }
+.aih-card.g-red { --gc: var(--g-red); --gt: var(--g-red-t); --gi: var(--g-red-i); }
+.aih-card.g-yellow { --gc: var(--g-yellow); --gt: var(--g-yellow-t); --gi: var(--g-yellow-i); }
+.aih-card.g-green { --gc: var(--g-green); --gt: var(--g-green-t); --gi: var(--g-green-i); }
+.aih-card { box-shadow: none; border-top: 4px solid var(--gc); }
+.aih-card .aih-ico { color: var(--gi); background: var(--gt); }
+.aih-card .aih-prod { color: var(--gi); }
+.aih-card .aih-btn.pri { background: var(--gc); border-color: var(--gc); }
+.aih-card.g-yellow .aih-btn.pri { color: #202124; }
+.aih-card .aih-chip { border-color: var(--gt); background: var(--gt); }
+.aih-card.coming { border-top-style: dashed; }
+.aih-layer { border-top-color: var(--g-blue); }
+.aih-ln { background: var(--g-blue); }
+.aih-tech span { border-color: rgba(26,115,232,.3); background: var(--g-blue-t); }
+.aih-layer.l2 { border-top-color: var(--g-green); }
+.aih-layer.l2 .aih-ln { background: var(--g-green); }
+.aih-layer.l2 .aih-tech span { border-color: rgba(52,168,83,.35); background: var(--g-green-t); }
+.aih-arch { border-top: 0; position: relative; overflow: hidden; }
+.aih-arch::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: linear-gradient(90deg, var(--g-blue) 0 25%, var(--g-red) 25% 50%, var(--g-yellow) 50% 75%, var(--g-green) 75%); }
+.aih-zone.ggl { border-color: rgba(26,115,232,.45); }
+.aih-zone.ggl .aih-row span { background: var(--g-blue-t); border-color: rgba(26,115,232,.3); }
+.aih-flow li.gem { border-color: var(--g-blue); }
+.aih-flow li.gem b { color: var(--g-blue-i); }
+.aih-voice { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; padding: 22px; border-radius: var(--r-lg);
+  border: 1px solid var(--border); background: var(--card-bg); backdrop-filter: var(--card-blur); position: relative; overflow: hidden; }
+.aih-voice::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: linear-gradient(90deg, var(--g-blue) 0 25%, var(--g-red) 25% 50%, var(--g-yellow) 50% 75%, var(--g-green) 75%); }
+.aih-voice-mic { display: flex; align-items: center; gap: 6px; height: 64px; padding: 0 18px; border-radius: 999px; background: var(--g-blue-t); }
+.aih-voice-mic span { width: 9px; border-radius: 9px; animation: aih-wave 1.1s ease-in-out infinite; }
+.aih-voice-mic span:nth-child(1) { background: var(--g-blue); height: 22px; }
+.aih-voice-mic span:nth-child(2) { background: var(--g-red); height: 40px; animation-delay: .15s; }
+.aih-voice-mic span:nth-child(3) { background: var(--g-yellow); height: 30px; animation-delay: .3s; }
+.aih-voice-mic span:nth-child(4) { background: var(--g-green); height: 18px; animation-delay: .45s; }
+@keyframes aih-wave { 50% { transform: scaleY(.45); } }
+@media (prefers-reduced-motion: reduce) { .aih-voice-mic span { animation: none; } }
+.aih-voice-txt { display: flex; flex-direction: column; gap: 8px; }
+.aih-voice h2 { margin: 0; font-size: 20px; color: var(--ink); text-wrap: balance; }
+.aih-voice p { margin: 0; font-size: 13.5px; color: var(--ink-2); max-width: 80ch; line-height: 1.5; }
+.aih-voice-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.aih-voice-chips .aih-chip b { color: var(--g-blue-i); margin-right: 4px; }
+.aih-voice-note { font-size: 11.5px; color: var(--ink-3); }
+@media (max-width: 760px) { .aih-voice { grid-template-columns: 1fr; } .aih-voice-mic { justify-self: start; height: 48px; } }
 `

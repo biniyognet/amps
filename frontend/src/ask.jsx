@@ -4,6 +4,7 @@
 // surface. Hidden entirely when the deployment has no model configured.
 import { useEffect, useRef, useState } from 'react'
 import { API, useMe } from './api'
+import { useDictation, useSpeaker, useVoiceLang, LangPick } from './voice.jsx'
 
 // Three starters, each lands on a seeded demo story. The tools filter by site (not
 // by location) and need a code for one asset's history, so the chips name both.
@@ -132,6 +133,10 @@ export default function AskAmps() {
   const { canWrite } = useMe()
   const end = useRef(null)
   const input = useRef(null)
+  const [lang, setLang] = useVoiceLang()
+  const voiced = useRef(false) // last question was spoken -> read the answer aloud
+  const speaker = useSpeaker()
+  const mic = useDictation((t) => { voiced.current = true; setQ(''); ask(t) }, lang, setQ)
 
   useEffect(() => {
     fetch(`${API}/api/ai/status`).then(r => r.ok ? r.json() : null)
@@ -163,9 +168,11 @@ export default function AskAmps() {
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.detail || 'The assistant could not answer just now.')
       setMsgs(m => [...m, { role: 'assistant', text: j.answer, tools: j.tools, model: j.model, provider: j.provider, fallback: j.fallback, plan: j.plan }])
+      if (voiced.current) speaker?.speak(j.answer, msgs.length + 1)
     } catch (e) {
       setMsgs(m => [...m, { role: 'assistant', text: e.message, error: true }])
     } finally {
+      voiced.current = false
       setBusy(false)
     }
   }
@@ -184,13 +191,14 @@ export default function AskAmps() {
               <b>Ask AMPS</b>
               <small>Answers from the live records · {status.model}</small>
             </div>
-            <button onClick={() => setOpen(false)} aria-label="Close">×</button>
+            <button onClick={() => { speaker?.stop(); setOpen(false) }} aria-label="Close">×</button>
           </header>
           <div className="ask-body">
             {!msgs.length && (
               <div className="ask-intro">
                 <p>Ask about your assets in plain words — English, हिन्दी or বাংলা. Every answer is
                   looked up in the register, PM schedule and failure log; nothing is made up.</p>
+                {mic && <p className="ask-voice-tip">🎤 Or just say it: pick a language below, tap the mic, ask. The answer is read back to you.</p>}
                 <div className="ask-chips">
                   {SUGGEST.map(s => <button key={s} onClick={() => ask(s)}>{s}</button>)}
                 </div>
@@ -206,14 +214,24 @@ export default function AskAmps() {
                   </small>
                 )}
                 {m.model && <ModelChip model={m.model} provider={m.provider} fallback={m.fallback} />}
+                {speaker && m.role === 'assistant' && !m.error && (
+                  <button type="button" className={`ask-say${speaker.speaking === i ? ' on' : ''}`}
+                          onClick={() => speaker.speaking === i ? speaker.stop() : speaker.speak(m.text, i)}
+                          aria-label={speaker.speaking === i ? 'Stop reading' : 'Read aloud'}>
+                    {speaker.speaking === i ? '■ Stop' : '🔊 Listen'}</button>
+                )}
               </div>
             ))}
             {busy && <div className="ask-msg assistant busy"><span /><span /><span /></div>}
             <div ref={end} />
           </div>
+          {mic && <div className="ask-voicebar"><LangPick lang={lang} setLang={setLang} />
+            <small>{mic.on ? 'Listening…' : 'Voice: speak in English, বাংলা or हिन्दी'}</small></div>}
           <form className="ask-input" onSubmit={e => { e.preventDefault(); ask() }}>
+            {mic && <button type="button" className={`ask-mic${mic.on ? ' on' : ''}`} onClick={() => { speaker?.stop(); mic.toggle() }}
+              disabled={busy} aria-label={mic.on ? 'Stop listening' : 'Speak your question'}>🎤</button>}
             <input ref={input} value={q} onChange={e => setQ(e.target.value)} maxLength={500}
-              placeholder="e.g. Which pumps are overdue at City Water?" />
+              placeholder={mic?.on ? 'Listening…' : 'e.g. Which pumps are overdue at City Water?'} />
             <button disabled={busy || !q.trim()}>Ask</button>
           </form>
         </section>

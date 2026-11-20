@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { API, ORG, getJSON, useLiveAsset, useMe } from './api.js'
 import { compressImage } from './logbook.jsx'
 import QR, { assetUrl } from './qr.jsx'
+import { useDictation, useSpeaker, useVoiceLang, LangPick } from './voice.jsx'
 
 const SEVERITIES = ['low', 'med', 'high', 'critical']
 const SEV_LABEL = { low: 'Low', med: 'Medium', high: 'High', critical: 'Critical' }
@@ -59,24 +60,6 @@ async function postJSON(path, body) {
 
 export const rememberNext = (hash) => { try { sessionStorage.setItem('amps-next', hash) } catch { /* private mode */ } }
 
-/* Dictation through the browser's Web Speech API — Chrome on Android has it;
-   where it doesn't exist the mic button simply isn't shown. */
-function useDictation(onText) {
-  const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
-  const [on, setOn] = useState(false)
-  const rec = useRef(null)
-  const toggle = () => {
-    if (on) { rec.current?.stop(); return }
-    const r = new SR()
-    r.lang = 'en-IN'; r.interimResults = false; r.continuous = false
-    r.onresult = (e) => onText([...e.results].map((x) => x[0].transcript).join(' '))
-    r.onend = () => setOn(false)
-    r.onerror = () => setOn(false)
-    rec.current = r; r.start(); setOn(true)
-  }
-  return SR ? { on, toggle } : null
-}
-
 export default function SnapReport({ code }) {
   const { asset: a, log, loading, error } = useLiveAsset(code)
   const { canWrite, loading: meLoading } = useMe()
@@ -93,7 +76,9 @@ export default function SnapReport({ code }) {
   const [err, setErr] = useState('')
   const [result, setResult] = useState(null)
   const fileRef = useRef(null)
-  const mic = useDictation((t) => setRemarks((r) => (r ? `${r} ${t}` : t)))
+  const [lang, setLang] = useVoiceLang()
+  const mic = useDictation((t) => setRemarks((r) => (r ? `${r} ${t}` : t)), lang)
+  const speaker = useSpeaker()
 
   useEffect(() => {
     if (!canWrite) return
@@ -227,6 +212,7 @@ export default function SnapReport({ code }) {
                         title={mic.on ? 'Stop dictation' : 'Dictate'} aria-label="Dictate remark">🎤</button>
               )}
             </div>
+            {mic && stage === 'input' && <LangPick lang={lang} setLang={setLang} />}
 
             {stage === 'input' && (
               <button type="button" className="btn snap-go" onClick={analyse}
@@ -242,6 +228,15 @@ export default function SnapReport({ code }) {
                 {meta.model && (
                   <span className="snap-model">{meta.model}{meta.vision ? ' · read the photo' : ' · text only'}
                     {draft.confidence != null ? ` · confidence ${Math.round(draft.confidence * 100)}%` : ''}</span>
+                )}
+                {speaker && meta.model && (
+                  <button type="button" className="ask-say"
+                          onClick={() => speaker.speaking ? speaker.stop() : speaker.speak(
+                            [draft.summary, draft.likely_cause && `Likely cause: ${draft.likely_cause}`,
+                             draft.suggested_action && `Action: ${draft.suggested_action}`,
+                             draft.safety_note && `Safety: ${draft.safety_note}`].filter(Boolean).join('. '), 'draft')}
+                          aria-label={speaker.speaking ? 'Stop reading' : 'Read the draft aloud'}>
+                    {speaker.speaking ? '■ Stop' : '🔊 Listen'}</button>
                 )}
               </div>
               {gearMissing.length > 0 && (
