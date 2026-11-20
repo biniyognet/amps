@@ -25,6 +25,7 @@ Standard library only (urllib) — no new dependency.
 """
 import json
 import os
+import re
 import secrets
 import time
 import urllib.error
@@ -464,11 +465,31 @@ def _run_tool(name, args, db, user):
         return {"error": f"{type(e).__name__}: {e}"}
 
 
-def _post(url, body, headers):
-    req = urllib.request.Request(url, data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json", **headers})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-        return json.loads(r.read())
+def _post(url, body, headers, retries=2):
+    """POST JSON. A 503/429 (model overloaded / rate-limited, routine on the
+    shared Gemini tier at peak) is retried twice with a short backoff before it
+    surfaces — one busy second shouldn't fail a technician's click."""
+    data = json.dumps(body).encode()
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, data=data,
+                                     headers={"Content-Type": "application/json", **headers})
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 503) or attempt == retries:
+                raise
+            time.sleep(1.5 * (attempt + 1))
+
+
+def thinking_off(model: str | None = None) -> dict:
+    """thinkingConfig for the cheapest/fastest reasoning. Gemini 3.x rejects
+    thinkingBudget=0 (400 INVALID_ARGUMENT) and takes thinkingLevel instead;
+    2.5 keeps the budget form."""
+    m = (model or GEMINI_MODEL).split("/")[-1]
+    if re.match(r"gemini-[3-9]", m):
+        return {"thinkingLevel": "minimal"}
+    return {"thinkingBudget": 0}
 
 
 def gemini_target(model: str, method: str = "generateContent") -> tuple[str, dict]:

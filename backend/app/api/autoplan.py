@@ -261,7 +261,7 @@ def _gemini_explain(board, backlog, basis) -> str:
     resp = ai.gemini_generate({
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 600,
-                             "thinkingConfig": {"thinkingBudget": 0}},
+                             "thinkingConfig": ai.thinking_off()},
     })
     parts = (resp.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
     return "".join(p.get("text", "") for p in parts).strip()

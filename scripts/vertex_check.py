@@ -70,7 +70,7 @@ def main():
     try:
         r = ai.gemini_generate({"contents": [{"role": "user", "parts": [{"text": "Reply with the word OK."}]}],
                                 "generationConfig": {"temperature": 0, "maxOutputTokens": 5,
-                                                     "thinkingConfig": {"thinkingBudget": 0}}})
+                                                     "thinkingConfig": ai.thinking_off()}})
         parts = (r.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
         print(f"LIVE generate {ai.GEMINI_MODEL}: {''.join(p.get('text', '') for p in parts).strip()!r}"
               f"  (token from {vertex.token_source()})")

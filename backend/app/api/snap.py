@@ -163,7 +163,7 @@ def _gemini_draft(prompt: str, photo: tuple[bytes, str] | None) -> dict:
         "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024,
                              "responseMimeType": "application/json", "responseSchema": SCHEMA,
-                             "thinkingConfig": {"thinkingBudget": 0}},
+                             "thinkingConfig": ai.thinking_off()},
     })
     out = (resp.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
     return json.loads("".join(p.get("text", "") for p in out))

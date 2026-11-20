@@ -14,6 +14,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
+# exporters the worker's bq.export job loads by path (app/jobs.py → /scripts)
+COPY scripts/*.py /scripts/
 
 EXPOSE 8000
 CMD ["sh", "-c", "if [ \"$AMPS_SEED_ON_START\" = \"1\" ]; then python seed.py; fi; exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
