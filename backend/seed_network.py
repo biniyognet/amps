@@ -623,5 +623,30 @@ def _stories(db, crews) -> int:
     return n
 
 
+def add_stories():
+    """Adds the AI demo stories to an already-seeded DB, keeping every other row.
+    Safe to re-run: does nothing once the first story is in."""
+    init_db()
+    db = SessionLocal()
+    try:
+        if db.scalar(select(LogEntry).where(LogEntry.text == STORIES[0][4])):
+            print("AI demo stories already in — nothing to do.")
+            return
+        crews: dict[str, list[str]] = {}
+        for name, *_ in LINES:
+            site = db.scalar(select(Location).where(Location.kind == LocationKind.SITE,
+                                                    Location.name == name))
+            if site:
+                crews[name] = list(db.scalars(select(User.full_name).where(
+                    User.line_id == site.id,
+                    User.role.in_([UserRole.SUPERVISOR, UserRole.TECHNICIAN]))))
+        n = _stories(db, crews)
+        db.commit()
+        print(f"AI demo stories: {n} failures added, existing data kept.")
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
-    seed()
+    import sys
+    add_stories() if "--stories" in sys.argv else seed()
