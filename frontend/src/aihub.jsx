@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { API, useMe } from './api.js'
 import { rememberNext } from './snap.jsx'
+import { useLiveStatus } from './live.jsx'
 
 const SNAP_DEMO = 'MTD-CEN-HSC-01'
 const SIMILAR_DEMO = 'CWT-AM-MTR-01'
@@ -82,6 +83,65 @@ function Layers() {
           <p className="aih-econ"><b>Economy:</b> {l.econ}</p>
         </article>
       ))}
+    </section>
+  )
+}
+
+// How it's built: binihost runs everything, Google is the brain (BUILDATHON_NOTES §5, final).
+// The proof tiles read this server, not a script: socket state and the cache header.
+const PROBE = '/api/lines'
+
+function useCacheProbe() {
+  const [r, setR] = useState(null)
+  useEffect(() => {
+    let dead = false
+    const once = async () => {
+      const t = performance.now()
+      const res = await fetch(`${API}${PROBE}`, { credentials: 'include' })
+      await res.arrayBuffer()
+      return { ms: Math.round(performance.now() - t), hdr: res.headers.get('X-AMPS-Cache') }
+    }
+    // two reads: the second is the one a busy screen gets
+    once().then(() => once()).then((v) => { if (!dead) setR(v) }).catch(() => { if (!dead) setR({ err: true }) })
+    return () => { dead = true }
+  }, [])
+  return r
+}
+
+function Arch() {
+  const live = useLiveStatus()
+  const probe = useCacheProbe()
+  return (
+    <section className="aih-arch" aria-label="How AMPS is built">
+      <header>
+        <span className="aih-ln">Architecture</span>
+        <h2>Our Kubernetes runs the plant. Google is the brain.</h2>
+      </header>
+      <div className="aih-arch-map">
+        <div className="aih-zone home">
+          <small>binihost · 3-node Kubernetes, high availability · fixed cost</small>
+          <div className="aih-row"><span>CDN · screens</span></div>
+          <div className="aih-row"><span>api ×N <em>stateless</em></span><span className="bus">Redis · cache · queue · events</span><span>worker ×N <em>AI jobs</em></span></div>
+          <div className="aih-row"><span>Postgres + pgvector <em>primary + replicas</em></span></div>
+        </div>
+        <div className="aih-links">
+          <span><b>every click</b> →</span>
+          <span><b>nightly learn</b> ⇄ <i>scores back live</i></span>
+        </div>
+        <div className="aih-zone ggl">
+          <small>Google · pay per use</small>
+          <div className="aih-row"><span>Gemini <em>Vertex AI · RAG · vision · voice · drafts</em></span></div>
+          <div className="aih-row"><span>BigQuery + BQML <em>cleansed history · failure-risk model</em></span></div>
+        </div>
+      </div>
+      <div className="aih-proof">
+        <div className={live ? 'on' : ''}><small>Live events</small><b>{live ? 'Websocket on' : 'Websocket off'}</b><span>Screens update without polling</span></div>
+        <div className={probe?.hdr === 'hit' ? 'on' : ''}><small>Read cache</small>
+          <b>{!probe ? 'measuring…' : probe.err ? 'unreachable' : `${probe.hdr || 'n/a'} · ${probe.ms} ms`}</b>
+          <span>Second read of {PROBE}, from Redis</span></div>
+        <div><small>Learning layer</small><b>BigQuery ML</b><span>Trains weekly, scores nightly, pushed back to every screen</span></div>
+      </div>
+      <p className="aih-econ"><b>No lock-in:</b> the same containers move to GKE, and pgvector moves to AlloyDB, with no code change.</p>
     </section>
   )
 }
@@ -205,6 +265,8 @@ export default function AiHub() {
         <li><small>Schema JSON</small><b>Report + job card</b></li>
         <li><small>Person</small><b>Checks and submits</b></li>
       </ol>
+      <Arch />
+
       <p className="aih-guard">Guardrail: nothing is saved until a person approves it. Demo Industries data only, all synthetic.</p>
     </main>
   )
@@ -282,6 +344,33 @@ const AIH_CSS = `
 .aih-flow li.gem { border-color: #9B72CB; }
 .aih-flow li.gem b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #6B4FB0; }
 .aih-guard { margin: 0; font-size: 13px; color: var(--ink-2); }
+.aih-arch { display: flex; flex-direction: column; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--card-bg); backdrop-filter: var(--card-blur); -webkit-backdrop-filter: var(--card-blur); border-top: 4px solid #4285F4; }
+.aih-arch header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.aih-arch h2 { margin: 0; font-size: 18px; color: var(--ink); }
+.aih-arch .aih-ln { background: #4285F4; }
+.aih-arch-map { display: grid; grid-template-columns: 1.6fr auto 1fr; gap: 12px; align-items: stretch; }
+.aih-zone { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface); }
+.aih-zone.home { border-color: var(--accent-line); }
+.aih-zone.ggl { border-color: rgba(155,114,203,.5); }
+.aih-zone > small { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.aih-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.aih-row span { flex: 1 1 120px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--accent-soft); border: 1px solid var(--accent-line);
+  font-size: 13px; font-weight: 600; color: var(--ink); }
+.aih-row span.bus { background: transparent; border-style: dashed; font-weight: 500; color: var(--ink-2); text-align: center; }
+.aih-zone.ggl .aih-row span { background: rgba(155,114,203,.1); border-color: rgba(155,114,203,.4); }
+.aih-row em { display: block; font-style: normal; font-weight: 400; font-size: 11.5px; color: var(--ink-2); }
+.aih-links { display: flex; flex-direction: column; justify-content: space-around; gap: 8px; font-size: 12px; color: var(--ink-2); text-align: center; }
+.aih-links b { color: var(--ink); }
+.aih-links i { font-style: normal; color: var(--good); }
+.aih-proof { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.aih-proof > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface); }
+.aih-proof > div.on { border-color: var(--good); }
+.aih-proof small { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.aih-proof b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; color: var(--ink); }
+.aih-proof .on b { color: var(--good); }
+.aih-proof span { font-size: 12px; color: var(--ink-2); }
+@media (max-width: 900px) { .aih-arch-map { grid-template-columns: 1fr; } .aih-links { flex-direction: row; justify-content: center; } .aih-proof { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .aih-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .aih-layers { grid-template-columns: 1fr; } .aih-layer li { grid-template-columns: 1fr; gap: 0; } .aih-mcp { grid-template-columns: 1fr; } .aih-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 500px) {
