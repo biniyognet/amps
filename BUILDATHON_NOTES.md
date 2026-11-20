@@ -38,6 +38,20 @@
 - [ ] Pitch deck + demo video/link
 - [ ] Submit on Hack2skill before 21 Nov 09:00
 
+## 1b. Evaluation parameters & weightage (Hack2skill AI Evaluation slide, 20 Nov 11:06)
+| Parameter | Weight | What AMPS shows for it |
+|---|---|---|
+| Functional Product & Implementation | 30% | Live app end to end: Snap & Report, Ask AMPS, log book, job cards, printables |
+| Technical Architecture & Engineering Quality | 20% | FastAPI + Postgres + React, tests, three hosting paths (§8) |
+| Google AI Integration & Implementation Depth | 20% | Gemini multimodal + function calling + JSON schema, BigQuery data agent, AlloyDB, Cloud Run |
+| Problem-Solution Alignment | 15% | Floor technician: QR → photo → draft → failure report / job card |
+| UX, Usability & Accessibility | 10% | Phone-first one column, 500px floor, voice remarks |
+| Innovation & Differentiation | 5% | AI drafts, human confirms; asset history in the prompt |
+| **Total** | **100%** | |
+
+The slide also asks for a **problem statement** (the challenge we solve) and **rubric criteria** (what earns a high or low score).
+Priority for the build: working product first (30%), then Google AI depth and architecture (20% each).
+
 ## 2. Session notes — Abirami Sukumaran (Cloud Databases & AI, Google)
 Deck: https://goo.gle/data-ai-biz · "Data & AI for Businesses"
 
