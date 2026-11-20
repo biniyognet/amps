@@ -5,6 +5,7 @@
 #
 #   gcloud auth login        # once, an account with BigQuery on the project
 #   bigquery/load.sh bq_out  # bq_out = folder written by scripts/bq_export.py
+#   bigquery/load.sh --check # read-back only (counts, bands, samples), no reload
 #
 # Needs the gcloud SDK (bq). Fictional Demo Industries seed data only.
 set -euo pipefail
@@ -14,6 +15,7 @@ OUT=${1:-bq_out}
 HERE=$(cd "$(dirname "$0")" && pwd)
 bq="bq --project_id=$P"
 
+if [ "$OUT" != "--check" ]; then
 $bq show "$DS" >/dev/null 2>&1 || $bq mk --location us-central1 --dataset "$DS"
 for f in "$OUT"/*.json; do
   $bq load --replace --autodetect --source_format=NEWLINE_DELIMITED_JSON "$DS.$(basename "$f" .json)" "$f"
@@ -21,6 +23,7 @@ done
 for s in failure_fields asset_risk; do
   sed "s/amps_demo\./$DS./g" "$HERE/$s.sql" | $bq query --use_legacy_sql=false
 done
+fi
 # check.sql holds three SELECTs: run them one by one so each prints its table
 grep -v '^--' "$HERE/check.sql" | sed "s/amps_demo\./$DS./g" |
   while IFS= read -r -d ';' q; do
