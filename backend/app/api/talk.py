@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import cache, events
 from app.api.assets import visible_asset
 from app.api.auth import optional_user, require_admin
 from app.api.logbook import LogEntryIn, _add_one, _latest_open_failure
@@ -244,6 +245,12 @@ async def telemetry(request: Request, db: Session = Depends(get_db),
             if r.breach:
                 r.entry_id = failure_id
     db.commit()
+    events.publish("talk.reading", {"device": dev.code, "asset_code": dev.asset.code, "accepted": len(rows),
+                                    "breaches": sum(1 for r in rows if r.breach)})
+    if failure_id and not existing:
+        cache.bump()
+        events.publish("failure.raised", {"asset_code": dev.asset.code, "failure_id": failure_id,
+                                          "text": f"{first_breach[0].metric} {first_breach[1][0]} limit (ampsTalk)"})
     return TelemetryOut(device=dev.code, accepted=len(rows), breaches=sum(1 for r in rows if r.breach),
                         failure_id=failure_id, failure_existing=existing)
 

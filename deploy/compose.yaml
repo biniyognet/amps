@@ -38,10 +38,45 @@ services:
       AMPS_SECRET: ${AMPS_SECRET:-}            # set to keep sessions across restarts
       AMPS_ADMIN_PASSWORD: ${AMPS_ADMIN_PASSWORD:-admin}  # first-boot admin
       AMPS_MEDIA_DIR: /app/media
+      # Split server: slow work (reindex, BigQuery export, ampsTalk breach
+      # fan-out) queues here for the worker instead of blocking a request.
+      AMPS_REDIS_URL: redis://redis:6379/0
     volumes:
       - media:/app/media          # checksheet scans/photos/PDFs (backed up off-box)
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    # job queue + event pub/sub only — nothing here needs to survive a restart
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/docker/backend.Dockerfile
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://amps:amps@db/amps
+      AMPS_AUTH: ${AMPS_AUTH:-0}
+      AMPS_SECRET: ${AMPS_SECRET:-}
+      AMPS_ADMIN_PASSWORD: ${AMPS_ADMIN_PASSWORD:-admin}
+      AMPS_MEDIA_DIR: /app/media
+      AMPS_REDIS_URL: redis://redis:6379/0
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:

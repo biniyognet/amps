@@ -168,6 +168,9 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov (Arup) | Old 23-slide pitch PDF `frontend/public/pitch/AMPS_pitch_deck.pdf` dropped and its "PDF ↓" link removed from the Brief page: it named the pilot source. Replacement = the new two-layer deck as a PDF on the Hack2skill template, once Arup approves it. Git history keeps the old file; any history scrub is Arup's call | The source is never named in what judges see |
 | 20 Nov (Arup) | Source word out of what people see: the shortcuts-menu pilot link now comes from build env `AMPS_PILOT_URL` (unset = no link, so the submitted build shows none); README bio says "rail". Left on purpose: the line-colour key and the ribbon CSS class name, code identifiers that never render as text | Nothing a judge sees names the source; no behaviour change |
 | 20 Nov (Arup) | Source word nowhere, images included: Brief-page slide deck hidden (`SHOW_DECK = false`) and the 8 slides that named it (03, 04, 05, 09, 12, 15, 18, 23) removed from `public/pitch/`; the other 15 stay (OCR clean, 01 is the og:image). Snap & Report clip and poster removed and the hero runs without them (`SNAP_CLIP = false`) until the demo film is reshot. Colour key and ribbon class renamed to `line` / `.line-ribbon`. Also fixes dc04086, whose `PILOT_URL` line split the `ORG_ALIASES` chain and blanked the page | 0 hits in tree, dist and OCR; the new two-layer deck slides go in after Arup approves it |
+| 20 Nov (Arup) | Drop AlloyDB from the build; **pgvector on Postgres now, AlloyDB at scale** (same SQL, `pg_dump` → AlloyDB, no app change) | Startup economy: ₹0 extra today; a hassle-free migration path when load needs it |
+| 20 Nov | **Speed = architecture.** GZip (min 1 KB) + read-through cache on the 7 hot GETs (`app/cache.py`, Redis when `AMPS_REDIS_URL`, else in-process; key = data version + caller + path; any 2xx write bumps the version) + event bus (`app/events.py`, Redis pub/sub `amps:events`) + live websocket `/api/ws` + worker split (`app/worker.py`, Redis list `amps:jobs`) | Before (laptop, in-container): risk 1.55 s · open-failures 1.1–1.3 s · failure-stats 0.8 s · assets 0.75–1.2 s / 2.7 MB · schedule 0.77 s / 1.5 MB, no gzip. Mentor asked for split servers + websockets + event-driven. Growth path: in-process → Redis → Pub/Sub/Kafka, same `publish()` |
+| 20 Nov (Arup ask → JARVIS rec.) | **Hosting = hybrid.** Home = on-prem k3s / Kubernetes (binihost): app, Postgres+pgvector, Redis, worker, fixed cost. Google = the AI + data + edge layer: Gemini / Vertex, BigQuery + BQML, Pub/Sub for ampsTalk, Cloud Run as scale-to-zero burst + DR mirror of the same images. Scale path: pgvector → AlloyDB, k3s → GKE Autopilot. See §8 | Cheapest steady state (on-prem ≈ ₹0 marginal), pay-per-use only where Google is best, no lock-in (same containers everywhere). The mentor already liked on-prem k8s. Prototype link for judges = Arup's pick (amps.binihost.com gets no roll today) |
 
 ## 6. Open items (20 Nov evening)
 | Item | Owner | Next |
@@ -217,3 +220,17 @@ Admin login (Arup, 20 Nov): a simple admin key is fine for the prototype on **lo
 | Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Cloud Run** for the API/MCP | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 (`deploy/gcp/`, merged fa1a6f6, not run on GCP) · Cloud Run = step 10 · Cloud SQL not started | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same image on Cloud Run |
 
 Rule: nothing is tied to one host. A feature that only works on one of them says so here.
+
+### 8b. Decision — hybrid (20 Nov evening)
+
+| Layer | Where | Cost model | Scale step |
+|---|---|---|---|
+| App (api, worker, frontend) | on-prem k3s (binihost) | fixed, already paid | more nodes → GKE Autopilot, same images |
+| App DB + vectors | Postgres 16 + pgvector on k3s | fixed | AlloyDB (pgvector-compatible, `pg_dump` move) |
+| Cache + queue + events | Redis on k3s | fixed | Memorystore; events → Pub/Sub |
+| AI | Gemini (AI Studio now, Vertex on billing) | per call, Flash-Lite | Vertex quotas, same code (`AMPS_AI_PROVIDER`) |
+| Analytics + ML | BigQuery + BQML (sandbox now) | per scan, MB-sized | partitioned tables, scheduled export |
+| IoT (ampsTalk) | HTTP direct, or Pub/Sub push to `/api/talk/telemetry` | per message | Pub/Sub fan-in, no app change |
+| Burst / DR | Cloud Run mirror of the api image | scale to zero, $0 idle | min instances on demand |
+
+Pitch line: *runs on a client's own Kubernetes for a fixed cost, uses Google only where Google is best, and moves to fully managed Google with no code change.*

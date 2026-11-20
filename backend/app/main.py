@@ -8,11 +8,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api import (agencies, ai, assets, auth, autoplan, checksheets, correspondence,
-                     drawings, failures, logbook, maintenance, planned, qr, risk, roster, similar, snap,
+                     drawings, failures, jobs_api, logbook, maintenance, planned, qr, risk, roster, similar, snap,
                      sync, talk,
-                     tenders)
+                     tenders, ws)
+from app.cache import CacheMiddleware
 from app.db import init_db
 
 # AMPS over MCP (hosted): opt-in, so the core API runs without the mcp package.
@@ -47,6 +49,12 @@ app = FastAPI(
 # the public demo runs) set AMPS_CORS_ORIGINS to a comma-separated allow-list.
 # Default "*" is fine while the API is an unauthenticated read/demo surface —
 # revisit when auth lands.
+# Speed (measured 20 Nov: /api/assets 2.7 MB, /api/risk 1.5 s, no compression):
+# the read cache answers repeat loads from Redis/memory, GZip shrinks JSON ~8x
+# on the wire. Added before CORS so CORS stays outermost; GZip wraps the cache.
+app.add_middleware(CacheMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("AMPS_CORS_ORIGINS", "*").split(",")],
@@ -78,6 +86,8 @@ app.include_router(snap.router, prefix="/api/snap", tags=["snap"])
 app.include_router(talk.router, prefix="/api/talk", tags=["ampsTalk"])
 app.include_router(similar.router, prefix="/api/similar", tags=["ai"])
 app.include_router(risk.router, prefix="/api/risk", tags=["assets"])
+app.include_router(ws.router, prefix="/api", tags=["live"])
+app.include_router(jobs_api.router, prefix="/api/jobs", tags=["jobs"])
 if _mcp:
     from starlette.routing import Route
     # exact /mcp too: the mount alone 307s it to /mcp/, and behind TLS that redirect is http://
