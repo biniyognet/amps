@@ -74,8 +74,16 @@ def test_source_opened_read_only(old_src):
 def test_apply_needs_go_and_refuses_laptop(old_src, tmp_path):
     with pytest.raises(SystemExit, match="arup-go"):
         mi.main(["--src", old_src, "--dst", f"sqlite:///{tmp_path}/d.db", "--apply"])
-    with pytest.raises(SystemExit, match="laptop"):
-        mi.main(["--src", old_src, "--dst", "postgresql://amps-buildathon-db/amps", "--apply", "--arup-go"])
+    with pytest.raises(SystemExit, match="stage DB"):
+        mi.main(["--src", old_src, "--dst", "postgresql://amps:amps@localhost/amps", "--apply", "--arup-go"])
+    with pytest.raises(SystemExit, match="BigQuery"):
+        mi.main(["--src", old_src, "--dst", "bigquery://proj/amps_demo", "--apply", "--arup-go"])
+
+
+def test_target_db_swaps_only_the_database():
+    u = mi.target_url("postgresql+psycopg2://amps:amps@localhost:5432/amps", "amps_metro")
+    assert (u.database, u.host, u.port, u.username) == ("amps_metro", "localhost", 5432, "amps")
+    assert mi.target_url("postgresql://h/amps", None).database == "amps"
 
 
 def test_demo_round_trip(tmp_path, monkeypatch):

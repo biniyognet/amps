@@ -7,6 +7,13 @@
     python scripts/metro_import.py --src sqlite:////path/outside/git/metro_export.db
     # apply into an EMPTY buildathon DB, only with Arup's go
     python scripts/metro_import.py --src ... --dst postgresql+psycopg2://... --apply --arup-go
+    # same Postgres server, separate database (stage `amps` untouched), created if missing
+    python scripts/metro_import.py --src ... --dst postgresql+psycopg2://amps:amps@localhost/amps \
+        --target-db amps_metro --create-db --apply --arup-go
+
+Writes into the stage database itself (`amps`) are refused: load into amps_metro, then
+'metro go' points the backend at amps_metro and 'metro private' leaves stage as it is.
+Either way the demo DB is never overwritten (scripts/demo_db_backup.sh before any change).
 
 The source is an export copy (pg_dump restored somewhere, or a SQLite file), never the
 production box itself. It is opened read-only. Its schema may be older than buildathon
@@ -29,14 +36,16 @@ from collections import Counter
 
 sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend")]
 
-from sqlalchemy import MetaData, create_engine, func, select, text  # noqa: E402
+from sqlalchemy import MetaData, create_engine, func, inspect, select, text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
 
 from app.models import Base  # noqa: E402
 
 TABLES = ["locations", "asset_classes", "agencies", "assets", "log_entries", "failures"]
 OPTIONAL = {"agencies"}
 SELF_REFS = {"locations": ["parent_id"], "log_entries": ["corrects_id", "rectifies_id"]}
-BLOCKED_DST = ("bigquery", "amps-buildathon", "amps_buildathon")
+BLOCKED_DST = ("bigquery",)
+STAGE_DBS = {"amps"}          # the demo/stage database on the laptop Postgres
 
 
 def _src_engine(url):
@@ -104,6 +113,30 @@ def plan(src):
     return rows, rep
 
 
+def target_url(dst, target_db):
+    """--dst with its database swapped for --target-db (same server and login)."""
+    url = make_url(dst)
+    return url.set(database=target_db) if target_db else url
+
+
+def ensure_db(url, create):
+    """Create the target database (Postgres) and the AMPS schema in it when missing."""
+    if url.get_backend_name() == "postgresql":
+        admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+        with admin.connect() as c:
+            exists = c.execute(text("SELECT 1 FROM pg_database WHERE datname = :n"),
+                               {"n": url.database}).scalar()
+            if not exists:
+                if not create:
+                    raise SystemExit(f"database {url.database} does not exist (add --create-db)")
+                c.execute(text(f'CREATE DATABASE "{url.database}"'))
+        admin.dispose()
+    eng = create_engine(url)
+    if "assets" not in inspect(eng).get_table_names():
+        Base.metadata.create_all(eng)
+    return eng
+
+
 def apply(dst, rows):
     """Insert into an empty buildathon DB in one transaction; self-refs patched after."""
     meta = MetaData()
@@ -153,6 +186,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--src", required=True, help="SQLAlchemy URL of the read-only export copy")
     ap.add_argument("--dst", help="buildathon DB URL (only with --apply)")
+    ap.add_argument("--target-db", help="database name on the --dst server, e.g. amps_metro")
+    ap.add_argument("--create-db", action="store_true", help="create --target-db when missing")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--arup-go", action="store_true", help="Arup confirmed this import")
     a = ap.parse_args(argv)
@@ -168,9 +203,12 @@ def main(argv=None):
     if not (a.dst and a.arup_go):
         raise SystemExit("--apply needs --dst and --arup-go")
     if any(b in a.dst.lower() for b in BLOCKED_DST):
-        raise SystemExit("refusing: --dst looks like the laptop compose or BigQuery")
-    apply(create_engine(a.dst), rows)
-    print("applied")
+        raise SystemExit("refusing: --dst looks like BigQuery")
+    url = target_url(a.dst, a.target_db)
+    if url.database in STAGE_DBS:
+        raise SystemExit(f"refusing: {url.database} is the stage DB, use --target-db amps_metro")
+    apply(ensure_db(url, a.create_db), rows)
+    print(f"applied into {url.database}")
     return rep
 
 
