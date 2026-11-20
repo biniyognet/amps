@@ -31,7 +31,7 @@
 - [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart). Reloaded 20 Nov from the laptop DB with the stories (JARVIS): assets 1,874 · log_entries 14,416 · `asset_risk` view 1,874; sandbox project, tables expire in 59 days
 - [ ] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
-- [ ] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list
+- [x] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list (merged; live after the laptop rebuild)
 
 ### Submit
 - [ ] Demo runs end to end (with a pre-loaded backup table, in case the venue Wi-Fi is slow)
@@ -157,8 +157,8 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 |------|------|--------|----------|-------|
 | 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · laptop rebuild to a412e19+ (JARVIS, running) |
 | 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-chips-snap-history` | Ask, Snap | ✅ merged b73057e (3 starter chips, hub chips match; Snap "Earlier on this asset") · in the laptop rebuild |
-| 3 F6 risk badge | builder-2 | `builder-2/f6-risk` | Risk badge | ⏳ |
-| 4 BigQuery reload + F2 failure_fields (AI.GENERATE) + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore` (bq_out ignored, `load.sh --check`) | Fault fields, Risk badge (data) | ✅ merged · data reloaded + asset_risk built (JARVIS, from the laptop DB); `failure_fields` needs billing (Arup). Risk badge waits for builder-2's in-app badge; Fault fields stays coming until `failure_fields` runs |
+| 3 F6 risk badge | builder-2 | `b2/f6-risk-badge` (`/api/risk` + register dot, filter, sort) | Risk badge | ✅ merged · card flips once the badge shows on :8081 after the laptop rebuild |
+| 4 BigQuery reload + F2 failure_fields (AI.GENERATE) + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore` (bq_out ignored, `load.sh --check`), `floki/bq-sandbox` (`load.sh` sets 59-day expiry) | Fault fields, Risk badge (data) | ✅ merged · data reloaded + asset_risk built (JARVIS, from the laptop DB); `failure_fields` needs billing (Arup). Risk badge waits for builder-2's in-app badge; Fault fields stays coming until `failure_fields` runs |
 | 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc (`/api/similar` + "Seen before" on the asset page; new table `failure_embeddings`; keyword match without a key; pre-warm `scripts/embed_failures.py`) · in the laptop rebuild; needs the Gemini key for embeddings (keyword match until then); card flips once Seen before works on :8081 |
 | Cloud Run amps-mcp + safety watch | ragnar | `ragnar/cloudrun-mcp` | MCP (URL) | ⏳ |
 | Pitch script + judge Q&A | nefario | `nefario/pitch` | — | ⏳ |
