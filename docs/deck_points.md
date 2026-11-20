@@ -12,6 +12,6 @@ Slide order follows the eval weights: product 30% · Google AI 20% · architectu
 | Architecture | Split servers: api serves users, worker runs slow jobs off a Redis queue | `backend/app/worker.py`, `jobs.py` |
 | Architecture | Event-driven: every write and every sensor breach is an event; screens update live over a websocket, no polling. Growth path in-process → Redis → Pub/Sub/Kafka | `app/events.py`, `/api/ws` |
 | Product / new | ampsTalk: sensors, PLC gateways and meters talk to AMPS directly (HTTP or Pub/Sub push); an out-of-band reading files the failure itself | `backend/app/api/talk.py` |
-| Hosting | Hybrid: on-prem Kubernetes home at a fixed cost + Google for AI, data and edge + Cloud Run scale-to-zero burst/DR; moves to GKE/AlloyDB with no code change | NOTES §8b |
+| Hosting | "Our Kubernetes runs the plant, Google is the brain": frontend + api + worker + Postgres/pgvector + Redis on binihost 3-node HA k3s at a fixed cost; Gemini (Vertex) thinks on every click, BigQuery/BQML learns from history every night; scores flow back live. Moves to GKE/AlloyDB with no code change | NOTES §5 (final) |
 | Economy | Flash-Lite for every click, BQ scans in MB, Cloud Run $0 idle; the whole build ran inside a $5 budget | NOTES §5 |
 | Proof | In daily use at Kolkata Metro (decision B, 20 Nov) | — |
