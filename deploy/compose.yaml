@@ -51,6 +51,9 @@ services:
       args:
         AMPS_DATA: ${AMPS_DATA:-demo}   # live = screens read the backend, no demo dataset
         AMPS_ORG: ${AMPS_ORG:-}         # organisation name on headers/tags/printouts
+        AMPS_ORDER_REF: ${AMPS_ORDER_REF:-}          # operator details: office env only
+        AMPS_ORDER_EXTRACT: ${AMPS_ORDER_EXTRACT:-}
+        AMPS_ORG_ALIASES: ${AMPS_ORG_ALIASES:-}
     volumes:
       - ./docker/nginx.compose.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
