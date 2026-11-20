@@ -1,6 +1,6 @@
 # BigQuery — F2 fault fields + F6 risk badge
 
-Dataset `amps_demo` (project `gen-lang-client-0618042629`), fictional Demo Industries seed only.
+Dataset `amps_demo` (project `gen-lang-client-0618042629`), Demo Industries demo dataset (exported by `scripts/bq_export.py`; users, passwords, audit trail, attachments and correspondence are never exported).
 
 | File | Builds | Google product |
 |---|---|---|
