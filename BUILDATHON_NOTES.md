@@ -5,6 +5,20 @@
 > Audited 20 Nov (freya) against `buildathon` 5b40544 and every pushed lane branch. Laptop: JARVIS rebuilt :8081 at 512e0b1, 20 Nov 12:00 (data kept, no `down -v`): app 200, `/api/risk` 200.
 > Refreshed 21 Nov 00:45 (JARVIS): Cloud Run dropped everywhere, F1 = EmbeddingGemma on-prem, deck v12 + PDF re-export, submit checklist.
 
+## 0. Where we are — 21 Nov 01:20 IST (submission closes 09:00)
+| Item | Status | Next |
+|---|---|---|
+| Prototype amps-demo.binihost.com | ✅ live: app 200, `/api/risk` 200, 5/5 pods Running (api, worker, frontend, db, redis) | keep up until evaluation ends · no rolls after 08:00 |
+| Google Slides submission deck | ✅ updated 01:06: EmbeddingGemma + Gemma 3 4B, prototype link, judge login · backup kept | ⬜ **Team Name** (Arup gives it) · ⬜ **video link** (or remove the line) |
+| Deck PDF | ✅ `deck/AMPS_pitch_deck.pdf` (claude.ai v12, 11 pages) · ✅ Drive "Idea Submission.pdf" refreshed from the Google deck | Arup picks which one to upload (the Google deck is the Hack2skill template) |
+| AI features on the judges' stack | ✅ 6 live: Snap & Report, Ask AMPS, AI PM plan, MCP server, Similar failures (EmbeddingGemma), Risk badge · 2 "coming" (Fault fields, Estate agent) | none before submit |
+| BigQuery | ✅ data loaded (sandbox) · ⚠️ BQML model eval degenerate · F2 + data agent wait on billing | after submit, only if billing comes back |
+| Demo video (optional) | ⬜ not made | Arup: skip, or record a ≤3 min screen run |
+| Demo backup for venue Wi-Fi | ⬜ | laptop :8081 stack is the offline fallback |
+| **Hack2skill submit** | ⬜ | **Arup on the dashboard before 09:00**: prototype link + deck/PDF (+ video if any) |
+| After judging | GPU free → ragnar resumes user_docs embed · nomic delete last | — |
+
+
 ## 1. Checklist
 
 ### Setup (MSI laptop)
@@ -38,7 +52,7 @@
 > Window: opens **20 Nov 23:00**, closes **21 Nov 09:00**, no extension. One submission per team, on the participant dashboard.
 > 21 Nov agenda: mentor evaluation 10:00–13:00 · showcase 14:00–17:30 · results 18:00.
 - [x] Working prototype link — **amps-demo.binihost.com** (ns `amps-judges`, one-click judge login); stays live until evaluation ends
-- [ ] **Hack2skill submission deck = Google Slides** https://docs.google.com/presentation/d/1IQdBwCr11AwtRYKYjVSp0SHhAV7PH9IL_AjGdiS8mv0/edit (owner arupbiswas1994; SA jarvis-drive can edit). JARVIS edits it directly and keeps it in sync with the claude.ai Slides deck. Edited copy `deck/AMPS_submission_deck.pptx` (EmbeddingGemma + Gemma 3 4B, prototype link, judge login) sent on TG 21 Nov. In-place edit waits on the Slides API being enabled on GCP binihost, or on Arup's "overwrite". Still blank: Team Name, video link
+- [ ] **Hack2skill submission deck = Google Slides** https://docs.google.com/presentation/d/1IQdBwCr11AwtRYKYjVSp0SHhAV7PH9IL_AjGdiS8mv0/edit (owner arupbiswas1994; SA jarvis-drive can edit). JARVIS edits it directly and keeps it in sync with the claude.ai Slides deck. Edited copy `deck/AMPS_submission_deck.pptx` (EmbeddingGemma + Gemma 3 4B, prototype link, judge login) sent on TG 21 Nov. Google file UPDATED in place 21 Nov 01:06 IST (Drive files.update of the edited pptx onto the same ID, same path as 20 Nov 21:14), and companion Drive PDF refreshed. Still blank: Team Name, video link
 - [x] Pitch deck PDF < 10 MB — `deck/AMPS_pitch_deck.pdf` re-exported 21 Nov 00:40 from Slides v12: 11 slides, 1920×1080, 0.48 MB · Arup uploads it on the dashboard
 - [ ] Demo video (optional) ≤ 3 min, public Google Drive or YouTube link
 - [ ] Demo runs end to end (with a pre-loaded backup table, in case the venue Wi-Fi is slow)
@@ -193,7 +207,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 21 Nov 00:45 (Arup "fix all") | **Deck v12 + PDF + notes refresh.** Slides: cover team line (Arup Biswas · Nilanjan Chakraborty; Gemini, Gemma, BigQuery, AlloyDB), Google card 6 → "Antigravity + Agent Skill" (own k3s), hosting slide amps-demo.binihost.com + GKE Autopilot, close card "GKE when it grows", "Try it: amps-demo.binihost.com", demo note → EmbeddingGemma. PDF re-rendered headless from the Slides content: 11 pages 1920×1080, 0.48 MB → `deck/AMPS_pitch_deck.pdf` (replaces the 5-page `#/guide` print). Notes: Cloud Run lines marked dropped, F1 → EmbeddingGemma, submit checklist ticked | Slides artifact v12 · `deck/AMPS_pitch_deck.pdf` |
 | 21 Nov 01:30 (Arup) | **Google Slides submission deck is the one to edit.** Link saved: https://docs.google.com/presentation/d/1IQdBwCr11AwtRYKYjVSp0SHhAV7PH9IL_AjGdiS8mv0/edit. Exported, then 7 text fixes: gemini-embedding-001 → EmbeddingGemma · Gemma 3 4B; similar failures on-prem 17/18 vs nomic 8 (Bengali 5/5 vs 0/5); Gemma fallback; [prototype link] → amps-demo.binihost.com; [demo login] → one-click Judge login. Saved as `deck/AMPS_submission_deck.pptx`, sent on TG. Then pushed onto the same Google file (Drive files.update), 8 slides verified, companion PDF refreshed. The Slides API is not needed | Keep iterating on the Google file |
 
-## 6. Open items (21 Nov 00:45)
+## 6. Open items (21 Nov 00:45; current view = §0)
 | Item | Owner | Next |
 |---|---|---|
 | Laptop AI stories | JARVIS | ✅ done e658bd6: `seed_network.py --stories` added 10 stories, data kept (no `down -v`, ever) |
