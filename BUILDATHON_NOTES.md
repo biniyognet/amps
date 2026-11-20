@@ -2,6 +2,7 @@
 
 > Kolkata · 20–21 Nov 2026 · submission closes **21 Nov, 09:00** · branch `buildathon`
 > Goal: integrate Google AI + data features into AMPS and make it as powerful as we can.
+> Audited 20 Nov evening against the branch (HEAD after 7c77643) and the laptop stack.
 
 ## 1. Checklist
 
@@ -15,13 +16,19 @@
 - [x] Gemini key — done 20 Nov, project above at Tier 1; audit: `gemini-3.5-flash-lite` 8/8 0.85 s (default), `gemini-3.5-flash` 0.7–1.8 s, `gemini-pro-latest` 3/3 3.4 s; 2.5 models closed to new keys
 - [x] Start Docker Desktop (needed to run AMPS locally)
 - [x] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin). One stack only, project `amps-buildathon` (set in compose.demo.yaml), running on the laptop 20 Nov. Fresh seed with the AI demo stories: add `down -v` first.
+- [ ] Laptop DB still holds the **pre-85fd3d5 seed** (1,874 assets, 168 failures, no AI demo stories). Reseed = `down -v` then the command above; it wipes laptop data, so Arup's call
+- [ ] Turn AI on for the laptop stack: put `AMPS_GEMINI_API_KEY=…` in `deploy/.env` (git-ignored), re-run the command. Until then `/api/ai/status` = off and Snap / Ask / auto-plan do not draw (compose.demo now passes provider `gemini` + model `gemini-3.5-flash-lite`)
+- [x] Nilanjan synced — 20 Nov 09:15 email: `git clone -b buildathon https://github.com/biniyognet/amps.git amps-buildathon`, pull loop every 2 min, same compose command, push to his own branch `nilanjan` (never `buildathon`)
+- [x] Laptop pulls `buildathon` every 2 min (scheduled task `amps-sync`)
 - [ ] Codelab 2 (**do this one**, ~30 min = F4): https://codelabs.developers.google.com/data-agents-in-agy-and-bq
 - [ ] Codelab 1 (optional skim, F5 covers it): https://codelabs.developers.google.com/getting-started-with-antigravity-skills
 
 ### Build (order: F4 → F1 → F2 → F6; each ships with its screen)
 - [x] F3 AMPS MCP server — 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`; local stdio + https://amps-api.binihost.com/mcp, pod `amps-mcp`; Cloud Run next)
 - [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
-- [~] F4 Estate analytics agent — data loaded 20 Nov: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart)
+- [x] AI demo stories seeded — 85fd3d5 `backend/seed_network.py` `STORIES`: 10 failures on 5 assets (Pump Motor 1 repeat seal leak past codal life, HSCB Panel 1 trips, PTR 1 oil-temp trend, বাংলা + हिन्दी + shorthand remarks); 178 failures on a fresh DB
+- [~] **AI hub** `#/ai` + ✦ AI nav link — plan: `crew/freya/out/buildathon-ai-hub-ui-plan.md`; step 1 (page, 8 cards: 4 live, 4 coming) on the branch 20 Nov, steps 2–6 below
+- [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart). Re-export after the reseed so BigQuery shows the 178 failures with the stories
 - [ ] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [ ] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list
@@ -75,7 +82,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Frontend | React + Vite SPA, Ensign site 70 (amps.binihost.com) | New panels: "Similar past failures", risk badge on assets, analytics chat | Additive UI |
 | API | FastAPI + SQLAlchemy 2 + Alembic, k3s `amps-demo` | New routes: `/ai/similar`, `/ai/extract`, `/ai/risk`, MCP server | Additive endpoints |
 | Database | Postgres 16 (pod), nightly reset 03:00 | + `vector` extension and an embeddings column (in the same Postgres, or an **AlloyDB Express** copy for the demo) | Additive schema (Alembic migration) |
-| AI calls | Gemini 2.5 Flash over REST `generateContent` (Ask AMPS, Snap & Report, Auto-plan) | + embeddings, **AI.EXTRACT** on remarks, risk scoring | Extends the same Gemini key |
+| AI calls | Gemini over REST `generateContent` (Ask AMPS, Snap & Report, Auto-plan); `gemini-3.5-flash-lite` on the buildathon stack, amps.binihost.com still pins `gemini-2.5-flash` in its k8s manifest | + embeddings, **AI.EXTRACT** on remarks, risk scoring | Extends the same Gemini key |
 | Agent access | Ask AMPS = 6 read-only tools inside the app | **F3 MCP server** exposes the same 6 tools to any agent (Antigravity, Claude, Gemini CLI) | Wrapper, no logic change |
 | Guardrails | Code-level (read-only tools, human submits) | **F5 SKILL.md**: rules an agent must follow on AMPS data | New doc file |
 | Analytics | Dashboard counts/charts | **F4** logbook/failures → BigQuery + Conversational Analytics (ask in English) | New export job + Google console |
@@ -95,7 +102,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 ## 4b. Keyword brief (one line each)
 | Keyword | What it is | Where it fits in AMPS |
 |---|---|---|
-| Gemini | Google's LLM family (2.5 Flash is fast and cheap) | Already powers Ask AMPS / Snap |
+| Gemini | Google's LLM family (`gemini-3.5-flash-lite` = our default: fastest, 0.85 s in the audit) | Already powers Ask AMPS / Snap |
 | Embedding | Text turned into a list of numbers; similar meaning = nearby numbers | Turn each failure remark into a vector |
 | pgvector (`vector`) | Postgres extension that stores vectors and finds nearest ones | F1 "find failures like this one" |
 | ScaNN | Google's fast nearest-neighbour index (AlloyDB) | Speeds up F1 at scale; not needed for demo size |
@@ -127,3 +134,16 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov | MCP SDK 2.x (`mcp>=2.3,<3`), imported only when `AMPS_MCP_HTTP=1` | Core API runs without the new dependency |
 | 20 Nov | Google-first: wire every referenced product (Gemini, BigQuery, AlloyDB/pgvector, Cloud Run, DAK) in the time limit; binihost stays the parallel/backup host | Buildathon = Google ecosystem; learn by comparison |
 | 20 Nov | Gemini key = Arup's own AI Studio account, project linked to the GDP Event Credit billing; audit with `scripts/gemini_audit.py` | Free-tier keys hit 429 in a live demo |
+| 20 Nov | One laptop stack, compose project `amps-buildathon` on :8081 (was `amps-demo`, which made a second stack) | One set of volumes; the same command always reuses it |
+| 20 Nov | Buildathon model = `gemini-3.5-flash-lite`, set by compose.demo (`AMPS_GEMINI_MODEL`); key only in git-ignored `deploy/.env` | 2.5 models are closed to new keys; key never in git |
+| 20 Nov | AI hub `#/ai`: one page, 8 cards, each opens a seeded example in 1–2 clicks and names its Google product | Judges find every AI feature without a tour |
+
+## 6. Open items (20 Nov evening)
+| Item | Owner | Next |
+|---|---|---|
+| Laptop reseed with the AI stories (`down -v`) | Arup | say go; wipes laptop data |
+| Gemini key in laptop `deploy/.env` | Arup | add the key, re-run compose; check `/api/ai/status` = enabled |
+| BigQuery data agent (Codelab 2 steps 6–11) + reload `amps_demo` from the new seed | Arup | after the reseed |
+| AI hub steps 2–6: Ask chips + Snap history strip · F6 risk · F2 AI.EXTRACT · F1 embeddings | build | in that order |
+| Backend default model in `backend/app/api/ai.py` and the k8s manifest still say `gemini-2.5-flash` | build | change with the next amps-api roll (not part of the buildathon frontend work) |
+| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | before 21 Nov 09:00 |

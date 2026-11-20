@@ -18,6 +18,11 @@ services:
       AMPS_ORG: Demo Industries Group
       AMPS_STANDARD_LINE: Metro Traction & Depot
       AMPS_AUTH: "1"
+      # Gemini (Snap & Report, Ask AMPS, auto-plan): the key goes in deploy/.env
+      # (git-ignored) as AMPS_GEMINI_API_KEY=…; without it the AI features stay off.
+      AMPS_AI_PROVIDER: ${AMPS_AI_PROVIDER:-gemini}
+      AMPS_GEMINI_API_KEY: ${AMPS_GEMINI_API_KEY:-}
+      AMPS_GEMINI_MODEL: ${AMPS_GEMINI_MODEL:-gemini-3.5-flash-lite}
 
   frontend:
     build:
