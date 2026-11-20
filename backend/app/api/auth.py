@@ -97,6 +97,25 @@ def ensure_admin():
             print("AMPS: created default admin/admin — set AMPS_ADMIN_PASSWORD and change it.")
 
 
+# One-click demo login (public evaluation links). AMPS_DEMO_USER names a
+# whole-department SUPERVISOR account — writes everything, but not user admin,
+# sync or device keys. Its password is random and never shown; the button
+# below is the only way in. Unset = no demo login (operational deployments).
+DEMO_USER = os.environ.get("AMPS_DEMO_USER", "").strip()
+DEMO_NAME = os.environ.get("AMPS_DEMO_NAME", "Demo Supervisor")
+
+
+def ensure_demo_user():
+    if not (AUTH_ON and DEMO_USER):
+        return
+    with SessionLocal() as db:
+        if db.scalar(select(User).where(User.username == DEMO_USER)):
+            return
+        db.add(User(username=DEMO_USER, full_name=DEMO_NAME, role=UserRole.SUPERVISOR,
+                    password_hash=hash_password(secrets.token_urlsafe(24))))
+        db.commit()
+
+
 # ---- request identity -------------------------------------------------------
 
 _OPEN_USER = SimpleNamespace(  # auth disabled: everything acts as an unscoped admin
@@ -207,6 +226,26 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == body.username.strip()))
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "wrong username or password")
+    response.set_cookie(COOKIE, make_token(user.username), httponly=True,
+                        samesite="lax", max_age=SESSION_HOURS * 3600, path="/")
+    audit(db, "user", user.id, "login", actor=user.username)
+    db.commit()
+    return _me(user)
+
+
+@router.get("/demo")
+def demo_info():
+    """Whether this deployment offers the one-click demo login."""
+    return {"enabled": bool(AUTH_ON and DEMO_USER), "name": DEMO_NAME if DEMO_USER else None}
+
+
+@router.post("/demo", response_model=MeOut)
+def demo_login(response: Response, db: Session = Depends(get_db)):
+    if not (AUTH_ON and DEMO_USER):
+        raise HTTPException(404, "demo login is off")
+    user = db.scalar(select(User).where(User.username == DEMO_USER))
+    if not user:
+        raise HTTPException(404, "demo login is off")
     response.set_cookie(COOKIE, make_token(user.username), httponly=True,
                         samesite="lax", max_age=SESSION_HOURS * 3600, path="/")
     audit(db, "user", user.id, "login", actor=user.username)

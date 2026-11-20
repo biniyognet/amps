@@ -1860,6 +1860,8 @@ tbody tr:hover .edit-link { color: var(--accent); }
 }
 .login-card input:focus-visible { outline: 2px solid #b98a00; outline-offset: 1px; }
 .login-err { color: #a32e2e; font-size: 0.9em; }
+.login-demo { font-weight: 600; }
+.login-or { text-align: center; font-size: 12px; color: var(--muted, #777); margin: 2px 0; }
 /* topbar sign-in mirrors the landing's outlined button */
 .nav .login-btn {
   padding: 7px 18px; background: transparent; color: var(--accent);

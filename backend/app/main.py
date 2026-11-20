@@ -28,6 +28,7 @@ if os.environ.get("AMPS_MCP_HTTP") == "1":
 async def lifespan(app: FastAPI):
     init_db()
     auth.ensure_admin()
+    auth.ensure_demo_user()
     if _mcp:
         async with _mcp[1].run():
             yield

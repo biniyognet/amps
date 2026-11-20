@@ -99,7 +99,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: api
-          image: ghcr.io/biniyognet/amps-backend:oc11202158-e2e
+          image: ghcr.io/biniyognet/amps-backend:oc11202210-demo
           envFrom:
             - secretRef: {name: amps-judges-db}
             - secretRef: {name: amps-judges-app}
@@ -128,7 +128,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: worker
-          image: ghcr.io/biniyognet/amps-backend:oc11202158-e2e
+          image: ghcr.io/biniyognet/amps-backend:oc11202210-demo
           command: ["python", "-m", "app.worker"]
           envFrom:
             - secretRef: {name: amps-judges-db}
@@ -152,6 +152,8 @@ data:
   AMPS_ORG: Demo Industries Group
   AMPS_STANDARD_LINE: City Traction & Depot
   AMPS_AUTH: "1"
+  AMPS_DEMO_USER: judge            # one-click "demo login" button (supervisor, not admin)
+  AMPS_DEMO_NAME: Judge (demo)
   AMPS_MEDIA_DIR: /app/media
   AMPS_REDIS_URL: redis://redis:6379/0
   AMPS_AI_PROVIDER: gemini
@@ -178,7 +180,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: nginx
-          image: ghcr.io/biniyognet/amps-frontend:oc11202158-e2e
+          image: ghcr.io/biniyognet/amps-frontend:oc11202210-demo
           ports: [{containerPort: 80}]
           resources:
             requests: {cpu: 10m, memory: 16Mi}

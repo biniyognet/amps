@@ -11,7 +11,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, PILOT_URL, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath, triggerRefresh } from './api.js'
+import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, PILOT_URL, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiDemoLogin, apiDemoInfo, apiLogout, apiChangePassword, encPath, triggerRefresh } from './api.js'
 import { useLiveEvents, pushToast, LiveDot, LiveToasts } from './live.jsx'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
@@ -4668,11 +4668,12 @@ function LoginForm({ autoFocus = false }) {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
-  const submit = async (e) => {
-    e.preventDefault()
+  const [demo, setDemo] = useState(null)
+  useEffect(() => { let alive = true; apiDemoInfo().then((d) => alive && setDemo(d)); return () => { alive = false } }, [])
+  const signIn = async (fn) => {
     setBusy(true); setErr(null)
     try {
-      await apiLogin(username.trim(), password)
+      await fn()
       let next = '/'
       try { next = sessionStorage.getItem('amps-next') || '/'; sessionStorage.removeItem('amps-next') } catch { /* private mode */ }
       location.hash = next
@@ -4682,8 +4683,15 @@ function LoginForm({ autoFocus = false }) {
       setBusy(false)
     }
   }
+  const submit = (e) => { e.preventDefault(); signIn(() => apiLogin(username.trim(), password)) }
   return (
     <form className="login-form-fields" onSubmit={submit}>
+      {demo?.enabled && <>
+        <button className="btn login-demo" type="button" disabled={busy} onClick={() => signIn(apiDemoLogin)}>
+          {busy ? 'Signing in…' : `One-click demo login · ${demo.name}`}
+        </button>
+        <div className="login-or">or sign in with an account</div>
+      </>}
       <input autoFocus={autoFocus} autoComplete="username" placeholder="Username"
              value={username} onChange={(e) => setUsername(e.target.value)} />
       <input type="password" autoComplete="current-password" placeholder="Password"

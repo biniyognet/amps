@@ -110,6 +110,18 @@ export async function apiLogin(username, password) {
   return r.json()
 }
 
+/** One-click demo login, when the deployment offers it ({enabled, name}). */
+export async function apiDemoInfo() {
+  const r = await fetch(`${API}/api/auth/demo`).catch(() => null)
+  return r && r.ok ? r.json() : { enabled: false }
+}
+
+export async function apiDemoLogin() {
+  const r = await fetch(`${API}/api/auth/demo`, { method: 'POST' })
+  if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || 'demo login failed')
+  return r.json()
+}
+
 export async function apiLogout() {
   await fetch(`${API}/api/auth/logout`, { method: 'POST' }).catch(() => {})
   location.reload()
