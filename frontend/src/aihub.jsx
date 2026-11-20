@@ -10,6 +10,15 @@ import { API, useMe } from './api.js'
 import { rememberNext } from './snap.jsx'
 
 const SNAP_DEMO = 'MTD-CEN-HSC-01'
+const SIMILAR_DEMO = 'CWT-AM-MTR-01'
+// Register opens filtered to red + amber, riskiest first (the register keeps these in amps.filter.*).
+const openAtRisk = () => {
+  try {
+    localStorage.setItem('amps.filter.reg.risk', JSON.stringify('hot'))
+    localStorage.setItem('amps.filter.reg.sortKey', JSON.stringify('risk'))
+    localStorage.setItem('amps.filter.reg.sortDir', JSON.stringify('asc'))
+  } catch { /* private mode: register opens unfiltered */ }
+}
 const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
 
 // the six read-only tools Ask AMPS and the MCP server share (backend/app/api/ai.py TOOLS)
@@ -109,10 +118,10 @@ export default function AiHub() {
             {mcp ? 'Hide the tools' : 'See the 6 tools'}</button>
         </Card>
 
-        <Card status="coming" title="Similar past failures" product="gemini-embedding-001 + pgvector"
+        <Card status="live" title="Similar past failures" product="gemini-embedding-001 · cosine match"
               icon="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"
               line="Before the panel is opened, AMPS shows what fixed the same fault last time. Example: Pump Motor 1.">
-          <span className="aih-btn ghost" aria-disabled="true">Pump Motor 1 · coming</span>
+          <a className="aih-btn pri" href={`#/asset/${SIMILAR_DEMO}`}>Seen before on Pump Motor 1 →</a>
         </Card>
         <Card status="coming" title="Fault fields" product="BigQuery AI.EXTRACT · Flash-Lite"
               icon="M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3"
@@ -124,10 +133,10 @@ export default function AiHub() {
               line="Managers ask the whole estate in English and get charts back, from the amps_demo dataset.">
           <span className="aih-btn ghost" aria-disabled="true">Open agent ↗ · coming</span>
         </Card>
-        <Card status="coming" title="Risk badge" product="BigQuery SQL score · Flash-Lite reason"
+        <Card status="live" title="Risk badge" product="Rule score · BigQuery asset_risk view"
               icon="M12 3l9 16H3zM12 9v4M12 16v.5"
               line="Red means old, failing again and PM late, with the three reasons why. Example: Pump Motor 1 red, PTR 1 amber.">
-          <span className="aih-btn ghost" aria-disabled="true">Top 5 at risk · coming</span>
+          <a className="aih-btn pri" href="#/assets" onClick={openAtRisk}>See the assets at risk →</a>
         </Card>
       </section>
 

@@ -29,7 +29,7 @@
 - [x] AI demo stories seeded — 85fd3d5 `backend/seed_network.py` `STORIES`: 10 failures on 5 assets (Pump Motor 1 repeat seal leak past codal life, HSCB Panel 1 trips, PTR 1 oil-temp trend, বাংলা + हिन्दी + shorthand remarks); 178 failures on a fresh DB
 - [~] **AI hub** `#/ai` + ✦ AI nav link — plan: `crew/freya/out/buildathon-ai-hub-ui-plan.md`; step 1 (page, 8 cards: 4 live, 4 coming) on the branch 20 Nov, steps 2–6 below
 - [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart). Reloaded 20 Nov from the laptop DB with the stories (JARVIS): assets 1,874 · log_entries 14,416 · `asset_risk` view 1,874; sandbox project, tables expire in 59 days
-- [ ] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
+- [x] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [x] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list (merged; live after the laptop rebuild)
 
@@ -151,17 +151,19 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 
 ## 7. Crew lanes (20 Nov 09:30 — freya leads, merges into `buildathon`)
 
-Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wires the hub card, ticks here. Laptop pulls `buildathon` every 2 min.
+Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wires the hub card, ticks here. JARVIS rebuilds the laptop (:8081) after each merge.
 
 | Step | Seat | Branch | Hub card | State |
 |------|------|--------|----------|-------|
-| 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · laptop rebuild to a412e19+ (JARVIS, running) |
-| 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-chips-snap-history` | Ask, Snap | ✅ merged b73057e (3 starter chips, hub chips match; Snap "Earlier on this asset") · in the laptop rebuild |
-| 3 F6 risk badge | builder-2 | `b2/f6-risk-badge` (`/api/risk` + register dot, filter, sort) | Risk badge | ✅ merged · card flips once the badge shows on :8081 after the laptop rebuild |
-| 4 BigQuery reload + F2 failure_fields (AI.GENERATE) + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore` (bq_out ignored, `load.sh --check`), `floki/bq-sandbox` (`load.sh` sets 59-day expiry) | Fault fields, Risk badge (data) | ✅ merged · data reloaded + asset_risk built (JARVIS, from the laptop DB); `failure_fields` needs billing (Arup). Risk badge waits for builder-2's in-app badge; Fault fields stays coming until `failure_fields` runs |
-| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc (`/api/similar` + "Seen before" on the asset page; new table `failure_embeddings`; keyword match without a key; pre-warm `scripts/embed_failures.py`) · in the laptop rebuild; needs the Gemini key for embeddings (keyword match until then); card flips once Seen before works on :8081 |
-| Cloud Run amps-mcp + safety watch | ragnar | `ragnar/cloudrun-mcp` | MCP (URL) | ⏳ |
-| Pitch script + judge Q&A | nefario | `nefario/pitch` | — | ⏳ |
-| Day-1 run sheet (row 1 = the `up -d --build` command above; no `down -v`) | minion | `minion/runsheet` | — | ⏳ |
+| 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · on :8081 |
+| 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-chips-snap-history` | Ask, Snap | ✅ merged b73057e · on :8081 |
+| 3 F6 risk badge | builder-2 | `b2/f6-risk-badge` (`/api/risk` + register dot, filter, sort) | Risk badge | ✅ merged 63ad28a · on :8081 at 3558798 · card **live** (opens the register on red + amber, riskiest first) |
+| 4 BigQuery reload + F2 failure_fields + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore`, `floki/bq-sandbox` (59-day expiry) | Fault fields, Risk badge (data) | ✅ merged · data reloaded + asset_risk built; `failure_fields` needs billing (Arup) · Fault fields stays coming |
+| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc · on :8081 · card **live** (opens Pump Motor 1); keyword match until the Gemini key is set |
+| 6 F4 data agent | builder-1 | `builder-1/<topic>` | Estate agent | ⏳ |
+| 7 Metro data import script (prep only, no run) | builder-2 | `b2/<topic>` | — | ⏳ |
+| 8 Gemini in BigQuery + Vertex, ready for billing | master-builder | `master-builder/<topic>` | Fault fields | ⏳ |
+| 9 AlloyDB | minion | `minion/<topic>` | Similar (scale-up path) | ⏳ |
+| 10 Cloud Run (billing-gated) | ragnar | `ragnar/<topic>` | MCP (URL) | ⏳ |
 
 Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes never touch amps.binihost.com / amps-api. A "coming" card flips to live only after its branch is merged AND it works on :8081.
