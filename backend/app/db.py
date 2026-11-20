@@ -24,10 +24,43 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
 
+# True once failure_embeddings has a pgvector column the database can rank on
+PGVECTOR = False
+
+
 def init_db():
     Base.metadata.create_all(engine)
     _migrate(engine)
+    _enable_pgvector(engine)
     _seed_checksheets(engine)
+
+
+def _enable_pgvector(engine):
+    """pgvector is the startup default: on a Postgres that ships the `vector`
+    extension (pgvector/pgvector:pg16 locally, Cloud SQL, AlloyDB) apply
+    app/sql/pgvector.sql — embedding column, sync trigger, backfill, HNSW. Rerun-safe.
+    Anywhere else (SQLite, plain postgres:16) "Seen before" ranks in Python."""
+    global PGVECTOR
+    if engine.dialect.name != "postgresql" or os.environ.get("AMPS_PGVECTOR", "1") == "0":
+        return
+    from pathlib import Path
+
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        if not conn.execute(text(
+                "SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")).first():
+            return
+    try:
+        raw = engine.raw_connection()
+        try:
+            with raw.cursor() as cur:
+                cur.execute((Path(__file__).parent / "sql" / "pgvector.sql").read_text())
+            raw.commit()
+        finally:
+            raw.close()
+        PGVECTOR = True
+    except Exception as e:   # no CREATE privilege etc.: keep the Python ranking
+        print(f"pgvector not enabled: {type(e).__name__}")
 
 
 def _seed_checksheets(engine):

@@ -1,0 +1,73 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "AMPS export quality report (_quality.json)",
+ "type": "object",
+ "required": [
+  "generated_at",
+  "source",
+  "tables",
+  "totals"
+ ],
+ "properties": {
+  "generated_at": {
+   "type": "string"
+  },
+  "source": {
+   "type": "string"
+  },
+  "tables": {
+   "type": "object",
+   "additionalProperties": {
+    "type": "object",
+    "required": [
+     "rows_in",
+     "rows_out",
+     "duplicates_dropped",
+     "rows_flagged",
+     "flags",
+     "null_rate"
+    ],
+    "properties": {
+     "rows_in": {
+      "type": "integer"
+     },
+     "rows_out": {
+      "type": "integer"
+     },
+     "duplicates_dropped": {
+      "type": "integer"
+     },
+     "rows_flagged": {
+      "type": "integer"
+     },
+     "flags": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "integer"
+      }
+     },
+     "null_rate": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "number"
+      }
+     },
+     "lang": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "integer"
+      }
+     }
+    }
+   }
+  },
+  "totals": {
+   "type": "object",
+   "required": [
+    "rows_out",
+    "duplicates_dropped",
+    "rows_flagged"
+   ]
+  }
+ }
+}

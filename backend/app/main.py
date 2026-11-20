@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (agencies, ai, assets, auth, autoplan, checksheets, correspondence,
                      drawings, failures, logbook, maintenance, planned, qr, risk, roster, similar, snap,
-                     sync,
+                     sync, talk,
                      tenders)
 from app.db import init_db
 
@@ -75,6 +75,7 @@ app.include_router(drawings.router, prefix="/api/drawings", tags=["drawings"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(snap.router, prefix="/api/snap", tags=["snap"])
+app.include_router(talk.router, prefix="/api/talk", tags=["ampsTalk"])
 app.include_router(similar.router, prefix="/api/similar", tags=["ai"])
 app.include_router(risk.router, prefix="/api/risk", tags=["assets"])
 if _mcp:

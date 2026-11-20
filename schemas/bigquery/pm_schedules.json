@@ -1,0 +1,74 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "PM schedule id"
+ },
+ {
+  "name": "asset_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "AMPS asset id"
+ },
+ {
+  "name": "asset_code",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset code as on the QR plate"
+ },
+ {
+  "name": "asset_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset name"
+ },
+ {
+  "name": "asset_class",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset class, e.g. Transformer"
+ },
+ {
+  "name": "station",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station the asset stands in"
+ },
+ {
+  "name": "line",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Metro line / site"
+ },
+ {
+  "name": "task",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "PM task"
+ },
+ {
+  "name": "frequency",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "weekly … yearly"
+ },
+ {
+  "name": "last_done",
+  "type": "DATE",
+  "mode": "NULLABLE",
+  "description": "Last done"
+ },
+ {
+  "name": "next_due",
+  "type": "DATE",
+  "mode": "NULLABLE",
+  "description": "Next due"
+ },
+ {
+  "name": "is_overdue",
+  "type": "BOOLEAN",
+  "mode": "NULLABLE",
+  "description": "Past due on export day"
+ }
+]

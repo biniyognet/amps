@@ -1,24 +1,29 @@
 #!/usr/bin/env bash
-# AMPS buildathon on Google Cloud: AlloyDB (Postgres + vector) + Cloud Run (api, web, seed job).
+# AMPS buildathon on Google Cloud: Cloud Run (api, web, seed job) on Postgres + pgvector.
+#   AMPS_GCP_DB=postgres (default, startup): any Postgres 16 + pgvector you already run; its URL goes
+#                         into Secret Manager via `dburl`, no VPC, no database bill on Google Cloud
+#   AMPS_GCP_DB=alloydb  (scale): AlloyDB cluster on a private VPC; same SQL, see alloydb/migrate.py
 # Fictional Demo Industries seed only. Nothing on binihost (amps.binihost.com, k3s) is touched.
 #
 #   deploy/gcp/gcp.sh <step>      run from the repository root, after `gcloud auth login`
 #
 # Steps, in order (each is safe to re-run):
 #   apis      enable the Google APIs (billed project: GDP Event Credit)
-#   network   own VPC + subnet + private services access for AlloyDB
-#   alloydb   AlloyDB cluster + primary instance; DB password and DATABASE_URL into Secret Manager
+#   dburl     postgres mode: DATABASE_URL read from stdin into Secret Manager (never echoed)
+#   network   alloydb mode: own VPC + subnet + private services access
+#   alloydb   alloydb mode: cluster + primary instance; DB password and DATABASE_URL into Secret Manager
 #   image     Artifact Registry repo; build + push backend and frontend images
 #   seed      Cloud Run job: create tables + Demo Industries network seed (empty DB only)
 #   deploy    Cloud Run services amps-api (VPC egress to AlloyDB) and amps-web (SPA + /api proxy)
 #   check     health, index, AI status, MCP tool count through the public web URL
-#   all       apis → check
+#   all       apis → check, for the chosen AMPS_GCP_DB
 #   down      delete everything this script created (rollback)
 #
 # Secrets are never printed: they go from a generator straight into Secret Manager.
 set -euo pipefail
 
 P=${GCP_PROJECT:-gen-lang-client-0618042629}
+DB=${AMPS_GCP_DB:-postgres}
 R=${GCP_REGION:-asia-south1}
 NET=amps-vpc; SUB=amps-sub; SUB_RANGE=10.20.0.0/24; PSA=amps-psa
 CLUSTER=amps; INSTANCE=amps-primary; CPU=${ALLOYDB_CPU:-2}
@@ -34,11 +39,21 @@ secret_put() {  # name; value on stdin. Creates the secret or adds a version.
   else g secrets create "$1" --replication-policy=automatic --data-file=- >/dev/null; fi
 }
 has_secret() { g secrets describe "$1" >/dev/null 2>&1; }
-vpc_flags=(--network="$NET" --subnet="$SUB" --vpc-egress=private-ranges-only)
+vpc_flags=()
+if [ "$DB" = alloydb ]; then vpc_flags=(--network="$NET" --subnet="$SUB" --vpc-egress=private-ranges-only); fi
 
 step_apis() {
-  g services enable run.googleapis.com artifactregistry.googleapis.com alloydb.googleapis.com \
-    servicenetworking.googleapis.com compute.googleapis.com secretmanager.googleapis.com
+  g services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
+  if [ "$DB" = alloydb ]; then
+    g services enable alloydb.googleapis.com servicenetworking.googleapis.com compute.googleapis.com
+  fi
+}
+
+step_dburl() {  # e.g.  bvault get amps/GCP_DB_URL | deploy/gcp/gcp.sh dburl
+  if [ -t 0 ]; then echo "pipe the postgresql+psycopg2://… URL on stdin" >&2; exit 2; fi
+  tr -d '\r\n' | secret_put amps-db-url
+  app_secrets
+  echo "dburl ok: amps-db-url set"
 }
 
 step_network() {
@@ -49,6 +64,22 @@ step_network() {
     g compute addresses create "$PSA" --global --purpose=VPC_PEERING --prefix-length=20 --network="$NET"
   g services vpc-peerings connect --service=servicenetworking.googleapis.com --ranges="$PSA" --network="$NET" ||
     g services vpc-peerings update --service=servicenetworking.googleapis.com --ranges="$PSA" --network="$NET" --force
+}
+
+app_secrets() {  # Gemini key, admin password, and read access for Cloud Run
+  # Gemini key: from deploy/.env if present (git-ignored), else leave AI off
+  if ! has_secret amps-gemini-key && [ -f deploy/.env ] && grep -q '^AMPS_GEMINI_API_KEY=.' deploy/.env; then
+    grep '^AMPS_GEMINI_API_KEY=' deploy/.env | head -1 | cut -d= -f2- | tr -d '\r\n"' | secret_put amps-gemini-key
+  fi
+  # an admin password for the hosted copy (not admin/admin: Cloud Run is public)
+  has_secret amps-admin-pass ||
+    python3 -c 'import secrets;print(secrets.token_urlsafe(12),end="")' | secret_put amps-admin-pass
+  # Cloud Run's runtime service account reads the secrets
+  local sa; sa="$(g projects describe "$P" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
+  for s in amps-db-url amps-admin-pass amps-gemini-key; do
+    if has_secret "$s"; then g secrets add-iam-policy-binding "$s" --member="serviceAccount:$sa" \
+      --role=roles/secretmanager.secretAccessor >/dev/null; fi
+  done
 }
 
 step_alloydb() {
@@ -70,19 +101,7 @@ step_alloydb() {
   g secrets versions access latest --secret=amps-db-pass |
     IP="$ip" python3 -c 'import os,sys,urllib.parse as u;print(f"postgresql+psycopg2://postgres:{u.quote(sys.stdin.read(),safe="")}@{os.environ["IP"]}:5432/postgres",end="")' |
     secret_put amps-db-url
-  # Gemini key: from deploy/.env if present (git-ignored), else leave AI off
-  if ! has_secret amps-gemini-key && [ -f deploy/.env ] && grep -q '^AMPS_GEMINI_API_KEY=.' deploy/.env; then
-    grep '^AMPS_GEMINI_API_KEY=' deploy/.env | head -1 | cut -d= -f2- | tr -d '\r\n"' | secret_put amps-gemini-key
-  fi
-  # an admin password for the hosted copy (not admin/admin: Cloud Run is public)
-  has_secret amps-admin-pass ||
-    python3 -c 'import secrets;print(secrets.token_urlsafe(12),end="")' | secret_put amps-admin-pass
-  # Cloud Run's runtime service account reads the secrets
-  local sa; sa="$(g projects describe "$P" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
-  for s in amps-db-url amps-admin-pass amps-gemini-key; do
-    if has_secret "$s"; then g secrets add-iam-policy-binding "$s" --member="serviceAccount:$sa" \
-      --role=roles/secretmanager.secretAccessor >/dev/null; fi
-  done
+  app_secrets
   echo "alloydb ok: $CLUSTER/$INSTANCE private IP $ip"
 }
 
@@ -134,9 +153,10 @@ step_down() {
   g run services delete "$WEB" --region="$R" || true
   g run services delete "$API" --region="$R" || true
   g run jobs delete "$JOB" --region="$R" || true
-  g alloydb clusters delete "$CLUSTER" --region="$R" --force || true
+  if [ "$DB" = alloydb ]; then g alloydb clusters delete "$CLUSTER" --region="$R" --force || true; fi
   g artifacts repositories delete amps --location="$R" || true
   for s in amps-db-url amps-db-pass amps-admin-pass amps-gemini-key; do g secrets delete "$s" || true; done
+  [ "$DB" = alloydb ] || return 0
   g services vpc-peerings delete --service=servicenetworking.googleapis.com --network="$NET" || true
   g compute addresses delete "$PSA" --global || true
   g compute networks subnets delete "$SUB" --region="$R" || true
@@ -144,7 +164,9 @@ step_down() {
 }
 
 case "${1:-}" in
-  apis|network|alloydb|image|seed|deploy|check|down) "step_$1" ;;
-  all) for s in apis network alloydb image seed deploy check; do echo "== $s"; "step_$s"; done ;;
-  *) sed -n '2,19p' "$0"; exit 2 ;;
+  apis|dburl|network|alloydb|image|seed|deploy|check|down) "step_$1" ;;
+  all) if [ "$DB" = alloydb ]; then steps="apis network alloydb image seed deploy check"
+       else steps="apis dburl image seed deploy check"; fi
+       for s in $steps; do echo "== $s"; "step_$s"; done ;;
+  *) sed -n '2,23p' "$0"; exit 2 ;;
 esac

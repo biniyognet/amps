@@ -1,0 +1,43 @@
+{
+ "type": "OBJECT",
+ "description": "F2: one row per failure remark, from BigQuery AI.GENERATE output_schema (bigquery/failure_fields.sql)",
+ "properties": {
+  "component": {
+   "type": "STRING",
+   "description": "part that failed"
+  },
+  "symptom": {
+   "type": "STRING",
+   "description": "what was seen or heard"
+  },
+  "reading": {
+   "type": "STRING",
+   "description": "measured values with units, as written"
+  },
+  "cause": {
+   "type": "STRING",
+   "description": "cause the remark or repair note names"
+  },
+  "action": {
+   "type": "STRING",
+   "description": "repair done, else immediate action"
+  },
+  "language": {
+   "type": "STRING",
+   "enum": [
+    "en",
+    "hi",
+    "bn",
+    "mixed"
+   ]
+  }
+ },
+ "required": [
+  "component",
+  "symptom",
+  "reading",
+  "cause",
+  "action",
+  "language"
+ ]
+}

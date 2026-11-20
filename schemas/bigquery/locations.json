@@ -1,0 +1,32 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Location id"
+ },
+ {
+  "name": "name",
+  "type": "STRING",
+  "mode": "REQUIRED",
+  "description": "Location name"
+ },
+ {
+  "name": "kind",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "site, section, station or bay"
+ },
+ {
+  "name": "parent_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "Parent location id"
+ },
+ {
+  "name": "parent_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Parent location name"
+ }
+]

@@ -1,0 +1,92 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Asset id"
+ },
+ {
+  "name": "asset_code",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset code as on the QR plate"
+ },
+ {
+  "name": "asset_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset name"
+ },
+ {
+  "name": "asset_class",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset class, e.g. Transformer"
+ },
+ {
+  "name": "station",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station the asset stands in"
+ },
+ {
+  "name": "line",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Metro line / site"
+ },
+ {
+  "name": "system",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "System, e.g. HT, ECS, DG"
+ },
+ {
+  "name": "make_model",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Make and model"
+ },
+ {
+  "name": "depot",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Maintaining depot"
+ },
+ {
+  "name": "location_detail",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Where on site"
+ },
+ {
+  "name": "status",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "in_service, under_maintenance, out_of_service, decommissioned, spare"
+ },
+ {
+  "name": "criticality",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "A (critical), B or C"
+ },
+ {
+  "name": "commissioned_on",
+  "type": "DATE",
+  "mode": "NULLABLE",
+  "description": "Date commissioned"
+ },
+ {
+  "name": "codal_life_years",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "Codal (design) life in years"
+ },
+ {
+  "name": "dq_flags",
+  "type": "STRING",
+  "mode": "REPEATED",
+  "description": "Data-quality flags; the row is kept, never silently fixed"
+ }
+]

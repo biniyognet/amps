@@ -1,0 +1,100 @@
+{
+ "type": "OBJECT",
+ "properties": {
+  "fault_type": {
+   "type": "STRING",
+   "description": "short fault class, e.g. 'Overheating', 'Oil leak'"
+  },
+  "severity": {
+   "type": "STRING",
+   "enum": [
+    "low",
+    "med",
+    "high",
+    "critical"
+   ]
+  },
+  "likely_cause": {
+   "type": "STRING"
+  },
+  "suggested_action": {
+   "type": "STRING"
+  },
+  "safety_note": {
+   "type": "STRING"
+  },
+  "confidence": {
+   "type": "NUMBER",
+   "description": "0..1"
+  },
+  "recommend": {
+   "type": "OBJECT",
+   "properties": {
+    "failure": {
+     "type": "BOOLEAN"
+    },
+    "job_card": {
+     "type": "BOOLEAN"
+    }
+   },
+   "required": [
+    "failure",
+    "job_card"
+   ]
+  },
+  "summary": {
+   "type": "STRING",
+   "description": "one-line report title"
+  },
+  "safety_flags": {
+   "type": "OBJECT",
+   "description": "PPE / isolation seen in the photo",
+   "properties": {
+    "helmet": {
+     "type": "STRING",
+     "enum": [
+      "present",
+      "missing",
+      "unclear"
+     ]
+    },
+    "vest": {
+     "type": "STRING",
+     "enum": [
+      "present",
+      "missing",
+      "unclear"
+     ]
+    },
+    "lockout_tag": {
+     "type": "STRING",
+     "enum": [
+      "present",
+      "missing",
+      "unclear"
+     ]
+    },
+    "note": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "helmet",
+    "vest",
+    "lockout_tag",
+    "note"
+   ]
+  }
+ },
+ "required": [
+  "fault_type",
+  "severity",
+  "likely_cause",
+  "suggested_action",
+  "safety_note",
+  "confidence",
+  "recommend",
+  "summary",
+  "safety_flags"
+ ]
+}

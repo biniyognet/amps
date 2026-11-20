@@ -1,4 +1,6 @@
--- AMPS on AlloyDB: pgvector for "Seen before" (buildathon F1).
+-- AMPS pgvector for "Seen before" (buildathon F1). Startup default on any Postgres
+-- that ships the extension (init_db applies this file); the same file runs on
+-- AlloyDB after deploy/gcp/alloydb/migrate.py — the scale path, no app change.
 --
 -- Additive and safe to re-run. The app keeps writing failure_embeddings.vector
 -- (unit-length float32 bytes, see backend/app/api/similar.py); a trigger mirrors

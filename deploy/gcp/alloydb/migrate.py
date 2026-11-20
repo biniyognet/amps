@@ -117,7 +117,7 @@ def main() -> int:
 
     if not a.skip_vector:
         print("4/5 pgvector: extension, embedding column, sync trigger, backfill, HNSW")
-        d.execute((HERE / "pgvector.sql").read_text())
+        d.execute((HERE.parents[2] / "backend" / "app" / "sql" / "pgvector.sql").read_text())
         dst.commit()
 
     print("5/5 verify")

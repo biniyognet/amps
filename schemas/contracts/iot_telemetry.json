@@ -1,0 +1,55 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "ampsTalk telemetry",
+ "description": "POST /api/talk/telemetry body, sent direct or as the data of a Pub/Sub push message. Token in X-AMPS-Device-Token, Authorization: Bearer, or the Pub/Sub attribute 'token'.",
+ "type": "object",
+ "required": [
+  "device",
+  "readings"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "device": {
+   "type": "string",
+   "description": "device code registered in AMPS"
+  },
+  "readings": {
+   "type": "array",
+   "minItems": 1,
+   "maxItems": 500,
+   "items": {
+    "type": "object",
+    "required": [
+     "metric",
+     "value"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "metric": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+     },
+     "value": {
+      "type": "number"
+     },
+     "unit": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "maxLength": 16
+     },
+     "ts": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time",
+      "description": "ISO 8601; with offset, or naive = IST"
+     }
+    }
+   }
+  }
+ }
+}

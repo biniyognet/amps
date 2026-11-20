@@ -360,9 +360,11 @@ class FailureEmbedding(Base):
     """A failure's text as a vector, for "seen before" (buildathon F1).
 
     One row per failure logbook entry. The vector is float32 bytes, unit length,
-    so cosine similarity is a dot product in Python — no pgvector needed for an
-    estate of a few thousand failures. text_sha is the hash of the exact text that
-    was embedded: an edited remark, or a different model, re-embeds that row."""
+    which is all SQLite or plain Postgres needs (cosine = a dot product in Python).
+    On Postgres with pgvector, app/sql/pgvector.sql adds an `embedding vector(768)`
+    column that a trigger fills from these bytes, and the database ranks.
+    text_sha is the hash of the exact text that was embedded: an edited remark,
+    or a different model, re-embeds that row."""
     __tablename__ = "failure_embeddings"
 
     entry_id: Mapped[int] = mapped_column(ForeignKey("log_entries.id"), primary_key=True)
@@ -564,3 +566,47 @@ class AgencyScope(Base):
     cycles: Mapped[str | None] = mapped_column(String(120))       # "Monthly,Quarterly"; None = all
 
     agency: Mapped[Agency] = relationship(back_populates="scopes")
+
+
+class IoTDevice(Base):
+    """ampsTalk — a sensor or controller that reports straight to AMPS.
+
+    Each device is bound to one asset and holds its own token (stored only as a
+    sha256). `thresholds` is JSON: {"temp_c": {"max": 85}, "voltage_v":
+    {"min": 380, "max": 440}}; a reading outside a band files a failure on the
+    asset unless one is already open."""
+    __tablename__ = "iot_devices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(80), unique=True)
+    name: Mapped[str] = mapped_column(String(160))
+    kind: Mapped[str] = mapped_column(String(40), default="sensor")   # sensor | relay | plc | meter
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    line_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))
+    token_sha: Mapped[str] = mapped_column(String(64))
+    thresholds: Mapped[str | None] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(default=True)
+    last_seen: Mapped[datetime | None]
+    created_by: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    asset: Mapped["Asset"] = relationship()
+
+
+class IoTReading(Base):
+    """One value from one device. `breach` is the band it crossed (min/max), or
+    None; `entry_id` is the failure it filed, when it filed one."""
+    __tablename__ = "iot_readings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("iot_devices.id"), index=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    metric: Mapped[str] = mapped_column(String(40))
+    value: Mapped[float]
+    unit: Mapped[str | None] = mapped_column(String(16))
+    ts: Mapped[datetime] = mapped_column(index=True)
+    received_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    breach: Mapped[str | None] = mapped_column(String(8))
+    entry_id: Mapped[int | None] = mapped_column(ForeignKey("log_entries.id"))
+
+    device: Mapped[IoTDevice] = relationship()

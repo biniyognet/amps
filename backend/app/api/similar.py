@@ -11,9 +11,12 @@ anywhere in the user's scope by cosine similarity and shows the top few with
 the action that closed them — so the crew reads what worked last time before
 they open the panel. Multilingual by design: a Hindi remark finds an English one.
 
-No pgvector: vectors are unit-length float32 bytes and the ranking is a dot
-product in Python, which is instant for a few thousand failures. AlloyDB /
-pgvector is the scale-up path, not a demo dependency.
+pgvector is the startup default: on a Postgres with the `vector` extension
+(app/sql/pgvector.sql, applied by init_db) a trigger mirrors each stored vector
+into `embedding vector(768)` and the database ranks by cosine (`<=>`, HNSW).
+The same SQL moves unchanged to AlloyDB when the estate outgrows one box
+(deploy/gcp/alloydb/migrate.py). Without the extension the vectors stay
+unit-length float32 bytes and the ranking is a dot product in Python.
 
 Without a Gemini key (or when the embedding call fails) the panel still answers,
 from word overlap, and says so (`mode: "keyword"`). The key is read from
@@ -31,13 +34,14 @@ from array import array
 from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.orm import Session
 
 from app.api import ai, vertex
 from app.api.assets import visible_asset
 from app.api.auth import optional_user, scope_location_ids
 from app.api.logbook import _down_hours, _drop_superseded, _recovery_map
+from app import db as dbmod
 from app.db import get_db
 from app.models import Asset, FailureEmbedding, LogEntry, LogEntryType
 
@@ -169,6 +173,20 @@ def _item(e: LogEntry, fix: LogEntry, score: float) -> dict:
             "downtime_hrs": _down_hours(e, fix.at)}
 
 
+def _pg_rank(db: Session, query_id: int, ids: list[int]):
+    """(entry_id, cosine) for the candidates, ranked by pgvector; None when the
+    extension is off or a row is not mirrored yet (then Python ranks them)."""
+    if not dbmod.PGVECTOR or not ids:
+        return None
+    rows = db.execute(text(
+        "SELECT f.entry_id, 1 - (f.embedding <=> q.embedding) FROM failure_embeddings f,"
+        " (SELECT embedding FROM failure_embeddings WHERE entry_id = :q) q"
+        " WHERE f.entry_id IN :ids AND f.embedding IS NOT NULL AND q.embedding IS NOT NULL"
+        " ORDER BY f.embedding <=> q.embedding").bindparams(bindparam("ids", expanding=True)),
+        {"q": query_id, "ids": ids}).all()
+    return [(r[0], float(r[1])) for r in rows] if len(rows) == len(ids) else None
+
+
 @router.get("")
 def similar_failures(asset_code: str, failure_id: int | None = None, k: int = 3,
                      db: Session = Depends(get_db), user=Depends(optional_user)):
@@ -201,7 +219,12 @@ def similar_failures(asset_code: str, failure_id: int | None = None, k: int = 3,
             vecs = ensure_vectors(db, [query, *cands], cap=LAZY_CAP)
             qv = vecs.get(query.id)
             if qv is not None:
-                scored = [(sum(a * b for a, b in zip(qv, vecs[e.id])), e) for e in cands if e.id in vecs]
+                ranked = _pg_rank(db, query.id, [e.id for e in cands if e.id in vecs])
+                if ranked is not None:
+                    by_id = {e.id: e for e in cands}
+                    scored = [(s, by_id[i]) for i, s in ranked]
+                else:
+                    scored = [(sum(a * b for a, b in zip(qv, vecs[e.id])), e) for e in cands if e.id in vecs]
                 mode = "embedding"
         except Exception:   # quota / network / bad reply: keyword ranking, never a 500
             db.rollback()
@@ -215,4 +238,5 @@ def similar_failures(asset_code: str, failure_id: int | None = None, k: int = 3,
     scored.sort(key=lambda t: (-t[0], -t[1].at.timestamp()))
     base["matches"] = [_item(e, rec[e.id], s) for s, e in scored if s >= floor][:k]
     base["mode"], base["model"] = mode, EMBED_MODEL if mode == "embedding" else None
+    base["engine"] = ("pgvector" if dbmod.PGVECTOR else "python") if mode == "embedding" else None
     return base

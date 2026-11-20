@@ -1,0 +1,14 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Asset class id"
+ },
+ {
+  "name": "name",
+  "type": "STRING",
+  "mode": "REQUIRED",
+  "description": "Asset class name"
+ }
+]

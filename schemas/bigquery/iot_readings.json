@@ -1,0 +1,110 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Reading id"
+ },
+ {
+  "name": "device_code",
+  "type": "STRING",
+  "mode": "REQUIRED",
+  "description": "ampsTalk device code"
+ },
+ {
+  "name": "device_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Device name"
+ },
+ {
+  "name": "device_kind",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "sensor, meter, relay, gateway …"
+ },
+ {
+  "name": "asset_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "AMPS asset id"
+ },
+ {
+  "name": "asset_code",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset code as on the QR plate"
+ },
+ {
+  "name": "asset_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset name"
+ },
+ {
+  "name": "asset_class",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset class, e.g. Transformer"
+ },
+ {
+  "name": "station",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station the asset stands in"
+ },
+ {
+  "name": "line",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Metro line / site"
+ },
+ {
+  "name": "metric",
+  "type": "STRING",
+  "mode": "REQUIRED",
+  "description": "Metric, e.g. temp_c"
+ },
+ {
+  "name": "value",
+  "type": "FLOAT",
+  "mode": "REQUIRED",
+  "description": "Reading value"
+ },
+ {
+  "name": "unit",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Unit"
+ },
+ {
+  "name": "ts",
+  "type": "DATETIME",
+  "mode": "REQUIRED",
+  "description": "Reading time, IST wall clock"
+ },
+ {
+  "name": "breach",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "max or min when outside the device band"
+ },
+ {
+  "name": "failure_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "Failure the breach filed or joined"
+ },
+ {
+  "name": "event_date",
+  "type": "DATE",
+  "mode": "REQUIRED",
+  "description": "Partition column: the duty day (IST)"
+ },
+ {
+  "name": "dq_flags",
+  "type": "STRING",
+  "mode": "REPEATED",
+  "description": "Data-quality flags; the row is kept, never silently fixed"
+ }
+]

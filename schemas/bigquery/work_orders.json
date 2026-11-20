@@ -1,0 +1,92 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Work order id"
+ },
+ {
+  "name": "asset_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "AMPS asset id"
+ },
+ {
+  "name": "asset_code",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset code as on the QR plate"
+ },
+ {
+  "name": "asset_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset name"
+ },
+ {
+  "name": "asset_class",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset class, e.g. Transformer"
+ },
+ {
+  "name": "station",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station the asset stands in"
+ },
+ {
+  "name": "line",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Metro line / site"
+ },
+ {
+  "name": "type",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "preventive, breakdown or inspection"
+ },
+ {
+  "name": "status",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "open, assigned, done, verified, cancelled"
+ },
+ {
+  "name": "title",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Title"
+ },
+ {
+  "name": "findings",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Findings"
+ },
+ {
+  "name": "opened_at",
+  "type": "DATETIME",
+  "mode": "NULLABLE",
+  "description": "Opened, IST"
+ },
+ {
+  "name": "closed_at",
+  "type": "DATETIME",
+  "mode": "NULLABLE",
+  "description": "Closed, IST"
+ },
+ {
+  "name": "event_date",
+  "type": "DATE",
+  "mode": "REQUIRED",
+  "description": "Partition column: the duty day (IST)"
+ },
+ {
+  "name": "dq_flags",
+  "type": "STRING",
+  "mode": "REPEATED",
+  "description": "Data-quality flags; the row is kept, never silently fixed"
+ }
+]

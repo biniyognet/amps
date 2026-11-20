@@ -1,0 +1,140 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Failure id (log-book row)"
+ },
+ {
+  "name": "asset_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "AMPS asset id"
+ },
+ {
+  "name": "asset_code",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset code as on the QR plate"
+ },
+ {
+  "name": "asset_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset name"
+ },
+ {
+  "name": "asset_class",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset class, e.g. Transformer"
+ },
+ {
+  "name": "station",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station the asset stands in"
+ },
+ {
+  "name": "line",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Metro line / site"
+ },
+ {
+  "name": "station_text",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station as written in the book"
+ },
+ {
+  "name": "system",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "System"
+ },
+ {
+  "name": "category",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Category"
+ },
+ {
+  "name": "started_at",
+  "type": "DATETIME",
+  "mode": "NULLABLE",
+  "description": "When it failed, IST wall clock"
+ },
+ {
+  "name": "log_date",
+  "type": "DATE",
+  "mode": "REQUIRED",
+  "description": "Duty date"
+ },
+ {
+  "name": "shift",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Shift code M/E/N/G/R"
+ },
+ {
+  "name": "recovered_at",
+  "type": "DATETIME",
+  "mode": "NULLABLE",
+  "description": "When it was restored, IST"
+ },
+ {
+  "name": "downtime_hours",
+  "type": "FLOAT",
+  "mode": "NULLABLE",
+  "description": "Hours down, derived as in the app"
+ },
+ {
+  "name": "state",
+  "type": "STRING",
+  "mode": "REQUIRED",
+  "description": "open, acknowledged, job_card or rectified"
+ },
+ {
+  "name": "fault_type",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Fault type"
+ },
+ {
+  "name": "description",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "What the crew wrote"
+ },
+ {
+  "name": "action_taken",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "How it was fixed"
+ },
+ {
+  "name": "via_job_card",
+  "type": "BOOLEAN",
+  "mode": "NULLABLE",
+  "description": "Fixed through a job card to an agency"
+ },
+ {
+  "name": "event_date",
+  "type": "DATE",
+  "mode": "REQUIRED",
+  "description": "Partition column: the duty day (IST)"
+ },
+ {
+  "name": "lang",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Script of the free text: bn, hi, en, mixed or none"
+ },
+ {
+  "name": "dq_flags",
+  "type": "STRING",
+  "mode": "REPEATED",
+  "description": "Data-quality flags; the row is kept, never silently fixed"
+ }
+]

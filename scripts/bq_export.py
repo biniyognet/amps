@@ -4,9 +4,11 @@
 """Export AMPS estate data to newline-delimited JSON for BigQuery (buildathon F4).
 
     DATABASE_URL=... python scripts/bq_export.py --out bq_out
-    bq mk --location us-central1 --dataset amps_demo
-    for f in bq_out/*.json; do bq load --replace --autodetect --source_format=NEWLINE_DELIMITED_JSON \
-        amps_demo.$(basename $f .json) $f; done
+    bigquery/load.sh bq_out          # explicit schemas, partitioned + clustered
+
+Every table goes through scripts/bq_cleanse.py against schemas/bigquery/<table>.json
+(typed DATE/DATETIME, text normalised, lang + dq_flags + event_date added, exact
+duplicates dropped); bq_out/_quality.json reports what it found.
 
 Tables are flattened for a data agent (names, not ids, wherever a person would ask
 by name): assets carry their class, station and line; failures and logbook rows
@@ -21,15 +23,17 @@ import sys
 from datetime import date, datetime
 from enum import Enum
 
-sys.path[:0] = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"), os.getcwd()]
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [os.path.join(HERE, "..", "backend"), HERE, os.getcwd()]
 
 from sqlalchemy import select  # noqa: E402
 
 from app.api.logbook import (_ack_map, _down_hours, _drop_superseded,  # noqa: E402
                              _jobcard_map, _recovery_map)
 from app.db import SessionLocal  # noqa: E402
-from app.models import (Asset, AssetClass, Location, LogEntry, LogEntryType,  # noqa: E402
-                        PMPlan, PMSchedule, WorkOrder)
+from app.models import (Asset, AssetClass, IoTDevice, IoTReading, Location, LogEntry,  # noqa: E402
+                        LogEntryType, PMPlan, PMSchedule, WorkOrder)
+from bq_cleanse import cleanse, quality_report  # noqa: E402
 
 
 def val(v):
@@ -51,6 +55,7 @@ def main():
     loc = {l.id: l for l in db.scalars(select(Location))}
     cls = {c.id: c.name for c in db.scalars(select(AssetClass))}
     assets = {x.id: x for x in db.scalars(select(Asset))}
+    dev = {d.id: d for d in db.scalars(select(IoTDevice))}
 
     def name(i):
         return loc[i].name if i in loc else None
@@ -107,16 +112,24 @@ def main():
                          for p in db.scalars(select(PMSchedule))],
         "pm_plans": [{"id": p.id, "asset_id": p.asset_id, **asset_cols(p.asset_id), "frequency": p.frequency,
                       "last_done_seed": val(p.last_done_seed)} for p in db.scalars(select(PMPlan))],
+        "iot_readings": [{"id": r.id, "device_code": dev[r.device_id].code, "device_name": dev[r.device_id].name,
+                          "device_kind": dev[r.device_id].kind, **asset_cols(r.asset_id), "asset_id": r.asset_id,
+                          "metric": r.metric, "value": r.value, "unit": r.unit, "ts": val(r.ts),
+                          "breach": r.breach, "failure_id": r.entry_id}
+                         for r in db.scalars(select(IoTReading))],
     }
     db.close()
+    stats = {}
     for t, rows in tables.items():
-        if not rows:  # bq --autodetect cannot load an empty file
-            print(f"{t:14}      0 rows  (skipped)")
-            continue
+        rows, stats[t] = cleanse(t, rows)
+        # an empty file still loads against an explicit schema: the table exists, empty
         with open(os.path.join(a.out, f"{t}.json"), "w") as fh:
             for r in rows:
                 fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-        print(f"{t:14} {len(rows):6} rows")
+        st = stats[t]
+        print(f"{t:14} {st['rows_out']:6} rows  dup -{st['duplicates_dropped']}  flagged {st['rows_flagged']}")
+    with open(os.path.join(a.out, "_quality.json"), "w") as fh:
+        json.dump(quality_report(stats, os.environ.get("AMPS_SOURCE", "amps")), fh, indent=1, ensure_ascii=False)
 
 
 if __name__ == "__main__":

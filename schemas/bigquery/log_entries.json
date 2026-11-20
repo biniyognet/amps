@@ -1,0 +1,152 @@
+[
+ {
+  "name": "id",
+  "type": "INTEGER",
+  "mode": "REQUIRED",
+  "description": "Log-book row id"
+ },
+ {
+  "name": "at",
+  "type": "DATETIME",
+  "mode": "NULLABLE",
+  "description": "Entry time, IST wall clock"
+ },
+ {
+  "name": "log_date",
+  "type": "DATE",
+  "mode": "REQUIRED",
+  "description": "Duty date"
+ },
+ {
+  "name": "shift",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Shift code"
+ },
+ {
+  "name": "type",
+  "type": "STRING",
+  "mode": "REQUIRED",
+  "description": "maintenance, failure, rectification, acknowledgement, job_card …"
+ },
+ {
+  "name": "subtype",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Subtype, e.g. PM frequency"
+ },
+ {
+  "name": "system",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "System"
+ },
+ {
+  "name": "category",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Category"
+ },
+ {
+  "name": "asset_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "AMPS asset id"
+ },
+ {
+  "name": "asset_code",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset code as on the QR plate"
+ },
+ {
+  "name": "asset_name",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset name"
+ },
+ {
+  "name": "asset_class",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Asset class, e.g. Transformer"
+ },
+ {
+  "name": "station",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station the asset stands in"
+ },
+ {
+  "name": "line",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Metro line / site"
+ },
+ {
+  "name": "station_text",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Station as written"
+ },
+ {
+  "name": "fault_type",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Fault type"
+ },
+ {
+  "name": "ended_at",
+  "type": "DATETIME",
+  "mode": "NULLABLE",
+  "description": "End time, IST"
+ },
+ {
+  "name": "text",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "What the crew wrote"
+ },
+ {
+  "name": "action_taken",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Action taken"
+ },
+ {
+  "name": "consumables",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Consumables used"
+ },
+ {
+  "name": "rectifies_id",
+  "type": "INTEGER",
+  "mode": "NULLABLE",
+  "description": "The failure this row resolves / acknowledges"
+ },
+ {
+  "name": "via_job_card",
+  "type": "BOOLEAN",
+  "mode": "NULLABLE",
+  "description": "Done through a job card"
+ },
+ {
+  "name": "event_date",
+  "type": "DATE",
+  "mode": "REQUIRED",
+  "description": "Partition column: the duty day (IST)"
+ },
+ {
+  "name": "lang",
+  "type": "STRING",
+  "mode": "NULLABLE",
+  "description": "Script of the free text: bn, hi, en, mixed or none"
+ },
+ {
+  "name": "dq_flags",
+  "type": "STRING",
+  "mode": "REPEATED",
+  "description": "Data-quality flags; the row is kept, never silently fixed"
+ }
+]
