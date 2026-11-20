@@ -4,9 +4,9 @@
 
 **An open-source maintenance management suite for electrical and industrial assets** — asset registers, QR-based identification, preventive-maintenance scheduling and work-order tracking, built for multi-site, multi-user field environments.
 
-> Born from years of hands-on electrical maintenance practice — EOT crane maintenance in heavy industry, and traction-power / power-supply asset management in metro rail systems — AMPS encodes the record-keeping and planning discipline that field maintenance actually needs, and that spreadsheets cannot deliver at organizational scale.
+> Born from years of hands-on electrical maintenance practice — EOT crane maintenance in heavy industry, and traction-power / power-supply asset management in rail systems — AMPS encodes the record-keeping and planning discipline that field maintenance actually needs, and that spreadsheets cannot deliver at organizational scale.
 
-**Author:** Arup Biswas · Electrical Engineer (industrial & metro-rail maintenance) · License: [MIT](LICENSE)
+**Author:** Arup Biswas · Electrical Engineer (industrial & rail maintenance) · License: [MIT](LICENSE)
 
 ---
 

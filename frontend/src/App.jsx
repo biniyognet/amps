@@ -11,7 +11,7 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
+import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, PILOT_URL, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -2869,9 +2869,9 @@ function PrintablesNav({ active }) {
           <a className="sc-item" role="menuitem" href="#/printables?t=checksheets" onClick={() => go('checksheets')}>
             <span className="sc-name">Checksheets</span><span className="sc-sub">maintenance checksheet formats — print & manage</span>
           </a>
-          {!OPERATOR && <>
+          {!OPERATOR && PILOT_URL && <>
             <div className="sc-divider" />
-            <a className="sc-item" role="menuitem" href="https://metro.binihost.com" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
+            <a className="sc-item" role="menuitem" href={PILOT_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
               <span className="sc-name">Pilot AMPS<span className="sc-live">● LIVE</span></span><span className="sc-sub">in service · pilot power-supply ↗</span>
             </a>
           </>}

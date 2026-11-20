@@ -166,6 +166,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov | AI page `#/ai` opens with the two layers (techniques, feature → technique, economy line), L1 / L2 tag on every card (0d57849) | The jury reads the mental model in one screen |
 | 20 Nov | Deck and pitch use the same two-layer picture; the data is called the "Demo Industries demo dataset" | One story across app, deck and video |
 | 20 Nov (Arup) | Old 23-slide pitch PDF `frontend/public/pitch/AMPS_pitch_deck.pdf` dropped and its "PDF ↓" link removed from the Brief page: it named the pilot source. Replacement = the new two-layer deck as a PDF on the Hack2skill template, once Arup approves it. Git history keeps the old file; any history scrub is Arup's call | The source is never named in what judges see |
+| 20 Nov (Arup) | Source word out of what people see: the shortcuts-menu pilot link now comes from build env `AMPS_PILOT_URL` (unset = no link, so the submitted build shows none); README bio says "rail". Left on purpose: the line-colour key and the ribbon CSS class name, code identifiers that never render as text | Nothing a judge sees names the source; no behaviour change |
 
 ## 6. Open items (20 Nov evening)
 | Item | Owner | Next |

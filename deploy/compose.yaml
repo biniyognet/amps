@@ -54,6 +54,7 @@ services:
         AMPS_ORDER_REF: ${AMPS_ORDER_REF:-}          # operator details: office env only
         AMPS_ORDER_EXTRACT: ${AMPS_ORDER_EXTRACT:-}
         AMPS_ORG_ALIASES: ${AMPS_ORG_ALIASES:-}
+        AMPS_PILOT_URL: ${AMPS_PILOT_URL:-}          # live pilot link in the menu; unset = hidden
     volumes:
       - ./docker/nginx.compose.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
