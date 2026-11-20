@@ -3,6 +3,7 @@
 > Kolkata · 20–21 Nov 2026 · submission closes **21 Nov, 09:00** · branch `buildathon`
 > Goal: integrate Google AI + data features into AMPS and make it as powerful as we can.
 > Audited 20 Nov (freya) against `buildathon` 5b40544 and every pushed lane branch. Laptop: JARVIS rebuilt :8081 at 512e0b1, 20 Nov 12:00 (data kept, no `down -v`): app 200, `/api/risk` 200.
+> Refreshed 21 Nov 00:45 (JARVIS): Cloud Run dropped everywhere, F1 = EmbeddingGemma on-prem, deck v12 + PDF re-export, submit checklist.
 
 ## 1. Checklist
 
@@ -24,23 +25,23 @@
 - [ ] Codelab 1 (optional skim, F5 covers it): https://codelabs.developers.google.com/getting-started-with-antigravity-skills
 
 ### Build (order: F4 → F1 → F2 → F6; each ships with its screen)
-- [x] F3 AMPS MCP server — 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`; local stdio + https://amps-api.binihost.com/mcp, pod `amps-mcp`; Cloud Run next)
+- [x] F3 AMPS MCP server — 6 read-only tools over MCP — done 20 Nov (`backend/app/mcp_server.py`; local stdio + https://amps-api.binihost.com/mcp, pod `amps-mcp`; Cloud Run dropped 20 Nov, see §5)
 - [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
 - [x] AI demo stories seeded — 85fd3d5 `backend/seed_network.py` `STORIES`: 10 failures on 5 assets (Pump Motor 1 repeat seal leak past codal life, HSCB Panel 1 trips, PTR 1 oil-temp trend, বাংলা + हिन्दी + shorthand remarks); 178 failures on a fresh DB
 - [x] **AI hub** `#/ai` + ✦ AI nav link — 8 cards: **6 live** (Snap & Report, Ask AMPS, AI PM plan, MCP server, Similar past failures, Risk badge), **2 coming** (Fault fields, Estate agent; both wait for billing). Lane detail in §7
 - [~] F4 Estate analytics agent — data ✅ in BigQuery `amps_demo`, reloaded from the laptop DB with the stories (assets 1,874 · log_entries 14,416 · `asset_risk` view 1,874; sandbox, tables expire in 59 days) · agent config + 6 verified questions ✅ in `bigquery/agent/` · creating the agent (Codelab 2 steps 6–11) is **HELD until billing is on** · pitch fallback ✅ `bigquery/agent/pitch.sh`
-- [x] F1 Similar past failures — `gemini-embedding-001` on remarks + logbook, in the app's own Postgres; keyword match until the Gemini key is set · UI: "Similar past failures" panel on the failure card · AlloyDB pgvector = the scale-up path (step 9)
+- [x] F1 Similar past failures — **EmbeddingGemma on-prem** (Ollama on our k3s GPU, 768-dim) + pgvector in the app's own Postgres, live on the judges' stack; 17/18 vs nomic 8/18 (Bengali 5/5 vs 0/5) · UI: "Similar past failures" panel on the failure card · AlloyDB pgvector = the scale-up path (step 9)
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [x] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list (merged; live after the laptop rebuild)
 
 ### Submit (Hack2skill guide email, 20 Nov)
 > Window: opens **20 Nov 23:00**, closes **21 Nov 09:00**, no extension. One submission per team, on the participant dashboard.
 > 21 Nov agenda: mentor evaluation 10:00–13:00 · showcase 14:00–17:30 · results 18:00.
-- [ ] Working prototype link — must stay **live until evaluation ends** (pick: public host vs laptop; see §6)
-- [ ] Pitch deck as **PDF < 10 MB on the dashboard template** (re-flow our 11 slides into it; lead with the two AI layers)
+- [x] Working prototype link — **amps-demo.binihost.com** (ns `amps-judges`, one-click judge login); stays live until evaluation ends
+- [x] Pitch deck PDF < 10 MB — `deck/AMPS_pitch_deck.pdf` re-exported 21 Nov 00:40 from Slides v12: 11 slides, 1920×1080, 0.48 MB · Arup uploads it on the dashboard
 - [ ] Demo video (optional) ≤ 3 min, public Google Drive or YouTube link
 - [ ] Demo runs end to end (with a pre-loaded backup table, in case the venue Wi-Fi is slow)
-- [~] Pitch deck ✅ drafted 20 Nov, 11 slides in rubric order (private claude.ai Slides link, Arup shares it; fill [team members] · [demo URL] · [contact]) · demo video/link still open
+- [x] Pitch deck v12 (claude.ai Slides): placeholders filled — team Arup Biswas · Nilanjan Chakraborty, demo URL amps-demo.binihost.com, [contact] removed · Cloud Run cards out (scale path = GKE Autopilot)
 - [ ] Submit on Hack2skill between 20 Nov 23:00 and 21 Nov 09:00
 
 ## 1b. Evaluation parameters & weightage (Hack2skill AI Evaluation slide, 20 Nov 11:06)
@@ -48,7 +49,7 @@
 |---|---|---|
 | Functional Product & Implementation | 30% | Live app end to end: Snap & Report, Ask AMPS, log book, job cards, printables |
 | Technical Architecture & Engineering Quality | 20% | FastAPI + Postgres + React, tests, three hosting paths (§8) |
-| Google AI Integration & Implementation Depth | 20% | Gemini multimodal + function calling + JSON schema, BigQuery data agent, AlloyDB, Cloud Run |
+| Google AI Integration & Implementation Depth | 20% | Gemini multimodal + function calling + JSON schema · Gemma on-prem (EmbeddingGemma search + Gemma 3 4B fallback) · BigQuery + data agent · AlloyDB / GKE Autopilot = scale path |
 | Problem-Solution Alignment | 15% | Floor technician: QR → photo → draft → failure report / job card |
 | UX, Usability & Accessibility | 10% | Phone-first one column, 500px floor, voice remarks |
 | Innovation & Differentiation | 5% | AI drafts, human confirms; asset history in the prompt |
@@ -104,7 +105,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | Frontend | React + Vite SPA, Ensign site 70 (amps.binihost.com) | New panels: "Similar past failures", risk badge on assets, analytics chat | Additive UI |
 | API | FastAPI + SQLAlchemy 2 + Alembic, k3s `amps-demo` | New routes: `/ai/similar`, `/ai/extract`, `/ai/risk`, MCP server | Additive endpoints |
 | Database | Postgres 16 (pod), nightly reset 03:00 | + `vector` extension and an embeddings column (in the same Postgres, or an **AlloyDB Express** copy for the demo) | Additive schema (Alembic migration) |
-| AI calls | Gemini over REST `generateContent` (Ask AMPS, Snap & Report, Auto-plan); `gemini-3.5-flash-lite` on the buildathon stack, amps.binihost.com still pins `gemini-2.5-flash` in its k8s manifest | + embeddings, **AI.EXTRACT** on remarks, risk scoring | Extends the same Gemini key |
+| AI calls | Gemini over REST `generateContent` (Ask AMPS, Snap & Report, Auto-plan); `gemini-3.5-flash-lite` on the buildathon stack, amps.binihost.com still pins `gemini-2.5-flash` in its k8s manifest · Gemma on-prem via Ollama: EmbeddingGemma (search) + Gemma 3 4B (fallback) | + embeddings, **AI.EXTRACT** on remarks, risk scoring | Extends the same Gemini key |
 | Agent access | Ask AMPS = 6 read-only tools inside the app | **F3 MCP server** exposes the same 6 tools to any agent (Antigravity, Claude, Gemini CLI) | Wrapper, no logic change |
 | Guardrails | Code-level (read-only tools, human submits) | **F5 SKILL.md**: rules an agent must follow on AMPS data | New doc file |
 | Analytics | Dashboard counts/charts | **F4** logbook/failures → BigQuery + Conversational Analytics (ask in English) | New export job + Google console |
@@ -114,7 +115,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 ### What each feature needs (to choose what to build)
 | F | Feature | Needs | Effort | Demo wow |
 |---|---|---|---|---|
-| F1 | Similar past failures | pgvector + Gemini embeddings | M | High |
+| F1 | Similar past failures | pgvector + EmbeddingGemma (on-prem) | M | High |
 | F2 | Fault fields from remarks | Gemini (AI.EXTRACT-style prompt) | S | Medium |
 | F3 | AMPS MCP server | Python MCP SDK, the 6 existing tools | S | High (agent-native) |
 | F4 | BigQuery analytics agent | BigQuery dataset + export | M–L | Medium |
@@ -173,12 +174,12 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov (Arup ask → JARVIS rec.) | **Hosting = hybrid.** Home = on-prem k3s / Kubernetes (binihost): app, Postgres+pgvector, Redis, worker, fixed cost. Google = the AI + data + edge layer: Gemini / Vertex, BigQuery + BQML, Pub/Sub for ampsTalk, Cloud Run as scale-to-zero burst + DR mirror of the same images. Scale path: pgvector → AlloyDB, k3s → GKE Autopilot. See §8 | Cheapest steady state (on-prem ≈ ₹0 marginal), pay-per-use only where Google is best, no lock-in (same containers everywhere). The mentor already liked on-prem k8s. Prototype link for judges = Arup's pick (amps.binihost.com gets no roll today) |
 | 20 Nov (Arup, final) | **Architecture final: binihost runs everything, Google is the brain.** Frontend on binihost Ensign (CDN); api ×N, worker ×N, Redis, Postgres+pgvector (CNPG HA) on the binihost 3-node k3s. Google credits only for Gemini (Vertex AI) on every click and BigQuery + BQML for learning: the binihost worker loads cleansed rows nightly (free load jobs, day partitions), BQML trains weekly and scores nightly, and the worker pulls `risk_scores` back into Postgres → cache bump → `risk.updated` over the websocket. **Cloud Run dropped** (it only duplicated the 3 nodes). Supersedes the Cloud Run lines in §8b | Fixed cost for compute; credits spent where Google is unique; no lock-in |
 | 20 Nov | **"How it's built" section on the AI page** (`aihub.jsx` `Arch()`): binihost zone (CDN · api ×N · Redis bus · worker ×N · Postgres+pgvector) ⇄ Google zone (Gemini on Vertex · BigQuery+BQML), plus three live proof tiles: websocket on/off, read-cache hit/miss + ms on `/api/lines` (`X-AMPS-Cache`), learning layer. Checked headless at 1600 px and 500 px | Judges see the architecture inside the product, with live proof, not only on a slide |
-| 20 Nov (Arup) | **Decisions:** judges' link = amps-demo.binihost.com · Arup links billing for the Google credits for the evaluation only (review after) · after the event, AI runs on each **client's own** Google credits as the client needs · this architecture is the one to test, build and run. Deck architecture slide redrawn to it; Cloud Run removed from tools/next slides; Slides + PDF re-uploaded (8 pages, 0.55 MB) | One story everywhere: product, slide, page |
+| 20 Nov (Arup) | **Decisions:** judges' link = amps-demo.binihost.com · Arup links billing for the Google credits for the evaluation only (review after) · after the event, AI runs on each **client's own** Google credits as the client needs · this architecture is the one to test, build and run. Deck architecture slide redrawn to it; Cloud Run removed from the PDF then (8 pages, 0.55 MB), but the Slides cards still said Cloud Run until v12 (21 Nov) | One story everywhere: product, slide, page |
 | 20 Nov | **Frontend live + lazy.** One shared websocket (`src/live.jsx`, backoff 1→30 s, Live dot in the header, toast "⚡ New failure on <asset>"); `write` / `failure.raised` / `talk.reading` events → debounced re-read through the cached GETs; assets list cached across the 4 screens (stale-while-revalidate); Roster, Guide, Letters, Planner and AI Hub load on demand (`React.lazy`) | Main bundle 355 → 336 kB (gzip 110.9 → 104.9 kB); 92 kB moved to on-demand chunks. Screens update without polling. No layout change |
 | 20 Nov | Laptop end to end: rebuilt with redis + worker (DB kept). Read cache 360 ms → 9 ms on a hit. Fix: worker BRPOP had the shared 1 s Redis socket timeout, so every 5 s poll timed out; worker now has its own client (timeout poll + 5 s) | `backend/app/worker.py` |
 | 20 Nov | Gemini on the laptop key: works, but 3.x models reject `thinkingBudget: 0` (400) — Snap + auto-plan would have failed. New `ai.thinking_off()` sends `thinkingLevel: minimal` on 3.x. `_post` retries 503/429 twice (shared tier returned 503s at peak; latency 2–15 s, 3.5-flash-lite ~9 s). `bq.export` job failed (scripts/ not in image) → Dockerfile copies `scripts/*.py` to /scripts | `api/ai.py`, `snap.py`, `autoplan.py`, `backend.Dockerfile` |
 | 20 Nov | `bq.export` next failed on `/schemas/bigquery/*.json` (cleanse schemas) → image also copies `schemas/bigquery/`. Laptop worker overlay now points at `amps_data` like the api | `backend.Dockerfile` |
-| 20 Nov | **Judges' link live: amps-demo.binihost.com** = full stack on binihost k3s, ns `amps-judges` (frontend + api + worker + Redis + Postgres/pgvector), same images as the laptop e2e (`oc11202158-e2e`). Demo Industries network seed, login on, admin password generated (bvault `amps-judges/`). DNS-only A record, Let's Encrypt cert. Verified: bundle `CvJ7anaO`, ws 101, worker alive (redis mode), Ask AMPS 18 s. Embedding reindex got Gemini 429 → needs billing on the key's project. amps.binihost.com untouched | `deploy/k8s/judges/stack.yaml` |
+| 20 Nov | **Judges' link live: amps-demo.binihost.com** = full stack on binihost k3s, ns `amps-judges` (frontend + api + worker + Redis + Postgres/pgvector), same images as the laptop e2e (`oc11202158-e2e`). Demo Industries network seed, login on, admin password generated (bvault `amps-judges/`). DNS-only A record, Let's Encrypt cert. Verified: bundle `CvJ7anaO`, ws 101, worker alive (redis mode), Ask AMPS 18 s. Embedding reindex got Gemini 429 → needs billing on the key's project (resolved: switched to EmbeddingGemma on-prem, see the Hybrid AI row). amps.binihost.com untouched | `deploy/k8s/judges/stack.yaml` |
 | 20 Nov | **One-click judge login**: `AMPS_DEMO_USER=judge` adds a "One-click demo login · Judge (demo)" button on the sign-in page. Account = whole-department SUPERVISOR (writes, Snap, plans; no user admin / sync / device keys), random never-shown password, no credentials in the bundle. Off unless the env is set. Images `oc11202210-demo` | `api/auth.py`, `main.py`, `App.jsx` LoginForm, `api.js`, `tests/test_demo_login.py`, judges `stack.yaml` |
 | 20 Nov | **Failures empty for all-sites users — fixed**: the Failures tab sent anyone without a home site (admin, judge) to the FIRST site's board (City Traction & Depot, 0 open) → "No open failures". Now `/failures` shows every site's failures (178 total, 7 open) for line-less users; coordinators still go to their own line. Frontend `oc11202235-failall` | `App.jsx` FailuresRedirect, judges `stack.yaml` |
 | 20 Nov | **Failures board never opens empty**: a site with 0 open (City Traction & Depot, Bengal Steel) still opened on the remembered Open tab → "No open failures". The board now lands on the first tab with rows (open → acknowledged → job card → resolved). Frontend `oc11202245-failtab` | `App.jsx` LiveFailures, judges `stack.yaml` |
@@ -188,21 +189,22 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov (Arup) | **Hybrid AI in the pitch.** Pitch page (`brief.jsx`) gets §3 Hybrid AI: Gemini 3.5 Flash-Lite in the cloud (reasoning, vision, function calls) + Gemma 3 4B on-prem via Ollama on our k3s GPU (free fallback on Gemini error/quota) + EmbeddingGemma on-prem (768-dim similar-failures search, 100+ languages incl. Bengali; replaces nomic). Tagline: *Our Kubernetes runs the plant. Google is the brain. Gemma keeps it running on-prem.* Compare-table AI row, AI FAQ and the hidden deck's slide-6 title updated; sections renumbered §1–§9. Deck PDF rendered headless from `#/guide` → `deck/AMPS_pitch_deck.pdf` (5 pages, 0.3 MB; not served by the app) | Judges read one AI story: Google is the brain, Gemma keeps it on when the cloud can't |
 | 20 Nov (Arup) | **Gemma in the pitch deck (Slides artifact v8).** Slide 4 title "Six AI features, live: Gemini in the cloud, Gemma on-prem"; Ask AMPS row adds "Gemma 3 4B fallback", Similar past failures row → "EmbeddingGemma, on-prem", hybrid line in the footnote. Slide 5 card "Gemini embeddings + pgvector" → "Gemma on-prem: EmbeddingGemma + Gemma 3 4B". Slide 6 adds a "Gemma on our k3s · search + fallback" box; footer says Gemma answers on-prem when Gemini is down. Merged onto the live deck, nothing else changed | Deck tells the same hybrid story as the Pitch page |
 | 20 Nov (Arup) | **EmbeddingGemma vs nomic, measured (deck v10).** 18 fault questions over the 178 demo failures, top hit scored, both models on the i5 GPU Ollama: **EmbeddingGemma 17/18 vs nomic 8/18** — English 4/4 vs 4/4 · Bengali 5/5 vs 0/5 · Hindi 4/4 vs 1/4 · shorthand 4/5 vs 3/5 (only miss: "brg temp hi, mtr" → transformer oil temp). Slide 5 Gemma card now carries the score; speaker note says how it was measured. | Slides artifact v10 · eval script in JARVIS scratchpad |
+| 21 Nov 00:45 (Arup "fix all") | **Deck v12 + PDF + notes refresh.** Slides: cover team line (Arup Biswas · Nilanjan Chakraborty; Gemini, Gemma, BigQuery, AlloyDB), Google card 6 → "Antigravity + Agent Skill" (own k3s), hosting slide amps-demo.binihost.com + GKE Autopilot, close card "GKE when it grows", "Try it: amps-demo.binihost.com", demo note → EmbeddingGemma. PDF re-rendered headless from the Slides content: 11 pages 1920×1080, 0.48 MB → `deck/AMPS_pitch_deck.pdf` (replaces the 5-page `#/guide` print). Notes: Cloud Run lines marked dropped, F1 → EmbeddingGemma, submit checklist ticked | Slides artifact v12 · `deck/AMPS_pitch_deck.pdf` |
 
-## 6. Open items (20 Nov evening)
+## 6. Open items (21 Nov 00:45)
 | Item | Owner | Next |
 |---|---|---|
 | Laptop AI stories | JARVIS | ✅ done e658bd6: `seed_network.py --stories` added 10 stories, data kept (no `down -v`, ever) |
 | Gemini key in laptop `deploy/.env` | Arup (the key) · JARVIS (re-run compose) | ✅ done 20 Nov 14:06, key tested (AI Studio 200) |
-| Prototype link for the submission | Arup | pick the public link that stays live until evaluation ends (laptop :8081 is not public; amps.binihost.com gets no roll today) |
+| Prototype link for the submission | Arup | ✅ amps-demo.binihost.com (ns `amps-judges`) |
 | BigQuery ML `failure_risk_model` (layer 2) | JARVIS | trained 14:01; eval degenerate (no positives in the eval split) → fix the label window, retrain, record metrics here |
-| Deck PDF on the Hack2skill template | Arup + freya | re-flow the 11 slides into the dashboard template, < 10 MB, two-layer slide up front |
+| Deck PDF | JARVIS | ✅ `deck/AMPS_pitch_deck.pdf` from Slides v12, 11 pages, 0.48 MB · Arup uploads it on the dashboard |
 | BigQuery `amps_demo` reload | JARVIS | ✅ reloaded from the laptop DB: assets 1,874 · log_entries 14,416 · asset_risk view 1,874. Project is a BigQuery **sandbox**, so tables expire after 59 days |
 | BigQuery F2 `failure_fields` (AI.GENERATE) + data agent (Codelab 2 steps 6–11) | Arup | needs billing on the project · the event billing account auto-closed (credit expired), Arup is sorting it with the mentors · meanwhile the pitch uses `bigquery/agent/pitch.sh` (JARVIS runs it on the laptop) |
-| Hosting paths ready (§8) | crew | local PG ✅ · binihost ✅ · BigQuery ✅ data (sandbox) · AlloyDB = step 9 (merged fa1a6f6, not run on GCP) · Cloud SQL = not started · Cloud Run = step 10 |
+| Hosting paths ready (§8) | crew | local PG ✅ · binihost ✅ · BigQuery ✅ data (sandbox) · AlloyDB = step 9 (merged fa1a6f6, not run on GCP) · Cloud SQL = not started · Cloud Run = dropped (§5, 20 Nov final) |
 | AI hub steps 2–6 | crew | see §7 |
-| Backend default model in `backend/app/api/ai.py` and the k8s manifest still say `gemini-2.5-flash` | build | change with the next amps-api roll (not part of the buildathon frontend work) |
-| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | deck ✅ drafted 20 Nov (11 slides: cover, problem, solution, product 30%, Google AI 20%, architecture 20%, hosting, UX 10%, what is new 5%, demo, next) · Arup fills the 3 placeholders, shares the link, exports PDF if Hack2skill wants a file · video + submit before 21 Nov 09:00 |
+| Backend default model in `backend/app/api/ai.py` and the amps.binihost.com k8s manifest still say `gemini-2.5-flash` | build | judges' stack already runs `gemini-3.5-flash-lite` via env (`stack.yaml`); change the code default after the event |
+| Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | deck ✅ v12, placeholders filled, PDF ✅ · video optional · **submit on the dashboard before 21 Nov 09:00** (prototype link + PDF) |
 
 ## 7. Crew lanes (20 Nov 09:30 — freya leads, merges into `buildathon`)
 
@@ -214,12 +216,12 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 | 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-chips-snap-history` | Ask, Snap | ✅ merged b73057e · on :8081 |
 | 3 F6 risk badge | builder-2 | `b2/f6-risk-badge` (`/api/risk` + register dot, filter, sort) | Risk badge | ✅ merged 63ad28a · on :8081 at 3558798 · card **live** (opens the register on red + amber, riskiest first) |
 | 4 BigQuery reload + F2 failure_fields + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore`, `floki/bq-sandbox` (59-day expiry) | Fault fields, Risk badge (data) | ✅ merged · data reloaded + asset_risk built; `failure_fields` needs billing (Arup) · Fault fields stays coming |
-| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc · on :8081 · card **live** (opens Pump Motor 1); keyword match until the Gemini key is set |
+| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc · on :8081 · card **live** (opens Pump Motor 1); EmbeddingGemma on-prem since 20 Nov (Gemini 429 on reindex) |
 | 6 F4 data agent | builder-1 | `builder-1/f4-data-agent` | Estate agent | ✅ merged 94263a8 · paste-ready config + 6 verified questions in `bigquery/agent/` (`load.sh --agent` reads them back) · JARVIS creates the agent in the BigQuery console on the laptop · card flips once the agent answers; pitch Q1 red risk + why, Q3 failures by site and month, Q4 open failures by station · fallback ✅ bbb3bb3: `bigquery/agent/pitch.sh` runs Q1/Q3/Q4 in the sandbox → `pitch_out/pitch.html` (3 screenshot cards, SQL under each; git-ignored) while the agent is held |
 | 7 Pilot data import script (prep only, no run) | builder-2 | `b2/pilot-import` (renamed 20 Nov, same a87bd79) | — | 🟡 import script with `--target-db/--create-db`, its test, demo DB backup/restore pair · **not merged**: file names inside the branch still carry the source name, builder-2 renames them first (Arup rule 11-20) |
 | 8 Gemini in BigQuery + Vertex, ready for billing | master-builder | `master-builder/vertex-bq` | Fault fields | ✅ merged 0551552 · billing day = `bigquery/gemini_go.sh --dry`, then `bigquery/gemini_go.sh` (refuses while billing is off); app: `AMPS_AI_PROVIDER=vertex` + `AMPS_VERTEX_PROJECT` in `deploy/.env`, add `-f deploy/compose.vertex.yaml` · not yet run against GCP · Fault fields flips after `failure_fields` runs |
 | 9 AlloyDB | minion | `minion/gcp-host` | Similar (scale-up path) | ✅ merged fa1a6f6 20 Nov (freya, af3c888 dropped the hard-coded line name so the app default applies): `deploy/gcp/` = AlloyDB migrate script + pgvector SQL + local test, `gcp.sh`, Cloud Run frontend image, README. Local rehearsal green (178 embeddings, SQL = Python top-5, re-run refused, sync trigger ok) · 85 tests pass · billing-gated, nothing run against GCP |
-| 10 Cloud Run (billing-gated) | ragnar | `ragnar/<topic>` | MCP (URL) | ⏳ no branch yet · minion's `gcp-host` already has Cloud Run pieces, so check for overlap before building |
+| 10 Cloud Run | ragnar | — | MCP (URL) | ⛔ dropped 20 Nov (architecture final, §5): binihost runs everything; MCP stays on amps-api |
 | 11 Demo wording sweep (Demo Industries demo dataset) | builder-1, master-builder | `builder-1/demo-wording`, `master-builder/demo-wording` | — | ✅ merged 2e87e43 (frontend + docs, `operator-logo.svg`) · 205f3ae `deploy/compose.local.yaml` out of git + ignored (a pull deletes the local copy, so back it up first) · 8c5b273 backend prose; checksheet titles headed by `AMPS_ORG`, new seeds only · 20 Nov (Arup go): site renamed City Traction & Depot (minion b1a9c46, merged 0782a93) · operator name, office order and checksheet title org now come from build env, not git (6b9511e, 696e681) · branches renamed `b2/pilot-import`, `office/pilot-prod` · identifiers, hostname, README bio left as they are |
 
 Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes never touch amps.binihost.com / amps-api. A "coming" card flips to live only after its branch is merged AND it works on :8081.
@@ -228,13 +230,14 @@ Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes 
 
 AMPS must be able to run in production on any of these, so each client can get the cheapest host that works. All three use the same code; the database is picked by `DATABASE_URL` (`backend/app/db.py`).
 
-Admin login (Arup, 20 Nov): a simple admin key is fine for the prototype on **local and the laptop only**. Any public URL (Cloud Run, binihost) uses a generated password kept in Secret Manager, never the simple one.
+Admin login (Arup, 20 Nov): a simple admin key is fine for the prototype on **local and the laptop only**. Any public URL (binihost) uses a generated password kept in Secret Manager, never the simple one.
 
 | Path | What runs where | State | Next |
 |---|---|---|---|
 | Local Postgres | `deploy/compose.yaml` (Postgres 16 + API + frontend) on the client's own box or the laptop | ✅ the laptop stack :8081 | — |
 | binihost | k3s + Ensign (`deploy/k8s/`), amps.binihost.com · amps-api · amps-mcp | ✅ live (production) | no buildathon roll |
-| Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Cloud Run** for the API/MCP | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 (`deploy/gcp/`, merged fa1a6f6, not run on GCP) · Cloud Run = step 10 · Cloud SQL not started | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same image on Cloud Run |
+| binihost (judges) | ns `amps-judges`: amps-demo.binihost.com, frontend + api + worker + Redis + Postgres/pgvector + Gemma via Ollama (`deploy/k8s/judges/stack.yaml`) | ✅ live | prototype link for the evaluation |
+| Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Gemini / Vertex** for AI, **GKE Autopilot** when an estate outgrows k3s | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 (`deploy/gcp/`, merged fa1a6f6, not run on GCP) · Cloud Run dropped · Cloud SQL not started | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same images on GKE |
 
 Rule: nothing is tied to one host. A feature that only works on one of them says so here.
 
@@ -248,6 +251,6 @@ Rule: nothing is tied to one host. A feature that only works on one of them says
 | AI | Gemini (AI Studio now, Vertex on billing) | per call, Flash-Lite | Vertex quotas, same code (`AMPS_AI_PROVIDER`) |
 | Analytics + ML | BigQuery + BQML (sandbox now) | per scan, MB-sized | partitioned tables, scheduled export |
 | IoT (ampsTalk) | HTTP direct, or Pub/Sub push to `/api/talk/telemetry` | per message | Pub/Sub fan-in, no app change |
-| Burst / DR | Cloud Run mirror of the api image | scale to zero, $0 idle | min instances on demand |
+| Burst / DR | ~~Cloud Run mirror~~ dropped (§5, 20 Nov final) | — | GKE Autopilot, same images |
 
 Pitch line: *runs on a client's own Kubernetes for a fixed cost, uses Google only where Google is best, and moves to fully managed Google with no code change.*
