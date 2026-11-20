@@ -5,7 +5,7 @@ BigQuery dataset `gen-lang-client-0618042629.amps_demo`. This is demo seed data 
 (Asset Maintenance & Planning System). It is not any real organisation's data.
 
 ## The estate
-- 4 **sites** (column `line`): Metro Traction & Depot · Eastern Grid 132 kV Substation ·
+- 4 **sites** (column `line`): City Traction & Depot · Eastern Grid 132 kV Substation ·
   City Water Treatment Plant · Bengal Steel & Rolling Mill.
 - 40 **stations** (column `station`) under those sites. `locations` holds the tree
   (`kind` = site | station, `parent_name` = the site).
