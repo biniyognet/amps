@@ -19,15 +19,15 @@ const api = process.env.AMPS_DEV_API ?? 'http://localhost:8000'
 const LIVE = process.env.VITE_AMPS_DATA === 'live'
 const NEUTRAL = !LIVE || process.env.VITE_AMPS_BRAND === 'neutral'
 const ORG_UP = (process.env.VITE_AMPS_ORG || 'Demo Industries').toUpperCase()
-const DEMO_DROP = ['signature.png', 'ir-railways.png', 'ir-logo.png', 'ir-emblem.svg', 'metro-logo.svg', 'pitch-gm']
+const DEMO_DROP = ['signature.png', 'ir-railways.png', 'ir-logo.png', 'ir-emblem.svg', 'operator-logo.svg', 'pitch-gm']
 const demoUnbrand = {
   name: 'amps-demo-unbrand',
   apply: 'build',
-  transformIndexHtml: (html) => (!NEUTRAL ? html : html.replace('/metro-logo.svg', '/amps-bolt.svg')),
+  transformIndexHtml: (html) => (!NEUTRAL ? html : html.replace('/operator-logo.svg', '/amps-bolt.svg')),
   // neutral builds carry the org name, not the operator's, on checksheet titles
   transform(code, id) {
     if (!NEUTRAL || !/checksheets\.js$/.test(id)) return null
-    return code.replace(/METRO RAILWAY,\s*KOLKATA/g, ORG_UP).replace(/Metro Railway Kolkata/g, 'a metro railway')
+    return code.replace(/METRO RAILWAY,\s*KOLKATA/g, ORG_UP)
   },
   writeBundle(opts) {
     if (!NEUTRAL) return

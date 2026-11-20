@@ -51,7 +51,7 @@ const SLIDES = [
   'Scan this code with your phone',
   'One system, sixteen working parts',
   'Every role has its place in the record',
-  'Running today on the power system of a metro railway in India',
+  'Running today on the power system of a pilot site in India',
   'Next-generation EAM, without the legacy weight',
   'The framework is free forever. Services pay the bills.',
   'Anyone who keeps critical equipment running',
@@ -228,7 +228,7 @@ export default function Brief() {
       </ul>
 
       <h2><span>§3</span>Proof</h2>
-      <p>AMPS is not a prototype. It runs in production on a metro railway power system in India: over 7,900 assets across five lines and
+      <p>AMPS is not a prototype. It runs in production on a pilot power system in India: over 7,900 assets across five lines and
         230+ locations registered and tagged, and six years of maintenance and failure records (33,000+) migrated in.
         Overdue work and assets past design life are visible network-wide, the day they happen. The operator paid nothing for licences.
         This site runs the same code against four synthetic plant sites — Metro Traction &amp; Depot, Eastern Grid 132 kV Substation, City Water Treatment Plant and Bengal Steel &amp; Rolling Mill
@@ -244,7 +244,7 @@ export default function Brief() {
         onboarding (asset tagging, migration of old registers), and support or custom features, delivered by biniDev.</p>
 
       <h2><span>§6</span>Who it's for</h2>
-      <p>Transit (metros, rail depots, traction substations) · utilities (power, water, distribution) · factories ·
+      <p>Transit (urban rail, rail depots, traction substations) · utilities (power, water, distribution) · factories ·
         large campuses — anyone with equipment that must not fail.</p>
 
       <h2><span>§7</span>Questions buyers ask</h2>

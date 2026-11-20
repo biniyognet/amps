@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Arup Biswas and AMPS contributors (binidev)
 // AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
-// Synthetic demo dataset — ALL FICTIONAL, themed for a metro-railway
+// Synthetic demo dataset — ALL FICTIONAL, themed for an urban-rail
 // power-supply & E&M context. No real organization's stations, assets or
 // records appear here; names, codes and makers are invented. Due dates are
 // computed relative to "today" so the demo never goes stale. Replaced by
@@ -13,13 +13,13 @@ const today = new Date()
 const d = (offset) => new Date(today.getTime() + offset * day)
 
 export const LOCATIONS = [
-  { name: 'Demo Metro Line', kind: 'site', parent: null },
-  { name: 'TSS City Centre', kind: 'station', parent: 'Demo Metro Line' },
-  { name: 'Stn City Centre — E&M', kind: 'station', parent: 'Demo Metro Line' },
-  { name: 'Depot Workshop', kind: 'bay', parent: 'Demo Metro Line' },
+  { name: 'Demo Rail Line', kind: 'site', parent: null },
+  { name: 'TSS City Centre', kind: 'station', parent: 'Demo Rail Line' },
+  { name: 'Stn City Centre — E&M', kind: 'station', parent: 'Demo Rail Line' },
+  { name: 'Depot Workshop', kind: 'bay', parent: 'Demo Rail Line' },
 ]
 
-// sys: Traction / PS · Station E&M · Depot — the rollup metro management thinks in
+// sys: Traction / PS · Station E&M · Depot — the rollup rail management thinks in
 export const ASSETS = [
   { code: 'TRT-0001', name: 'Traction Rectifier Transformer', cls: 'Traction Transformer', sys: 'Traction / PS', location: 'TSS City Centre', makeModel: 'TransElec TR-2200 · 2.2 MVA', commissioned: '2019-03-12', status: 'in_service' },
   { code: 'RECT-0001', name: 'Silicon Rectifier, 750 V DC', cls: 'Rectifier', sys: 'Traction / PS', location: 'TSS City Centre', makeModel: 'RectiPower SR-3000', commissioned: '2019-03-12', status: 'in_service' },
