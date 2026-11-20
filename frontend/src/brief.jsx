@@ -37,29 +37,22 @@ const COMPARE = [
 // The pitch deck as slide images (public/pitch/), stepped in the page.
 // Titles double as alt text.
 const SLIDES = [
-  'AMPS',
-  'A failure nobody logs comes back as downtime',
-  'Snap & Report: a photo becomes a job card',
-  'AI drafts the plan. A supervisor approves. The Planner runs it.',
-  'Gemini turns the logbook into answers, job cards and early warnings',
-  'Where Gemini, Gemma and Google Cloud do the work',
-  'What we build with, and what runs in the product',
-  'One register for every asset, every record, every device',
-  'Every site’s PM compliance, at a glance',
-  'From a register to a maintenance cockpit',
-  'Scattered breakdowns become one clear bottleneck',
-  'Scan this code with your phone',
-  'One system, sixteen working parts',
-  'Every role has its place in the record',
-  'Running today on the power system of a pilot site in India',
-  'Next-generation EAM, without the legacy weight',
-  'The framework is free forever. Services pay the bills.',
-  'Anyone who keeps critical equipment running',
-  'One codebase, any footprint: a single office PC or a cluster',
-  'Three servers, no single point of failure',
-  'MVP on our own cluster today, built to scale on Google Cloud',
-  'Built on the same records, ready to add',
-  'Built by Arup Biswas, delivered by biniDev',
+  'AMPS — Asset Maintenance & Performance System',
+  'Team AMPS and the problem we solve',
+  'Brief about the idea',
+  'Opportunities: how AMPS is different',
+  'Features: Snap & Report, Ask AMPS, voice, ampsTalk IoT',
+  'Process flow: the machine speaks',
+  'Wireframes: from the QR tag to a job card',
+  'Architecture: who speaks, who listens, who decides',
+  'Technologies: Gemini, Gemma and Google Cloud',
+  'Estimated implementation cost',
+  'Snapshots of the prototype',
+  'Prototype performance: 9 of 9 live AI tests pass',
+  'Future development',
+  'One night, told twice',
+  'Try it in 60 seconds',
+  'Thank you',
 ]
 // Live demo entry points — every link opens the real app on synthetic data.
 const TRY = [
@@ -83,9 +76,9 @@ const FAQ = [
   ['What does it cost?', 'The software is free (MIT). You pay only for what you choose: hosting, onboarding and tagging, support or custom features.'],
 ]
 
-const SHOW_DECK = false
+const SHOW_DECK = true
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
-const src = (i) => `${PITCH}${String(i + 1).padStart(2, '0')}.webp?v=1119b`
+const src = (i) => `${PITCH}d16/${String(i + 1).padStart(2, '0')}.webp?v=1121`
 
 function Deck() {
   const [i, setI] = useState(0)
@@ -190,21 +183,21 @@ export default function Brief() {
         failure report and job card for a person to confirm.<span className="br-dek-x"> Open-source EAM for any plant, ₹0 licence.</span></p>
       </header>
 
-      {/* Deck hidden until the new two-layer deck's slides replace public/pitch/ */}
+      {/* the submitted deck, exported from Google Slides as 16 images (public/pitch/d16/) */}
       {SHOW_DECK && <>
-      <h2 className="br-deck-h"><span>Deck</span>The pitch, in twenty-three slides</h2>
+      <h2 className="br-deck-h"><span>Deck</span>The pitch, in sixteen slides</h2>
       <Deck />
       <p className="br-note">← → or n / p to step · Full screen to present</p>
       </>}
       </section>
 
       <aside className="br-side">
-      <div className="br-roll-h"><span>The details</span>
+      <div className="br-roll-h"><span><i className="br-gbar" aria-hidden="true" />The details</span>
         <button type="button" onClick={() => setPaused((x) => !x)} aria-pressed={paused}>{paused ? '▶ Roll' : '❚❚ Pause'}</button></div>
       <div className="br-roll" ref={roll}>
       <div className="br-delta">
-        <div><b>7,900+</b><span>assets in production, 5 lines</span></div>
-        <div><b>33,000+</b><span>maintenance records, 2020–2026</span></div>
+        <div><b>1,870+</b><span>assets live, 4 sites · 40 stations</span></div>
+        <div><b>14,600+</b><span>maintenance records, 2025–2026</span></div>
         <div><b>₹0</b><span>licence cost</span></div>
       </div>
 
@@ -239,8 +232,8 @@ export default function Brief() {
       </ul>
 
       <h2><span>§4</span>Proof</h2>
-      <p>AMPS is not a prototype. It runs in production on a pilot power system in India: over 7,900 assets across five lines and
-        230+ locations registered and tagged, and six years of maintenance and failure records (33,000+) migrated in.
+      <p>AMPS is not a prototype. It runs in production on a pilot power system in India: 1,874 assets across 4 sites and
+        40 stations registered and tagged, and 18 months of maintenance and failure records (14,660) in the log.
         Overdue work and assets past design life are visible network-wide, the day they happen. The operator paid nothing for licences.
         This site runs the same code against four synthetic plant sites — City Traction &amp; Depot, Eastern Grid 132 kV Substation, City Water Treatment Plant and Bengal Steel &amp; Rolling Mill
         {net?.lines?.length ? <> ({n(net.lines.reduce((s, l) => s + (l.assets || 0), 0))} assets)</> : null}.</p>

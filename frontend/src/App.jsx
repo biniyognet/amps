@@ -147,7 +147,7 @@ function ShowcaseDropdown() {
    organisation on a second line so it never drops out after sign-in */
 // navbar mark = the same file the favicon uses (bolt on neutral/demo builds)
 const Brand = () => (
-  <a href="#/" className="brand">
+  <a href={OPERATOR ? '#/' : '#/welcome'} className="brand" title="AMPS home">
     {/* the real Indian Railways emblem is for the live office deployment only —
        a public synthetic demo must not carry a national/government emblem */}
     {OPERATOR ? <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />
@@ -4889,6 +4889,8 @@ function Landing() {
   const lines = useLines()
   const pitch = `${import.meta.env.BASE_URL}pitch/`
   const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
+  const { me } = useMe()
+  const signedIn = LIVE && me?.auth_enabled && me.username !== 'viewer'
   const { net, loading } = useNetworkGlance()
   const nf = (v) => (v == null || loading ? '—' : v.toLocaleString())
   const stats = [
@@ -4906,7 +4908,7 @@ function Landing() {
           <a href="#/ai">✦ AI</a>
           <a href="#/guide">Pitch</a>
           <a href={dashHref()}>Dashboard</a>
-          <a className="lx-signin" href="#/login">Sign in</a>
+          {signedIn ? <a className="lx-signin" href="#/">Open app →</a> : <a className="lx-signin" href="#/login">Sign in</a>}
         </nav>
       </header>
       <section className="lx-hero" aria-label="AMPS">
@@ -5015,7 +5017,7 @@ function Landing() {
         <div className="lx-wrap">
           <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS</a>
           <nav aria-label="Footer">
-            <a href={dashHref()}>Dashboard</a><a href="#/sites">{W.Network}</a><a href="#/guide">Pitch</a><a href="#/about">About</a><a href="#/login">Sign in</a>
+            <a href={dashHref()}>Dashboard</a><a href="#/sites">{W.Network}</a><a href="#/guide">Pitch</a><a href="#/about">About</a>{signedIn ? <a href="#/">Open app</a> : <a href="#/login">Sign in</a>}
           </nav>
           <small><AmpsLink /> · MIT © 2026 <SignatureMark /></small>
         </div>
@@ -5461,13 +5463,16 @@ export default function App() {
   // reloads on navigation; only its opacity changes (full on the landing,
   // muted behind every other page).
   const onLanding = anonymous && routePath !== '/login' && routePath !== '/guide' && routePath !== '/ai' && routePath !== '/sites' && routePath !== '/dash' && !assetMatch && !snapMatch && !lineMatch && !lineFailMatch && !lineAssetsMatch
+  // signed in, the logo opens the public landing at #/welcome
+  const welcome = routePath === '/welcome' && !OPERATOR && !anonymous
   const siteArt = (
-    <img className={`site-art${onLanding && !OPERATOR ? '' : ' muted'}`} alt="" aria-hidden="true"
+    <img className={`site-art${(onLanding || welcome) && !OPERATOR ? '' : ' muted'}`} alt="" aria-hidden="true"
          src={`${import.meta.env.BASE_URL}${OPERATOR ? 'landing-art.webp?v=57cfb09' : 'landing-art-neutral.webp?v=1115b'}`} />
   )
 
   // Anonymous surface = landing (line squares + sign-in), a chosen line
   // view-only, and QR-scanned asset pages. Everything else routes home.
+  if (welcome) return <>{siteArt}<Landing /><AskAmps /></>
   if (anonymous) {
     if (routePath === '/login') return <>{siteArt}<LoginPage /></>
     // operator box: the landing IS the network glance, inside the normal shell

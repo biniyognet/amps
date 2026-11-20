@@ -456,7 +456,8 @@ const AIH_CSS = `
 .aih-voice-mic span:nth-child(4) { background: var(--g-green); height: 18px; animation-delay: .45s; }
 @keyframes aih-wave { 50% { transform: scaleY(.45); } }
 @media (prefers-reduced-motion: reduce) { .aih-voice-mic span { animation: none; } }
-.aih-voice-txt { display: flex; flex-direction: column; gap: 8px; }
+.aih-voice-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.aih-voice-txt > * { align-self: stretch; } .aih-voice-txt > .aih-ln { align-self: flex-start; }
 .aih-voice h2 { margin: 0; font-size: 20px; color: var(--ink); text-wrap: balance; }
 .aih-voice p { margin: 0; font-size: 13.5px; color: var(--ink-2); max-width: 80ch; line-height: 1.5; }
 .aih-voice-chips { display: flex; flex-wrap: wrap; gap: 6px; }

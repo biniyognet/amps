@@ -91,3 +91,22 @@
   .br-side .br-cmp{font-size:13.5px}
   .br-side .br-cmp td:first-child{white-space:normal}
 }
+/* v88 (21 Nov): Google palette, same language as the AI page — four-colour bar,
+   cards with coloured tops, section numbers cycling blue/red/yellow/green */
+.brief{--gb:#1A73E8;--gr:#EA4335;--gy:#FBBC04;--gg:#34A853}
+.br-gbar{display:inline-block;width:34px;height:4px;border-radius:2px;margin-right:9px;vertical-align:2px;
+  background:linear-gradient(90deg,var(--gb) 0 25%,var(--gr) 25% 50%,var(--gy) 50% 75%,var(--gg) 75%)}
+.brief .br-kick{color:var(--gb)}
+.br-delta div{border-left:1px solid var(--rule);border-top:3px solid var(--gb)}
+.br-delta div:nth-child(2){border-top-color:var(--gr)}.br-delta div:nth-child(3){border-top-color:var(--gg)}
+.br-delta div:nth-child(1) b{color:var(--gb)}.br-delta div:nth-child(2) b{color:#C5221F}.br-delta div:nth-child(3) b{color:#188038}
+.br-roll h2:nth-of-type(4n+1) span{color:var(--gb)}.br-roll h2:nth-of-type(4n+2) span{color:var(--gr)}
+.br-roll h2:nth-of-type(4n+3) span{color:#B06000}.br-roll h2:nth-of-type(4n) span{color:var(--gg)}
+.br-try a{border-left:3px solid var(--gb)}
+.br-try a:nth-child(4n+2){border-left-color:var(--gr)}.br-try a:nth-child(4n+3){border-left-color:var(--gy)}.br-try a:nth-child(4n){border-left-color:var(--gg)}
+.br-try b{color:#1967D2}
+.br-dots i.on{background:var(--gb)}
+.br-stage{box-shadow:0 1px 2px rgba(60,64,67,.15),0 8px 28px rgba(26,115,232,.10)}
+.br-ctl button:not(:disabled):hover{border-color:var(--gb);color:var(--gb)}
+.br-roll-h span{display:inline-flex;align-items:center}
+.br-roll-h button[aria-pressed="false"]{border-color:var(--gb);color:var(--gb)}
