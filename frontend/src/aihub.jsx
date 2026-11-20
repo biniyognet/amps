@@ -200,7 +200,6 @@ function VoiceBand({ on }) {
 export default function AiHub() {
   const { me } = useMe()
   const [ai, setAi] = useState(undefined) // undefined = checking, null = unreachable
-  const [mcp, setMcp] = useState(false)
   const [copied, setCopied] = useState(false)
   useEffect(() => {
     fetch(`${API}/api/ai/status`).then((r) => (r.ok ? r.json() : null)).then(setAi).catch(() => setAi(null))
@@ -254,8 +253,9 @@ export default function AiHub() {
         <Card tone="green" status="live" layer={1} title="MCP server" product="Model Context Protocol · Agent Skills"
               icon="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"
               line="Any agent, Antigravity or others, can use AMPS through the same six tools, read-only.">
-          <button type="button" className="aih-btn pri" aria-expanded={mcp} onClick={() => setMcp((v) => !v)}>
-            {mcp ? 'Hide the tools' : 'See the 6 tools'}</button>
+          <button type="button" className="aih-btn pri"
+                  onClick={() => document.getElementById('aih-mcp')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            See the 6 tools ↓</button>
         </Card>
 
         <Card tone="blue" status="live" layer={1} title="Similar past failures" product="RAG · gemini-embedding-001 · EmbeddingGemma on-prem"
@@ -280,8 +280,7 @@ export default function AiHub() {
         </Card>
       </section>
 
-      {mcp && (
-        <section className="aih-mcp" aria-label="AMPS MCP tools">
+      <section className="aih-mcp" id="aih-mcp" aria-label="AMPS MCP tools">
           <div>
             <h2>Six read-only tools</h2>
             <ul>{TOOLS.map(([n, d]) => <li key={n}><code>{n}</code><span>{d}</span></li>)}</ul>
@@ -294,7 +293,6 @@ export default function AiHub() {
             <p className="aih-note">Offline: <code>python -m app.mcp_server</code> over stdio. Rules for agents: skill <code>amps-guardrails</code>.</p>
           </div>
         </section>
-      )}
 
       <ol className="aih-flow" aria-label="How a Snap travels">
         <li><small>Phone</small><b>Photo + rough note</b></li>
@@ -365,7 +363,7 @@ const AIH_CSS = `
 .aih-chip { text-align: left; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--accent-line); background: var(--accent-soft);
   color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer; }
 .aih-chip:disabled { opacity: .5; cursor: not-allowed; }
-.aih-mcp { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
+.aih-mcp { scroll-margin-top: 72px; border-top: 3px solid #34A853; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
   background: var(--card-bg); backdrop-filter: var(--card-blur); }
 .aih-mcp h2 { margin: 0 0 8px; font-size: 15px; color: var(--ink); }
 .aih-mcp ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -409,7 +407,7 @@ const AIH_CSS = `
 .aih-proof span { font-size: 12px; color: var(--ink-2); }
 @media (max-width: 900px) { .aih-arch-map { grid-template-columns: 1fr; } .aih-links { flex-direction: row; justify-content: center; } .aih-proof { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .aih-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .aih-layers { grid-template-columns: 1fr; } .aih-layer li { grid-template-columns: 1fr; gap: 0; } .aih-mcp { grid-template-columns: 1fr; } .aih-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .aih-layers { grid-template-columns: 1fr; } .aih-layer li { grid-template-columns: 1fr; gap: 0; } .aih-mcp { grid-template-columns: minmax(0,1fr); } .aih-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 500px) {
   .aih-grid, .aih-flow { grid-template-columns: 1fr; }
   .aih-head h1 { font-size: 24px; }

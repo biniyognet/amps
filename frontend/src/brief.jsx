@@ -78,7 +78,7 @@ const FAQ = [
 
 const SHOW_DECK = true
 const PITCH = `${import.meta.env.BASE_URL}pitch/`
-const src = (i) => `${PITCH}d16/${String(i + 1).padStart(2, '0')}.webp?v=1121`
+const src = (i) => `${PITCH}d16/${String(i + 1).padStart(2, '0')}.webp?v=1121c`
 
 function Deck() {
   const [i, setI] = useState(0)
@@ -262,6 +262,9 @@ export default function Brief() {
         <li><b>Partners</b> — integrators and OEMs in transit, utilities and manufacturing.</li>
         <li><b>Google</b> — cloud credits and mentorship to ship the Gemini layer at scale.</li>
       </ul>
+      <h2><span>♥</span>Thanks</h2>
+      <p>To our mentors, <b>Abirami Sukumaran</b> (Google Cloud Databases &amp; AI) and <b>Rishav</b> from Google,
+        who taught us so much and made the GCP and Google AI integration feel effortless.</p>
       <p className="br-foot">Source: github.com/arupbiswas1994-byte/amps · MIT · Demo data on this site is synthetic.</p>
       </div>
       </aside>
