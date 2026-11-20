@@ -2752,6 +2752,13 @@ a.dk:hover { background: var(--accent-soft); color: var(--accent); }
 .snap-sub { font-size: 13px; }
 .snap-open { font-size: 12px; font-weight: 650; color: var(--critical); background: color-mix(in srgb, var(--critical) 9%, #fff);
   border: 1px solid color-mix(in srgb, var(--critical) 30%, #fff); border-radius: 99px; padding: 3px 10px; }
+.snap-earlier { padding: 12px 14px; gap: 0; }
+.snap-earlier .snap-l { margin: 0 0 4px; }
+.snap-ear-row { padding: 6px 0; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); font-size: 13px; min-width: 0; }
+.snap-ear-row:first-of-type { border-top: 0; }
+.snap-ear-h { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.snap-ear-h span { color: var(--ink-3); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.snap-ear-fix { color: var(--ink-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .snap-h { margin: 0; font-size: 16px; }
 .snap-l { font-size: 12px; font-weight: 650; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; margin-top: 8px; }
 .snap input, .snap textarea, .snap select { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px;

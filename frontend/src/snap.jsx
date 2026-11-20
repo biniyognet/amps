@@ -17,8 +17,36 @@ const SEV_LABEL = { low: 'Low', med: 'Medium', high: 'High', critical: 'Critical
 const EMPTY = { fault_type: '', severity: 'med', likely_cause: '', suggested_action: '', safety_note: '', confidence: null, summary: '', safety_flags: null }
 const GEAR_LABEL = { helmet: 'helmet', vest: 'hi-vis vest', lockout_tag: 'lockout/tag' }
 const enc = encodeURIComponent
-const fmtIST = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
+const asUTC = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
+const fmtIST = (ts) => asUTC(ts)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+// "Earlier on this asset": the past failures already in the asset's logbook (the
+// same rows Gemini reads), so the technician sees what fixed it last time.
+function Earlier({ log }) {
+  const done = log.filter((e) => e.type === 'failure' && (e.resolved_by || e.ended_at))
+    .sort((x, y) => asUTC(y.at) - asUTC(x.at))
+  if (!done.length) return null
+  const past = done.slice(0, 3)
+  return (
+    <div className="card snap-card snap-earlier">
+      <label className="snap-l">Earlier on this asset</label>
+      {past.map((e) => {
+        const hrs = (asUTC(e.ended_at || e.resolved_by.at) - asUTC(e.at)) / 36e5
+        return (
+          <div key={e.id} className="snap-ear-row" title={e.text}>
+            <div className="snap-ear-h">
+              <b>{e.fault_type || 'Failure'}</b>
+              <span>{fmtIST(e.at).split(',')[0]}{hrs > 0 ? ` · ${hrs < 10 ? hrs.toFixed(1) : Math.round(hrs)} h down` : ''}</span>
+            </div>
+            {e.resolved_by?.text && <div className="snap-ear-fix" title={e.resolved_by.text}>Fixed: {e.resolved_by.text}</div>}
+          </div>
+        )
+      })}
+      {done.length > 3 && <small className="dim">and {done.length - 3} more on the asset page</small>}
+    </div>
+  )
+}
 
 async function postJSON(path, body) {
   const r = await fetch(`${API}${path}`, body instanceof FormData
@@ -149,6 +177,8 @@ export default function SnapReport({ code }) {
         </div>
         {openFail && <span className="snap-open" title={openFail.text}>Open failure since {fmtIST(openFail.at)}</span>}
       </div>
+
+      {stage !== 'done' && <Earlier log={log} />}
 
       {stage === 'done' ? (
         <div className="card snap-card snap-done">
