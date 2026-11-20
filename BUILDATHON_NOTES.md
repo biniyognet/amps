@@ -165,6 +165,7 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov (mentor → Arup) | **Refocus on two AI layers.** Layer 1 = every click: RAG + deterministic rules + small Gemini (Flash-Lite) + voice + OCR. Layer 2 = learns over time: data cleansing + boosted trees / random forest / neural nets in BigQuery ML pipelines. PM plan stays a deterministic scheduler; Gemini only explains it | Jury sees efficiency and economy per layer; cheap and explainable now, predictive as data grows |
 | 20 Nov | AI page `#/ai` opens with the two layers (techniques, feature → technique, economy line), L1 / L2 tag on every card (0d57849) | The jury reads the mental model in one screen |
 | 20 Nov | Deck and pitch use the same two-layer picture; the data is called the "Demo Industries demo dataset" | One story across app, deck and video |
+| 20 Nov (Arup) | Old 23-slide pitch PDF `frontend/public/pitch/AMPS_pitch_deck.pdf` dropped and its "PDF ↓" link removed from the Brief page: it named the pilot source. Replacement = the new two-layer deck as a PDF on the Hack2skill template, once Arup approves it. Git history keeps the old file; any history scrub is Arup's call | The source is never named in what judges see |
 
 ## 6. Open items (20 Nov evening)
 | Item | Owner | Next |

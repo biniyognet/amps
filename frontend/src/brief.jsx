@@ -34,8 +34,8 @@ const COMPARE = [
   ['AI', 'Add-on modules, if any', 'Gemini answers, photo → job card, AI maintenance plans'],
 ]
 
-// The pitch deck, rendered from the same source as the PDF (public/pitch/) —
-// one deck, two forms. Titles double as alt text.
+// The pitch deck as slide images (public/pitch/), stepped in the page.
+// Titles double as alt text.
 const SLIDES = [
   'AMPS',
   'A failure nobody logs comes back as downtime',
@@ -110,7 +110,6 @@ function Deck() {
         <span className="br-count">{i + 1} / {SLIDES.length}</span>
         <button type="button" onClick={() => setI(Math.min(last, i + 1))} disabled={i === last}>Next ›</button>
         <button type="button" onClick={() => ref.current?.requestFullscreen?.()} title="Full screen · ← → or n / p to step">Present</button>
-        <a className="br-pdf" href={`${PITCH}AMPS_pitch_deck.pdf?v=1119b`} download title="Download the deck as PDF">PDF ↓</a>
       </figcaption>
     </figure>
   )

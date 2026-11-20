@@ -41,7 +41,6 @@
 .brief h1,.brief h2{text-transform:none;letter-spacing:normal;color:inherit}
 .brief h2{letter-spacing:-.005em}
 .br-stage img{display:block;width:100%;height:100%;object-fit:contain}
-.br-pdf{margin-left:auto;color:var(--ink);border:1px solid var(--rule);background:var(--card);padding:5px 12px;border-radius:8px;text-decoration:none}
 .br-try{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0 0}
 .br-try a{display:block;border:1px solid var(--rule);background:var(--card);padding:12px 14px;border-radius:12px;text-decoration:none;color:var(--ink)}
 .br-try a:hover{border-color:var(--accent-line,#60CCF0);background:var(--accent-soft,#F0F9FE)}
@@ -72,7 +71,7 @@
   .br-main .br-deck{flex:1;min-height:0;margin:0;container-type:size;display:flex;flex-direction:column;justify-content:center}
   .br-main .br-deck:not(:fullscreen) .br-stage{width:min(100cqw,calc((100cqh - var(--ctl-h)) * 16 / 9));flex:none;box-sizing:border-box;border-radius:10px}
   .br-main .br-deck:not(:fullscreen) .br-ctl{width:min(100cqw,calc((100cqh - var(--ctl-h)) * 16 / 9));flex-wrap:nowrap;gap:6px;margin-top:7px;font-size:11px}
-  .br-main .br-deck:not(:fullscreen) .br-ctl button,.br-main .br-deck:not(:fullscreen) .br-pdf{padding:3px 9px;border-radius:7px}
+  .br-main .br-deck:not(:fullscreen) .br-ctl button{padding:3px 9px;border-radius:7px}
   .br-main .br-deck:not(:fullscreen) .br-dots{gap:4px}
   .br-main .br-deck:not(:fullscreen) .br-dots i{width:6px;height:6px}
   .br-side{display:flex;flex-direction:column;min-height:0;height:100%;border-left:1px solid var(--rule);padding-left:22px}
