@@ -157,7 +157,7 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 | 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · laptop needs frontend rebuild |
 | 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-snap-strip` | Ask, Snap | ⏳ |
 | 3 F6 risk badge | builder-2 | `builder-2/f6-risk` | Risk badge | ⏳ |
-| 4 BigQuery reload + AI.EXTRACT + asset_risk | floki | `floki/bq-reload` | Fault fields, Estate agent | ⏳ |
+| 4 BigQuery reload + F2 failure_fields (AI.GENERATE) + F6 asset_risk | floki | `floki/bq-f2-f6` | Fault fields, Risk badge (data) | ✅ merged · not run yet: Arup `gcloud auth login` then `bigquery/load.sh bq_out` after the reseed; cards stay coming until it runs |
 | 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ⏳ |
 | Cloud Run amps-mcp + safety watch | ragnar | `ragnar/cloudrun-mcp` | MCP (URL) | ⏳ |
 | Pitch script + judge Q&A | nefario | `nefario/pitch` | — | ⏳ |
