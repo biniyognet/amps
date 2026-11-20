@@ -26,7 +26,7 @@ def _codes():
 
 def test_demo_sites():
     assert [(l[0], l[1]) for l in sn.LINES] == [
-        ("Metro Traction & Depot", "MTD"),
+        ("City Traction & Depot", "MTD"),
         ("Eastern Grid 132 kV Substation", "EGS"),
         ("City Water Treatment Plant", "CWT"),
         ("Bengal Steel & Rolling Mill", "BSR"),
@@ -47,4 +47,4 @@ def test_brief_links_resolve_to_seeded_codes():
     linked = set(re.findall(r"#/(?:asset|snap)/([A-Z0-9-]+)'", brief))
     assert linked == {"MTD-CEN-TTR-01", "MTD-CEN-HSC-01"}
     assert linked <= _codes()
-    assert "#/line/Metro%20Traction%20%26%20Depot'" in brief
+    assert "#/line/City%20Traction%20%26%20Depot'" in brief

@@ -39,7 +39,7 @@ spec:
         - name: AMPS_ORG
           value: Demo Industries Group
         - name: AMPS_STANDARD_LINE
-          value: Metro Traction & Depot
+          value: City Traction & Depot
         - name: AMPS_AUTH
           value: '1'
         readinessProbe:

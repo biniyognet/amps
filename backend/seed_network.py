@@ -40,14 +40,14 @@ HISTORY_DAYS = 548  # ~18 months
 # site, unit code, opened, health profile, industry. Each site's last area is its
 # hub (workshop / control building / MCC / utility block) and gets the hub counts.
 LINES = [
-    ("Metro Traction & Depot",         "MTD", 2004, "exemplary", "transit"),
+    ("City Traction & Depot",         "MTD", 2004, "exemplary", "transit"),
     ("Eastern Grid 132 kV Substation", "EGS", 2011, "lagging",   "power"),
     ("City Water Treatment Plant",     "CWT", 2016, "cluster",   "water"),
     ("Bengal Steel & Rolling Mill",    "BSR", 2024, "new",       "factory"),
 ]
 
 STATIONS = {
-    "Metro Traction & Depot": ["Central", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
+    "City Traction & Depot": ["Central", "Harbour Gate", "Northfield", "Mill Road", "Civic Centre",
                                "Old Town", "University", "Lakeview", "Market Square", "Depot Workshop"],
     "Eastern Grid 132 kV Substation": ["HV Yard North", "HV Yard South", "MV Switchyard",
                                        "Transformer Bay A", "Transformer Bay B", "Feeder Bay East",

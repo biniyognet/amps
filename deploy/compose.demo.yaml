@@ -16,7 +16,7 @@ services:
       AMPS_SEED_ON_START: "1"
       AMPS_SEED: network
       AMPS_ORG: Demo Industries Group
-      AMPS_STANDARD_LINE: Metro Traction & Depot
+      AMPS_STANDARD_LINE: City Traction & Depot
       AMPS_AUTH: "1"
       # Gemini (Snap & Report, Ask AMPS, auto-plan): the key goes in deploy/.env
       # (git-ignored) as AMPS_GEMINI_API_KEY=…; without it the AI features stay off.
