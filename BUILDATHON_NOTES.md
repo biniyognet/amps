@@ -14,7 +14,7 @@
 - [x] gcloud CLI — done 20 Nov: SDK 594, signed in as arupbiswas1994 (user + ADC), project `gen-lang-client-0618042629`, 9 APIs enabled (BigQuery, BQ Storage, Cloud Run, Artifact Registry, Cloud Build, Storage, AlloyDB, Vertex AI, Gemini Data Analytics)
 - [x] Gemini key — done 20 Nov, project above at Tier 1; audit: `gemini-3.5-flash-lite` 8/8 0.85 s (default), `gemini-3.5-flash` 0.7–1.8 s, `gemini-pro-latest` 3/3 3.4 s; 2.5 models closed to new keys
 - [x] Start Docker Desktop (needed to run AMPS locally)
-- [ ] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin)
+- [x] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin). One stack only, project `amps-buildathon` (set in compose.demo.yaml), running on the laptop 20 Nov. Fresh seed with the AI demo stories: add `down -v` first.
 - [ ] Codelab 2 (**do this one**, ~30 min = F4): https://codelabs.developers.google.com/data-agents-in-agy-and-bq
 - [ ] Codelab 1 (optional skim, F5 covers it): https://codelabs.developers.google.com/getting-started-with-antigravity-skills
 

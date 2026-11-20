@@ -1,13 +1,14 @@
 # AMPS public-demo look on one machine — same build and data as amps.binihost.com:
 # live screens + neutral brand, Demo Industries Group network seed (44 sites/stations,
-# 1,874 assets, 14k logbook rows). Own project name, volume and port, so an existing
-# `amps` stack and its data are left alone.
+# 1,874 assets, 14k logbook rows). One project, `amps-buildathon` (volumes
+# amps-buildathon_pgdata/_media, port 8081), so it never clashes with an `amps` stack
+# and the command below always reuses the same stack instead of starting a second one.
 #
 #   docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build
 #   → http://localhost:8081   (login admin / admin)
 #
 # Fresh data: add `down -v` first (seed.py only seeds an empty database).
-name: amps-demo
+name: amps-buildathon
 
 services:
   backend:
