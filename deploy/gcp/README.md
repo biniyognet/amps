@@ -28,6 +28,28 @@ Allow about 20 minutes on the first run. Most of it is AlloyDB: the cluster plus
 Admin login for the hosted copy: user `admin`, with the password stored in Secret Manager (it is never admin/admin, because the URL is public). To read it on your own terminal:
 `gcloud secrets versions access latest --secret=amps-admin-pass`
 
+## Move the laptop data into AlloyDB (pgvector)
+
+To host the laptop's grown data instead of a fresh seed, copy it across, then add pgvector:
+
+```bash
+python3 deploy/gcp/alloydb/migrate.py \
+    --source postgresql://amps:amps_dev_only@<laptop>:5432/amps \
+    --target postgresql://postgres:<pass>@<alloydb-ip>:5432/amps
+```
+
+| Step | What it does |
+|---|---|
+| schema | The app's own tables on the target (`create_all` + its column migrations) |
+| copy | Every table, parents first, `COPY` source → target, `failure_embeddings` included; the source is read only |
+| seq | Serial sequences moved past the copied ids |
+| vector | `pgvector.sql`: `embedding vector(768)` column, a trigger that mirrors the app's float32 bytes into it, backfill, HNSW cosine index, `amps_similar_failures(entry_id, k)` |
+| verify | Row counts per table; every 768-d embedding indexed; SQL top-5 equals the app's Python dot-product top-5 |
+
+A non-empty target is refused unless `--force` (it TRUNCATEs the target first). The app needs no change: it keeps writing the bytes and the trigger keeps the vector column in step.
+
+Rehearse with no Google Cloud at all: `deploy/gcp/alloydb/test_local.sh` (postgres:16 source + pgvector/pgvector:pg16 target in throwaway containers).
+
 ## Cost (billed to the GDP Event Credit)
 
 | Item | Rough cost |
