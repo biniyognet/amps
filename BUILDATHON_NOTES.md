@@ -16,7 +16,7 @@
 - [x] Gemini key — done 20 Nov, project above at Tier 1; audit: `gemini-3.5-flash-lite` 8/8 0.85 s (default), `gemini-3.5-flash` 0.7–1.8 s, `gemini-pro-latest` 3/3 3.4 s; 2.5 models closed to new keys
 - [x] Start Docker Desktop (needed to run AMPS locally)
 - [x] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin). One stack only, project `amps-buildathon` (set in compose.demo.yaml), checked on the laptop 20 Nov 09:35: `docker compose ls` shows only `amps-buildathon` (3 containers, volumes `amps-buildathon_pgdata`/`_media`); no `amps-demo` containers or volumes left. Re-run the same command after a pull; never `down -v` (it wipes the demo data BigQuery needs).
-- [ ] Laptop DB: **keep and grow it, never wipe** (BigQuery wants volume). Add the 85fd3d5 AI demo stories on top: `docker exec amps-buildathon-backend-1 python seed_network.py --stories` (additive, re-run safe). JARVIS runs laptop steps itself over Tailscale ssh (`arupb@100.77.190.74`, PowerShell by full path); seats ask JARVIS, not Arup. `down -v` is never on the path
+- [x] Laptop DB: **keep and grow it, never wipe** (BigQuery wants volume). Add the 85fd3d5 AI demo stories on top: `docker exec amps-buildathon-backend-1 python seed_network.py --stories` (additive, re-run safe). JARVIS runs laptop steps itself over Tailscale ssh (`arupb@100.77.190.74`, PowerShell by full path); seats ask JARVIS, not Arup. `down -v` is never on the path. Done 20 Nov (e658bd6): 10 stories added, data kept
 - [ ] Turn AI on for the laptop stack: put `AMPS_GEMINI_API_KEY=…` in `deploy/.env` (git-ignored), re-run the command. Until then `/api/ai/status` = off and Snap / Ask / auto-plan do not draw (compose.demo now passes provider `gemini` + model `gemini-3.5-flash-lite`)
 - [x] Nilanjan synced — 20 Nov 09:15 email: `git clone -b buildathon https://github.com/biniyognet/amps.git amps-buildathon`, pull loop every 2 min, same compose command, push to his own branch `nilanjan` (never `buildathon`)
 - [x] Laptop pulls `buildathon` every 2 min (scheduled task `amps-sync`)
@@ -28,7 +28,7 @@
 - [x] F5 AMPS Agent Skill — `.agents/skills/amps-guardrails/SKILL.md` — done 20 Nov
 - [x] AI demo stories seeded — 85fd3d5 `backend/seed_network.py` `STORIES`: 10 failures on 5 assets (Pump Motor 1 repeat seal leak past codal life, HSCB Panel 1 trips, PTR 1 oil-temp trend, বাংলা + हिन्दी + shorthand remarks); 178 failures on a fresh DB
 - [~] **AI hub** `#/ai` + ✦ AI nav link — plan: `crew/freya/out/buildathon-ai-hub-ui-plan.md`; step 1 (page, 8 cards: 4 live, 4 coming) on the branch 20 Nov, steps 2–6 below
-- [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart). Re-export after the reseed so BigQuery shows the 178 failures with the stories
+- [~] F4 Estate analytics agent — data loaded 20 Nov from the **old** seed: `scripts/bq_export.py` → BigQuery `amps_demo` (6 tables: failures 168 with state + downtime_hours, log_entries 14,397, assets 1,874, pm_plans 3,064, locations, asset_classes) · agent instructions `GEMINI.md` · next: create the agent in BigQuery → Agents (Codelab 2 steps 6–11), then UI "Estate insights" tab (question → chart). Reloaded 20 Nov from the laptop DB with the stories (JARVIS): assets 1,874 · log_entries 14,416 · `asset_risk` view 1,874; sandbox project, tables expire in 59 days
 - [ ] F1 Similar past failures — AlloyDB pgvector + `gemini-embedding-001` on remarks + logbook · UI: "Similar past failures" panel on the failure card
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [ ] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list
@@ -141,10 +141,11 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 ## 6. Open items (20 Nov evening)
 | Item | Owner | Next |
 |---|---|---|
-| Laptop reseed with the AI stories (`down -v`) | Arup | say go; wipes laptop data |
-| Gemini key in laptop `deploy/.env` | Arup | add the key, re-run compose; check `/api/ai/status` = enabled |
-| BigQuery data agent (Codelab 2 steps 6–11) + reload `amps_demo` from the new seed | Arup | after the reseed |
-| AI hub steps 2–6: Ask chips + Snap history strip · F6 risk · F2 AI.EXTRACT · F1 embeddings | build | in that order |
+| Laptop AI stories | JARVIS | ✅ done e658bd6: `seed_network.py --stories` added 10 stories, data kept (no `down -v`, ever) |
+| Gemini key in laptop `deploy/.env` | Arup (the key) · JARVIS (re-run compose) | not there yet; then `/api/ai/status` = enabled |
+| BigQuery `amps_demo` reload | JARVIS | ✅ reloaded from the laptop DB: assets 1,874 · log_entries 14,416 · asset_risk view 1,874. Project is a BigQuery **sandbox**, so tables expire after 59 days |
+| BigQuery F2 `failure_fields` (AI.GENERATE) + data agent (Codelab 2 steps 6–11) | Arup | needs billing on the project |
+| AI hub steps 2–6 | crew | see §7 |
 | Backend default model in `backend/app/api/ai.py` and the k8s manifest still say `gemini-2.5-flash` | build | change with the next amps-api roll (not part of the buildathon frontend work) |
 | Pitch deck + demo video, Hack2skill submit | Arup + Nilanjan | before 21 Nov 09:00 |
 
@@ -154,11 +155,11 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 
 | Step | Seat | Branch | Hub card | State |
 |------|------|--------|----------|-------|
-| 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · laptop needs frontend rebuild |
-| 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-chips-snap-history` | Ask, Snap | ✅ merged b73057e (3 starter chips, hub chips match; Snap "Earlier on this asset") · laptop needs frontend rebuild |
+| 1 AI hub `#/ai` + ✦ AI nav | freya | (on buildathon, 119c576) | all 8 | ✅ merged · laptop rebuild to a412e19+ (JARVIS, running) |
+| 2 Ask chips + Snap strip | builder-1 | `builder-1/ask-chips-snap-history` | Ask, Snap | ✅ merged b73057e (3 starter chips, hub chips match; Snap "Earlier on this asset") · in the laptop rebuild |
 | 3 F6 risk badge | builder-2 | `builder-2/f6-risk` | Risk badge | ⏳ |
-| 4 BigQuery reload + F2 failure_fields (AI.GENERATE) + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore` (bq_out ignored, `load.sh --check`) | Fault fields, Risk badge (data) | ✅ merged · not run yet: Arup `gcloud auth login` then `bigquery/load.sh bq_out` after the reseed; cards stay coming until it runs |
-| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc (`/api/similar` + "Seen before" on the asset page; new table `failure_embeddings`; keyword match without a key; pre-warm `scripts/embed_failures.py`) · needs backend + frontend rebuild and the Gemini key; card stays coming until it works on :8081 |
+| 4 BigQuery reload + F2 failure_fields (AI.GENERATE) + F6 asset_risk | floki | `floki/bq-f2-f6`, `floki/bq-ignore` (bq_out ignored, `load.sh --check`) | Fault fields, Risk badge (data) | ✅ merged · data reloaded + asset_risk built (JARVIS, from the laptop DB); `failure_fields` needs billing (Arup). Risk badge waits for builder-2's in-app badge; Fault fields stays coming until `failure_fields` runs |
+| 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc (`/api/similar` + "Seen before" on the asset page; new table `failure_embeddings`; keyword match without a key; pre-warm `scripts/embed_failures.py`) · in the laptop rebuild; needs the Gemini key for embeddings (keyword match until then); card flips once Seen before works on :8081 |
 | Cloud Run amps-mcp + safety watch | ragnar | `ragnar/cloudrun-mcp` | MCP (URL) | ⏳ |
 | Pitch script + judge Q&A | nefario | `nefario/pitch` | — | ⏳ |
 | Day-1 run sheet (row 1 = the `up -d --build` command above; no `down -v`) | minion | `minion/runsheet` | — | ⏳ |
