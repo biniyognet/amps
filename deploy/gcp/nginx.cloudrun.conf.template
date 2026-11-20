@@ -1,0 +1,32 @@
+# Cloud Run variant of nginx.compose.conf. The official nginx image runs envsubst on
+# /etc/nginx/templates/*.template at start, so ${PORT} and ${BACKEND_URL} come from the
+# service env (Cloud Run sets PORT; deploy sets BACKEND_URL to the amps-api run.app URL).
+# nginx's own $variables are not env vars, so envsubst leaves them alone.
+server {
+    listen ${PORT};
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+        try_files $uri /index.html;
+    }
+
+    # same-origin API: proxy to the backend service over HTTPS (SNI + its own Host header,
+    # or Cloud Run's front end cannot route the request)
+    location ~ ^/(api|docs|openapi.json|redoc|mcp|health) {
+        client_max_body_size 32m;
+        proxy_pass ${BACKEND_URL};
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${BACKEND_HOST};
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 120s;
+    }
+}
