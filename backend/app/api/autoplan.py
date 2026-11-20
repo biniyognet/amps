@@ -258,12 +258,11 @@ def _gemini_explain(board, backlog, basis) -> str:
               "name the riskiest items, and flag anything the supervisor should check before "
               f"approving. Plain text, no markdown headings.\n\nCapacity: {basis}\n\n" +
               "\n".join(lines[:120]))
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ai.GEMINI_MODEL}:generateContent"
-    resp = ai._post(url, {
+    resp = ai.gemini_generate({
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 600,
                              "thinkingConfig": {"thinkingBudget": 0}},
-    }, {"x-goog-api-key": ai.GEMINI_KEY})
+    })
     parts = (resp.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
     return "".join(p.get("text", "") for p in parts).strip()
 
@@ -300,7 +299,7 @@ def preview(body: AutoIn, request: Request, db: Session = Depends(get_db),
         out["summary"] += (f" Outside agencies: {due} due on their scope, left off the roster"
                            f" — {gaps} missing from their schedules, {slip} planned dates slipped.")
     if body.explain and any(d["jobs"] for d in board):
-        if not ai._enabled() or ai.PROVIDER != "gemini":
+        if not ai.gemini_on():
             out["explanation_note"] = "Gemini is not configured on this server."
         else:
             ai._throttle(request.client.host if request.client else "-")

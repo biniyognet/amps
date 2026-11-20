@@ -35,7 +35,8 @@ def backfill(db) -> dict:
 def main():
     argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args()
     if not similar.embed_enabled():
-        sys.exit("AI is off: set AMPS_AI_PROVIDER=gemini and AMPS_GEMINI_API_KEY (the panel still works on keywords).")
+        sys.exit("AI is off: set AMPS_AI_PROVIDER=gemini + AMPS_GEMINI_API_KEY, or AMPS_AI_PROVIDER=vertex + "
+                 "AMPS_VERTEX_PROJECT (the panel still works on keywords).")
     init_db()
     with SessionLocal() as db:
         r = backfill(db)

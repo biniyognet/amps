@@ -1,0 +1,18 @@
+# Gemini on Vertex AI instead of the AI Studio key (needs billing on the project).
+# Add after the demo file:
+#
+#   docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml -f deploy/compose.vertex.yaml up -d
+#
+# The backend authenticates with your gcloud Application Default Credentials
+# (`gcloud auth application-default login`), mounted read-only. On Windows set
+# AMPS_ADC_FILE=%APPDATA%/gcloud/application_default_credentials.json in deploy/.env.
+# Check first: bigquery/gemini_go.sh --dry
+services:
+  backend:
+    environment:
+      AMPS_AI_PROVIDER: vertex
+      AMPS_VERTEX_PROJECT: ${AMPS_VERTEX_PROJECT:-gen-lang-client-0618042629}
+      AMPS_VERTEX_LOCATION: ${AMPS_VERTEX_LOCATION:-global}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/gcp/adc.json
+    volumes:
+      - ${AMPS_ADC_FILE:-~/.config/gcloud/application_default_credentials.json}:/run/gcp/adc.json:ro
