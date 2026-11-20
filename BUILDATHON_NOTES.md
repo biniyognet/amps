@@ -15,7 +15,7 @@
 - [x] gcloud CLI — done 20 Nov: SDK 594, signed in as arupbiswas1994 (user + ADC), project `gen-lang-client-0618042629`, 9 APIs enabled (BigQuery, BQ Storage, Cloud Run, Artifact Registry, Cloud Build, Storage, AlloyDB, Vertex AI, Gemini Data Analytics)
 - [x] Gemini key — done 20 Nov, project above at Tier 1; audit: `gemini-3.5-flash-lite` 8/8 0.85 s (default), `gemini-3.5-flash` 0.7–1.8 s, `gemini-pro-latest` 3/3 3.4 s; 2.5 models closed to new keys
 - [x] Start Docker Desktop (needed to run AMPS locally)
-- [x] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin). One stack only, project `amps-buildathon` (set in compose.demo.yaml), running on the laptop 20 Nov. Fresh seed with the AI demo stories: add `down -v` first.
+- [x] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin). One stack only, project `amps-buildathon` (set in compose.demo.yaml), checked on the laptop 20 Nov 09:35: `docker compose ls` shows only `amps-buildathon` (3 containers, volumes `amps-buildathon_pgdata`/`_media`); no `amps-demo` containers or volumes left. Re-run the same command after a pull; never `down -v` without Arup's ok.
 - [ ] Laptop DB still holds the **pre-85fd3d5 seed** (1,874 assets, 168 failures, no AI demo stories). Reseed = `down -v` then the command above; it wipes laptop data, so Arup's call
 - [ ] Turn AI on for the laptop stack: put `AMPS_GEMINI_API_KEY=…` in `deploy/.env` (git-ignored), re-run the command. Until then `/api/ai/status` = off and Snap / Ask / auto-plan do not draw (compose.demo now passes provider `gemini` + model `gemini-3.5-flash-lite`)
 - [x] Nilanjan synced — 20 Nov 09:15 email: `git clone -b buildathon https://github.com/biniyognet/amps.git amps-buildathon`, pull loop every 2 min, same compose command, push to his own branch `nilanjan` (never `buildathon`)
@@ -161,6 +161,6 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 | 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ⏳ |
 | Cloud Run amps-mcp + safety watch | ragnar | `ragnar/cloudrun-mcp` | MCP (URL) | ⏳ |
 | Pitch script + judge Q&A | nefario | `nefario/pitch` | — | ⏳ |
-| Day-1 run sheet | minion | `minion/runsheet` | — | ⏳ |
+| Day-1 run sheet (row 1 = the `up -d --build` command above; no `down -v`) | minion | `minion/runsheet` | — | ⏳ |
 
 Merge rule: build passes in Docker, no secrets in the diff, frontend-only lanes never touch amps.binihost.com / amps-api. A "coming" card flips to live only after its branch is merged AND it works on :8081.
