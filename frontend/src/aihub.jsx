@@ -4,7 +4,9 @@
 
 /* AI hub (#/ai): every AI feature on one page, each opening on a seeded
    example in one or two clicks and naming the Google product that does the
-   work. Four are live; four are planned for the buildathon and say so. */
+   work. Four are live; four are planned for the buildathon and say so.
+   The two-layer strip on top says which technique each feature uses and why
+   it is the cheapest one that does the job. */
 import { useEffect, useState } from 'react'
 import { API, useMe } from './api.js'
 import { rememberNext } from './snap.jsx'
@@ -46,11 +48,50 @@ const Ico = ({ d }) => (
   <svg className="aih-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor"
        strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>)
 
-function Card({ icon, title, product, line, status, children }) {
+// Layer 1 runs on every click, so it must be fast and cheap; Layer 2 runs in
+// batch and gets better as the log book grows.
+const LAYERS = [
+  { n: 1, name: 'Every click', sub: 'fast · cheap · explainable',
+    tech: ['RAG', 'Deterministic rules', 'Small model (Flash-Lite)', 'Voice to text', 'OCR / vision'],
+    rows: [
+      ['Snap & Report', 'OCR / vision + voice + Flash-Lite'],
+      ['Ask AMPS', 'RAG over our own records + Flash-Lite function calling'],
+      ['Similar past failures', 'RAG: Gemini embeddings, cosine match'],
+      ['PM plan', 'Deterministic scheduler; Gemini only explains it'],
+      ['Risk badge', 'Deterministic rule score, three reasons'],
+    ],
+    econ: 'Rules wherever rules are enough. The smallest Gemini model only where reading a photo or a language is needed. No GPU server.' },
+  { n: 2, name: 'Learns over time', sub: 'batch · predictive · matures',
+    tech: ['Data cleansing', 'Random forest / XGBoost', 'Neural nets / deep learning', 'ML pipelines'],
+    rows: [
+      ['Failure risk, next 30 days', 'BigQuery ML boosted tree, trained in SQL'],
+      ['Failure analysis', 'Patterns by asset class, site and age'],
+      ['Fault fields', 'BigQuery AI.EXTRACT turns remarks into columns'],
+    ],
+    econ: 'Runs in batch inside BigQuery, with no separate ML server. The more the log book holds, the better the model gets.' },
+]
+
+function Layers() {
+  return (
+    <section className="aih-layers" aria-label="Two AI layers">
+      {LAYERS.map((l) => (
+        <article key={l.n} className={`aih-layer l${l.n}`}>
+          <header><span className="aih-ln">AI layer {l.n}</span><h2>{l.name}</h2><small>{l.sub}</small></header>
+          <div className="aih-tech">{l.tech.map((t) => <span key={t}>{t}</span>)}</div>
+          <ul>{l.rows.map(([f, t]) => <li key={f}><b>{f}</b><span>{t}</span></li>)}</ul>
+          <p className="aih-econ"><b>Economy:</b> {l.econ}</p>
+        </article>
+      ))}
+    </section>
+  )
+}
+
+function Card({ icon, title, product, line, status, layer, children }) {
   return (
     <article className={`aih-card${status === 'coming' ? ' coming' : ''}`}>
       <header>
         <Ico d={icon} />
+        {layer && <span className="aih-lt">L{layer}</span>}
         <span className={`aih-st ${status}`}>{status === 'live' ? 'Live' : 'Coming'}</span>
       </header>
       <h3>{title}</h3>
@@ -92,48 +133,50 @@ export default function AiHub() {
         </div>
       </header>
 
+      <Layers />
+
       <section className="aih-grid" aria-label="AI features">
-        <Card status="live" title="Snap & Report" product="Gemini Flash · vision + structured output"
+        <Card status="live" layer={1} title="Snap & Report" product="Flash-Lite · OCR / vision + voice"
               icon="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
               line="Photo and a rough note in; a drafted failure report and job card out. A person submits.">
           <a className="aih-btn pri" href={`#/snap/${SNAP_DEMO}`}>Try on HSCB Panel 1 →</a>
         </Card>
-        <Card status="live" title="Ask AMPS" product="Gemini function calling · 6 read-only tools"
+        <Card status="live" layer={1} title="Ask AMPS" product="RAG + function calling · 6 read-only tools"
               icon="M4 5h16v11H9l-5 4zM8 9h8M8 12h5"
               line="Plain questions in English, हिन्दी or বাংলা. It looks the records up and shows which ones it used.">
           <div className="aih-chips">
             {ASK_CHIPS.map((q) => <button key={q} type="button" className="aih-chip" disabled={!on} onClick={() => ask(q)}>{q}</button>)}
           </div>
         </Card>
-        <Card status="live" title="AI PM plan" product="Gemini Flash · structured JSON"
+        <Card status="live" layer={1} title="PM plan" product="Deterministic scheduler · Gemini explains"
               icon="M4 5h16v15H4zM4 9h16M9 3v4M15 3v4M8 14l2 2 4-4"
               line="Lays due and overdue PM onto the week and finds the gaps. The supervisor approves each change.">
           <a className="aih-btn pri" href={planHref} onClick={() => { if (!signedIn) rememberNext('/planner?auto=1') }}>
             {signedIn ? 'Draft this week →' : 'Sign in to draft →'}</a>
         </Card>
-        <Card status="live" title="MCP server" product="Model Context Protocol · Agent Skills"
+        <Card status="live" layer={1} title="MCP server" product="Model Context Protocol · Agent Skills"
               icon="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"
               line="Any agent, Antigravity or others, can use AMPS through the same six tools, read-only.">
           <button type="button" className="aih-btn pri" aria-expanded={mcp} onClick={() => setMcp((v) => !v)}>
             {mcp ? 'Hide the tools' : 'See the 6 tools'}</button>
         </Card>
 
-        <Card status="live" title="Similar past failures" product="gemini-embedding-001 · cosine match"
+        <Card status="live" layer={1} title="Similar past failures" product="RAG · gemini-embedding-001"
               icon="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"
               line="Before the panel is opened, AMPS shows what fixed the same fault last time. Example: Pump Motor 1.">
           <a className="aih-btn pri" href={`#/asset/${SIMILAR_DEMO}`}>Seen before on Pump Motor 1 →</a>
         </Card>
-        <Card status="coming" title="Fault fields" product="BigQuery AI.EXTRACT · Flash-Lite"
+        <Card status="coming" layer={2} title="Fault fields" product="BigQuery AI.EXTRACT · Flash-Lite"
               icon="M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3"
               line="Free-text remarks in three languages become columns you can count: component, symptom, cause, action.">
           <span className="aih-btn ghost" aria-disabled="true">10 remarks · coming</span>
         </Card>
-        <Card status="coming" title="Estate agent" product="BigQuery Conversational Analytics"
+        <Card status="coming" layer={2} title="Estate agent" product="BigQuery Conversational Analytics"
               icon="M4 20V10M10 20V4M16 20v-7M22 20H2"
               line="Managers ask the whole estate in English and get charts back, from the amps_demo dataset.">
           <span className="aih-btn ghost" aria-disabled="true">Open agent ↗ · coming</span>
         </Card>
-        <Card status="live" title="Risk badge" product="Rule score · BigQuery asset_risk view"
+        <Card status="live" layer={1} title="Risk badge" product="Deterministic rule score · BigQuery ML next"
               icon="M12 3l9 16H3zM12 9v4M12 16v.5"
               line="Red means old, failing again and PM late, with the three reasons why. Example: Pump Motor 1 red, PTR 1 amber.">
           <a className="aih-btn pri" href="#/assets" onClick={openAtRisk}>See the assets at risk →</a>
@@ -180,6 +223,25 @@ const AIH_CSS = `
 .aih-model b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; color: var(--accent); }
 .aih-model.off b { color: var(--warning); }
 .aih-model span { font-size: 12px; color: var(--ink-2); }
+.aih-layers { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.aih-layer { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--card-bg); backdrop-filter: var(--card-blur); -webkit-backdrop-filter: var(--card-blur); border-top: 4px solid var(--accent); }
+.aih-layer.l2 { border-top-color: #9B72CB; }
+.aih-layer header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.aih-layer h2 { margin: 0; font-size: 18px; color: var(--ink); }
+.aih-layer header small { color: var(--ink-3); font-size: 12px; }
+.aih-ln { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+  color: #fff; background: var(--accent); }
+.aih-layer.l2 .aih-ln { background: #9B72CB; }
+.aih-tech { display: flex; flex-wrap: wrap; gap: 6px; }
+.aih-tech span { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--ink); }
+.aih-layer.l2 .aih-tech span { border-color: rgba(155,114,203,.4); background: rgba(155,114,203,.1); }
+.aih-layer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.aih-layer li { display: grid; grid-template-columns: minmax(150px, 38%) 1fr; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.aih-layer li b { color: var(--ink); font-weight: 600; }
+.aih-econ { margin: 0; font-size: 12.5px; color: var(--ink-2); padding-top: 8px; border-top: 1px dashed var(--border); }
+.aih-econ b { color: var(--ink); }
+.aih-lt { margin-left: auto; margin-right: 6px; font-size: 10.5px; font-weight: 700; color: var(--ink-3); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
 .aih-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .aih-card { display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
   background: var(--card-bg); backdrop-filter: var(--card-blur); -webkit-backdrop-filter: var(--card-blur); box-shadow: inset 3px 0 0 var(--accent); }
@@ -221,7 +283,7 @@ const AIH_CSS = `
 .aih-flow li.gem b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #6B4FB0; }
 .aih-guard { margin: 0; font-size: 13px; color: var(--ink-2); }
 @media (max-width: 1100px) { .aih-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .aih-mcp { grid-template-columns: 1fr; } .aih-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .aih-layers { grid-template-columns: 1fr; } .aih-layer li { grid-template-columns: 1fr; gap: 0; } .aih-mcp { grid-template-columns: 1fr; } .aih-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 500px) {
   .aih-grid, .aih-flow { grid-template-columns: 1fr; }
   .aih-head h1 { font-size: 24px; }

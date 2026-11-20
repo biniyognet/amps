@@ -1,33 +1,37 @@
-# Mentor input — 20 Nov (Google mentor, Risav)
+# Mentor input — 20 Nov (Google mentor)
 
-> Contact details kept off the repo. Notes as given, then how AMPS answers each point.
+> Notes from the 1st mentor round, as one picture plus what AMPS has today. Contact details are kept off the repo.
 
-## Inputs
-- **AI layer 1:** RAG + deterministic + smaller model + voice to text + OCR
-- **AI layer 2:** predictive models (random forest, XGBoost, neural nets / deep learning, data cleansing; long-running)
-- **Architecture:** app server + heavy data-processing server; queue Postgres → Redis → Kafka as scale needs
-- **Regional showcase blockers / demand:** UX (fewer clicks) · voice to text in Indian languages (Sarvam or similar)
+## The picture: two AI layers on Google Cloud
 
-## Google products
-- Host on GCP
-- GCP database for Postgres + vector (AlloyDB / pgvector)
-- AI layer 1: Vertex AI → Gemini Flash; Gemma for self-hosting and economy
-- AI layer 2: BigQuery, ML pipeline, data analysis, long-running ML research
+| | **AI layer 1 — every click** | **AI layer 2 — learns over time** |
+|---|---|---|
+| Job | Help the person on the floor right now | Predict and explain failures across the estate |
+| Techniques | RAG · deterministic rules · small model · voice to text · OCR | Data cleansing · random forest / XGBoost · neural nets / deep learning · ML pipelines |
+| Speed / cost | Fast and cheap: rules where rules are enough, the smallest Gemini model only where reading or language is needed | Batch, slower, matures as the log book grows |
+| Google | Gemini Flash-Lite (Vertex AI), Gemma for self-host economy, Speech-to-Text (Chirp) | BigQuery, BigQuery ML, ML pipelines |
+| In AMPS | Snap & Report · Ask AMPS · Similar past failures · PM plan · Risk badge | Failure risk next 30 days (BigQuery ML boosted tree) · Fault fields · Estate agent |
 
-## Suggestions
-- Showcase pilot operator acceptance (real-world data, real users)
-- Product potential · funding · business · pitch
+**Feature → technique**
+- **Snap & Report:** OCR / vision + voice + Flash-Lite.
+- **Ask AMPS:** RAG over our own records + Flash-Lite function calling.
+- **Similar past failures:** RAG (Gemini embeddings).
+- **PM plan:** a deterministic scheduler; Gemini only explains it.
+- **Risk badge:** a deterministic rule score today; the BigQuery ML model next.
 
-## How AMPS answers it (JARVIS audit)
-| Mentor point | AMPS today | Gap / next | Rubric weight |
-|---|---|---|---|
-| Layer 1: deterministic | Ask AMPS = Gemini function calling over our own SQL tools | — | Google AI 20% |
-| Layer 1: RAG | Similar past failures = Gemini embeddings on remarks + log book | AlloyDB pgvector = scale-up (step 9, billing-gated) | Google AI 20% |
-| Layer 1: OCR | Snap & Report: Gemini reads the photo | Name plate / meter reading as a Snap example | Product 30% |
-| Layer 1: voice | Snap 🎤 (browser speech, bn-IN / en-IN) | Google-first: Speech-to-Text (Chirp) for Indic; Sarvam = option | UX 10% |
-| Layer 1: smaller model | Gemini Flash-Lite | Gemma = self-host / economy fallback (slide, not build) | Arch 20% |
-| Layer 2: predictive | BigQuery `amps_demo` + `asset_risk` view | **BigQuery ML boosted tree (XGBoost family)**: "fails in next 30 days" per asset, trained in SQL inside BigQuery, no separate ML server | Google AI 20% |
-| Architecture + queue | App server + worker on one Postgres | Slide: Postgres queue → Redis → Kafka by scale | Arch 20% |
-| Fewer clicks | QR → photo → one tap draft | Show the click count on a slide | UX 10% |
-| Host on GCP | Cloud Run + AlloyDB kit in `deploy/gcp/` | Run when billing is on | Arch 20% |
-| Acceptance | Demo Industries demo dataset at real-world scale | Pitch line: pilot operator acceptance, never named | Fit 15% |
+## Around the layers
+- **Architecture:** app server + a separate data-processing worker; queue grows Postgres → Redis → Kafka as scale needs.
+- **Hosting:** GCP (Cloud Run); Postgres + vectors on AlloyDB (pgvector).
+- **UX:** fewer clicks (QR → photo → one-tap draft); voice in Indian languages.
+- **Pitch:** pilot operator acceptance (real-world scale, real users) · product potential · business · funding.
+
+## Status vs the advice
+
+| Point | Today | Next |
+|---|---|---|
+| Layer 1 | Live: Snap, Ask AMPS, Similar failures, PM plan, Risk badge | Gemma as a self-host fallback (slide) |
+| Voice | Browser speech (bn-IN / en-IN) in Snap | Google Speech-to-Text (Chirp) |
+| Layer 2 | First BigQuery ML boosted-tree model trained in `amps_demo` | Fix the training window and labels, then show the evaluation |
+| Architecture | App + worker on one Postgres | Slide: Postgres → Redis → Kafka |
+| GCP hosting | Cloud Run + AlloyDB kit in `deploy/gcp/` | Run when billing is on |
+| Acceptance | Demo Industries demo dataset at real-world scale | Pitch line: pilot operator acceptance |

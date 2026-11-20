@@ -53,7 +53,7 @@ The slide also asks for a **problem statement** (the challenge we solve) and **r
 Priority for the build: working product first (30%), then Google AI depth and architecture (20% each).
 
 ## 1c. Mentor input (20 Nov, Google mentor)
-Full notes + audit → `mentors-advise.md`. Take-aways: Layer 1 (RAG + deterministic + small model + voice + OCR) is mostly live; Layer 2 = **BigQuery ML** predictive model inside BigQuery (next); architecture slide shows app server + worker + queue path (Postgres → Redis → Kafka); voice = Google Speech-to-Text (Chirp) first; acceptance = "pilot operator acceptance", never named.
+Full notes → `mentor-input.md` (renamed from mentors-advise.md, simplified to one picture). Mental model: **AI layer 1 = every click** (RAG + deterministic + small model + voice + OCR: Snap, Ask AMPS, Similar failures, PM plan = deterministic scheduler with Gemini explaining, Risk badge) · **AI layer 2 = learns over time** (data cleansing, boosted trees / random forest, neural nets, ML pipelines in BigQuery ML). The AI page (`#/ai`, `aihub.jsx`) now opens with the two layers, each with its techniques, feature → technique rows and an economy line; every card carries an L1 / L2 tag. Gemini key on the laptop verified 20 Nov (AI Studio endpoint, 200). BigQuery ML `failure_risk_model` trained 20 Nov 14:01; first evaluation is degenerate (no positives in the eval split), so the labels and window are next.
 
 ## 2. Session notes — Abirami Sukumaran (Cloud Databases & AI, Google)
 Deck: https://goo.gle/data-ai-biz · "Data & AI for Businesses"
