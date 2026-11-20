@@ -1,4 +1,4 @@
-# Office-local overrides (not in git): Metro production settings
+# Office-local overrides (not in git): office production settings
 services:
   db:
     restart: unless-stopped

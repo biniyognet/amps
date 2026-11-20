@@ -52,15 +52,14 @@ def _seed_checksheets(engine):
         green = db.scalar(select(Location).where(
             Location.kind == LocationKind.SITE, Location.name == std))
         line_id = green.id if green else None
-        # AMPS_ORG re-heads the printed titles for another organisation
+        # AMPS_ORG heads the printed titles ("ORG — TITLE"); unset, the UI adds its own
         org = os.environ.get("AMPS_ORG", "").strip().upper()
         now = datetime.utcnow()
         for f in HT_CHECKSHEET_SEED:
             slug = _re.sub(r"[^a-z0-9]+", "-", f["label"].lower()).strip("-")[:80]
             db.add(ChecksheetFormat(
                 slug=slug, grp=f.get("grp", "HT"), label=f["label"][:120],
-                title=(_re.sub(r"^METRO RAILWAY,?\s*KOLKATA", org, f.get("title", f["label"]))
-                       if org else f.get("title", f["label"]))[:240],
+                title=((f"{org} — " if org else "") + f.get("title", f["label"]))[:240],
                 items_json=_json.dumps(f["items"], ensure_ascii=False),
                 version=1, status=ChecksheetStatus.PUBLISHED, line_id=line_id,
                 created_by="system", approved_by="system", approved_at=now))
@@ -169,7 +168,7 @@ def _migrate(engine):
         # a plain (non-unique) index on code for lookups
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_assets_code ON assets (code)"))
         # Uniqueness is PER LOCATION, not per line. A depot spans several
-        # substations (RSS/TSS/ASS) and the metro reuses generic equipment codes
+        # substations (RSS/TSS/ASS) and the pilot reuses generic equipment codes
         # (BAT CH-1, ACDB-1, DCDB-1 …) at EACH substation — physically distinct
         # assets that share a code. So the natural key is (location_id, code):
         # the same code may repeat across stations/depots/lines, never within one

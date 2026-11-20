@@ -7,7 +7,7 @@
 ALL DATA HERE IS FICTIONAL. Site, area, agency, make and person names are invented;
 no real organization's assets, locations or records appear in this file.
 
-Four industries on one AMPS: a metro, a power substation, a water works and a
+Four industries on one AMPS: a rail transit line, a power substation, a water works and a
 factory. Deterministic (fixed RNG seed) and relative to today, so the demo always
 looks current: ~2,000 assets, 18 months of maintenance history, breakdowns with
 their rectifications, job cards to outside agencies, staff and a duty roster. Each
