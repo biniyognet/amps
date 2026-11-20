@@ -14,3 +14,4 @@ backend/app/data/
 # BigQuery export dumps (scripts/bq_export.py output), loaded by bigquery/load.sh, never committed
 bq_out/
 bq_out*.tgz
+pitch_out/

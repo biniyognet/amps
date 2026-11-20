@@ -36,6 +36,27 @@ the live answers back: `bigquery/load.sh --agent`.
 
 ★ = the three pitch questions for the AI hub card.
 
+## Pitch fallback (no agent yet, e.g. billing off)
+
+The same three ★ answers, from the same verified SQL, in the BigQuery sandbox. No agent,
+no Gemini, read only.
+
+```bash
+bigquery/agent/pitch.sh            # runs Q1, Q3, Q4 → pitch_out/q*.json + pitch_out/pitch.html
+```
+
+| Step | Ask (say it) | Show |
+|---|---|---|
+| 1 | "Which assets are at red risk, and why?" | `pitch.html` card 1: 3 red, Pump Motor 1 on top with its reasons (matches the F6 red badge) |
+| 2 | "Failures by site and month" | card 2: stacked bars per month, one colour per site (178 failures, Jun 2025 → Nov 2026) |
+| 3 | "How many failures are still open, by station?" | card 3: 19 open across 15 stations, split not seen / acknowledged / job card |
+
+Each card has "SQL (the verified query the agent uses)" to open, so the judges see that
+the answer is SQL over the estate. Live in the console instead: paste the `-- Q1`/`Q3`/`Q4`
+blocks from `questions.sql` into BigQuery Studio and screenshot the results.
+`PITCH_RENDER_ONLY=1 bigquery/agent/pitch.sh pitch_out` re-draws the page from the saved
+JSON without querying again.
+
 ## What to show judges
 
 1. Ask Q1: the agent answers from the `asset_risk` view and quotes the reasons; it matches
