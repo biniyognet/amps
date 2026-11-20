@@ -30,7 +30,7 @@ export default function SeenBefore({ code }) {
       <div className="sb-head">
         <h3>🔁 Seen before</h3>
         <span className="sb-src" title={data.mode === 'embedding' ? `Ranked by meaning with ${data.model}` : 'Gemini is off: ranked by shared words'}>
-          {data.mode === 'embedding' ? `✦ ${data.model}` : 'keyword match'}
+          {data.mode === 'embedding' ? `✦ ${data.model}${data.onprem ? ' · on-prem' : ''}` : 'keyword match'}
         </span>
       </div>
       <div className="sb-query">

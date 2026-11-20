@@ -99,7 +99,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: api
-          image: ghcr.io/biniyognet/amps-backend:oc11202210-demo
+          image: ghcr.io/biniyognet/amps-backend:oc11202307-gemma
           envFrom:
             - secretRef: {name: amps-judges-db}
             - secretRef: {name: amps-judges-app}
@@ -128,7 +128,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: worker
-          image: ghcr.io/biniyognet/amps-backend:oc11202210-demo
+          image: ghcr.io/biniyognet/amps-backend:oc11202307-gemma
           command: ["python", "-m", "app.worker"]
           envFrom:
             - secretRef: {name: amps-judges-db}
@@ -160,6 +160,13 @@ data:
   AMPS_GEMINI_MODEL: gemini-3.5-flash-lite
   AMPS_AI_PER_MINUTE: "12"
   AMPS_AI_PER_DAY: "1500"
+  # hybrid: Gemma 3 on our own GPU answers when Gemini errors / hits quota,
+  # EmbeddingGemma on-prem ranks "Seen before" (no key, nothing leaves the cluster)
+  AMPS_AI_FALLBACK_URL: http://ollama.bini-ai.svc:11434/v1
+  AMPS_AI_FALLBACK_MODEL: gemma3:4b
+  AMPS_EMBED_PROVIDER: ollama
+  AMPS_EMBED_URL: http://ollama.bini-ai.svc:11434
+  AMPS_EMBED_MODEL: embeddinggemma
 ---
 apiVersion: v1
 kind: Service

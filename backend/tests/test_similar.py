@@ -192,3 +192,23 @@ def test_embed_request_shape(monkeypatch):
     assert seen["key"] == KEY
     r0 = seen["body"]["requests"][0]
     assert r0["taskType"] == "SEMANTIC_SIMILARITY" and r0["outputDimensionality"] == similar.EMBED_DIM
+
+
+def test_embed_ollama_embeddinggemma(monkeypatch):
+    """AMPS_EMBED_PROVIDER=ollama: EmbeddingGemma on our own Ollama, document prompt
+    on every text, no key needed, and embedding stays on without Gemini."""
+    seen = {}
+
+    def fake_post(url, body, headers, retries=2):
+        seen.update(url=url, body=body, headers=headers)
+        return {"embeddings": [[0.0, 2.0]] * len(body["input"])}
+    monkeypatch.setattr(similar, "EMBED_PROVIDER", "ollama")
+    monkeypatch.setattr(similar, "EMBED_URL", "http://ollama:11434")
+    monkeypatch.setattr(similar, "EMBED_MODEL", "embeddinggemma")
+    monkeypatch.setattr(ai, "GEMINI_KEY", "")
+    monkeypatch.setattr(similar.ai, "_post", fake_post)
+    assert similar.embed_enabled()
+    assert similar._embed(["seal leak", "bearing hot"]) == [[0.0, 2.0], [0.0, 2.0]]
+    assert seen["url"] == "http://ollama:11434/api/embed" and seen["body"]["model"] == "embeddinggemma"
+    assert seen["body"]["input"] == ["title: none | text: seal leak", "title: none | text: bearing hot"]
+    assert seen["headers"] == {}

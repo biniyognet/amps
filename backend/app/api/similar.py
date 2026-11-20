@@ -23,6 +23,9 @@ from word overlap, and says so (`mode: "keyword"`). The key is read from
 AMPS_GEMINI_API_KEY through app.api.ai and is never logged or returned.
 With AMPS_AI_PROVIDER=vertex the same model runs on Vertex AI (`:predict`, one
 text per call there) under the project's Google credentials.
+With AMPS_EMBED_PROVIDER=ollama the vectors come from EmbeddingGemma on the
+plant's own Ollama (AMPS_EMBED_URL / AMPS_EMBED_MODEL): same 768 dims, no key.
+The model name is part of each row's text hash, so switching provider re-embeds.
 """
 import hashlib
 import json
@@ -47,8 +50,16 @@ from app.models import Asset, FailureEmbedding, LogEntry, LogEntryType
 
 router = APIRouter()
 
-EMBED_MODEL = os.environ.get("AMPS_GEMINI_EMBED_MODEL", "gemini-embedding-001")
+# AMPS_EMBED_PROVIDER=ollama keeps search on-prem: EmbeddingGemma (768-dim, 100+
+# languages) served by our own Ollama, no key, no quota, remarks never leave the plant.
+EMBED_PROVIDER = os.environ.get("AMPS_EMBED_PROVIDER", "").strip().lower()
+EMBED_URL = os.environ.get("AMPS_EMBED_URL", "http://ollama:11434").rstrip("/")
+EMBED_MODEL = (os.environ.get("AMPS_EMBED_MODEL", "embeddinggemma") if EMBED_PROVIDER == "ollama"
+               else os.environ.get("AMPS_GEMINI_EMBED_MODEL", "gemini-embedding-001"))
 EMBED_DIM = int(os.environ.get("AMPS_GEMINI_EMBED_DIM", "768"))   # MRL: 768 of 3072 is plenty
+# EmbeddingGemma is trained with task prompts; a failure remark is compared with
+# other remarks (symmetric), so every text carries the document prompt
+GEMMA_DOC = "title: none | text: "
 BATCH = 100        # batchEmbedContents takes up to 100 texts per call
 LAZY_CAP = 300     # texts a single page view may embed; the backfill script does the rest
 MIN_SCORE = 0.35   # below this a "match" is noise — show fewer rather than wrong
@@ -72,7 +83,21 @@ def _unit(v):
 
 
 def embed_enabled() -> bool:
-    return ai.gemini_on()
+    return EMBED_PROVIDER == "ollama" or ai.gemini_on()
+
+
+def _embed_ollama(texts: list[str]) -> list[list[float]]:
+    """Ollama /api/embed — EmbeddingGemma on our own GPU, BATCH texts per call."""
+    out = []
+    for i in range(0, len(texts), BATCH):
+        chunk = texts[i:i + BATCH]
+        r = ai._post(f"{EMBED_URL}/api/embed",
+                     {"model": EMBED_MODEL, "input": [GEMMA_DOC + t for t in chunk]}, {})
+        vecs = r["embeddings"]
+        if len(vecs) != len(chunk):
+            raise ValueError("embedding count mismatch")
+        out.extend(vecs)
+    return out
 
 
 def _embed_vertex(texts: list[str]) -> list[list[float]]:
@@ -88,6 +113,8 @@ def _embed_vertex(texts: list[str]) -> list[list[float]]:
 
 def _embed(texts: list[str]) -> list[list[float]]:
     """Gemini batchEmbedContents → one vector per text, same order."""
+    if EMBED_PROVIDER == "ollama":
+        return _embed_ollama(texts)
     if ai.PROVIDER == "vertex":
         return _embed_vertex(texts)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{EMBED_MODEL}:batchEmbedContents"
@@ -238,5 +265,6 @@ def similar_failures(asset_code: str, failure_id: int | None = None, k: int = 3,
     scored.sort(key=lambda t: (-t[0], -t[1].at.timestamp()))
     base["matches"] = [_item(e, rec[e.id], s) for s, e in scored if s >= floor][:k]
     base["mode"], base["model"] = mode, EMBED_MODEL if mode == "embedding" else None
+    base["onprem"] = mode == "embedding" and EMBED_PROVIDER == "ollama"
     base["engine"] = ("pgvector" if dbmod.PGVECTOR else "python") if mode == "embedding" else None
     return base
