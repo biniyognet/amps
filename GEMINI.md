@@ -21,6 +21,7 @@ BigQuery dataset `gen-lang-client-0618042629.amps_demo`. This is demo seed data 
 | `pm_plans` | planned-maintenance plan on an asset | `asset_code`, `frequency`, `last_done_seed` |
 | `locations` | site or station | `name`, `kind`, `parent_name` |
 | `asset_classes` | asset class | `name` |
+| `asset_risk` (view) | asset, scored | `asset_code`, `asset_name`, `station`, `line`, `band`, `score`, `why`, `failures_12m`, `repeat_max`, `open_now`, `pm_late`, `age_years` |
 
 ## Meanings (use these, do not guess)
 - **Failure** = a row in `failures`. For counts of failures use `failures`, not `log_entries`.
@@ -37,6 +38,10 @@ BigQuery dataset `gen-lang-client-0618042629.amps_demo`. This is demo seed data 
 - `status`: `in_service` · `under_maintenance` · `spare`.
 - **Asset age** = years since `commissioned_on`; past `codal_life_years` = beyond design life.
 - PM frequency: Monthly · Quarterly · Half-Yearly · Yearly · 5-Yearly.
+- **Site** = column `line`; **station** = an area inside a site.
+- **Risk**: `asset_risk.band` is `red` · `amber` · `green` and `why` lists up to 3 reasons
+  (old, failing again, same fault repeating, open now, PM late). For "risky", "at risk" or
+  "which assets will fail next", use this view and quote `why`; do not invent a score.
 
 ## How to answer
 1. Write standard SQL against the tables above; show names (asset code, station, class), not ids.
@@ -47,9 +52,10 @@ BigQuery dataset `gen-lang-client-0618042629.amps_demo`. This is demo seed data 
 5. Read only. Never suggest changing data here; changes are made in AMPS by a person.
 6. If the data cannot answer the question, say so and say which table or field is missing.
 
-## Example questions
-- Which 5 assets failed most in the last 90 days?
+## Example questions (verified SQL for each: `bigquery/agent/questions.sql`)
+- Which assets are at red risk, and why?
+- Which 5 assets failed most in the last 12 months?
 - Failures by site and month, as a chart.
-- Which asset class has the longest MTTR?
 - How many failures are still open, by station?
-- Which criticality-A assets are past their codal life?
+- Which asset class takes longest to fix (MTTR)?
+- Per site: preventive maintenance done vs failures in the last 90 days.

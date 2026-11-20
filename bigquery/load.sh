@@ -6,6 +6,7 @@
 #   gcloud auth login        # once, an account with BigQuery on the project
 #   bigquery/load.sh bq_out  # bq_out = folder written by scripts/bq_export.py
 #   bigquery/load.sh --check # read-back only (counts, bands, samples), no reload
+#   bigquery/load.sh --agent # F4 agent's six questions (agent/questions.sql), no reload
 #
 # Needs the gcloud SDK (bq). Fictional Demo Industries seed data only.
 set -euo pipefail
@@ -18,7 +19,9 @@ OUT=${1:-bq_out}
 HERE=$(cd "$(dirname "$0")" && pwd)
 bq="bq --project_id=$P"
 
-if [ "$OUT" != "--check" ]; then
+READ="$HERE/check.sql"
+[ "$OUT" = "--agent" ] && READ="$HERE/agent/questions.sql"
+if [ "$OUT" != "--check" ] && [ "$OUT" != "--agent" ]; then
 $bq show "$DS" >/dev/null 2>&1 || $bq mk --location us-central1 --dataset "$DS"
 if [ "$EXP" != 0 ]; then
   $bq update --default_table_expiration "$EXP" --default_partition_expiration "$EXP" "$DS"
@@ -30,8 +33,8 @@ for s in failure_fields asset_risk; do
   sed "s/amps_demo\./$DS./g" "$HERE/$s.sql" | $bq query --use_legacy_sql=false
 done
 fi
-# check.sql holds three SELECTs: run them one by one so each prints its table
-grep -v '^--' "$HERE/check.sql" | sed "s/amps_demo\./$DS./g" |
+# check.sql (or questions.sql) holds several SELECTs: run them one by one so each prints its table
+grep -v '^--' "$READ" | sed "s/amps_demo\./$DS./g" |
   while IFS= read -r -d ';' q; do
     [ -n "${q//[[:space:]]/}" ] && $bq query --use_legacy_sql=false --format=pretty "$q"
   done
