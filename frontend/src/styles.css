@@ -84,6 +84,28 @@ a { color: inherit; text-decoration: none; }
 .brand-org { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
 /* line 2 = the full form — hidden in the slim bar to keep it single-row */
 .brand-tag { display: none; }
+
+/* "● Live" header dot — the shared websocket's connected state. Grey while
+   offline/reconnecting (quiet, not alarming — the app works fine either
+   way), green once the live feed is up. */
+.live-dot {
+  font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--ink-3);
+  display: inline-flex; align-items: center; margin-left: 6px; flex: none;
+}
+.live-dot.on { color: var(--good); }
+
+/* Minimal toast stack for live events (new failure, etc). Used only where
+   the host page doesn't already have its own notification UI. */
+.live-toasts {
+  position: fixed; right: 16px; bottom: 16px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px; max-width: 320px;
+}
+.live-toast {
+  background: var(--ink); color: #fff; border-radius: var(--r-md);
+  padding: 10px 14px; font-size: 13px; font-weight: 600; line-height: 1.35;
+  box-shadow: 0 6px 20px rgba(11, 42, 63, .25);
+}
+
 .nav { display: flex; flex-wrap: wrap; gap: 3px; margin-left: auto; align-items: center; }
 .nav a {
   font-size: 13.5px; font-weight: 550; color: var(--ink-2); padding: 4px 11px; border-radius: 99px;

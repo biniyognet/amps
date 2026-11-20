@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Arup Biswas and AMPS contributors (binidev)
 // AMPS - Asset & Preventive Maintenance System (https://github.com/arupbiswas1994-byte/amps)
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import AskAmps from './ask'
 import {
@@ -11,7 +11,8 @@ import {
   completedChecksheets, kpis, fmtDate, fmtTime, dueState, durationHrs, failureStats,
   failuresByMonth, classCountsAll, downtimeByAsset, recoveryStatus, pmOccurrencesInMonth,
 } from './data.js'
-import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, PILOT_URL, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath } from './api.js'
+import { LIVE, ORG, OPERATOR, ORDER_REF, ORDER_EXTRACT, ORG_ALIASES, PILOT_URL, W, getJSON, useLiveAssets, useLiveAsset, useMe, apiLogin, apiLogout, apiChangePassword, encPath, triggerRefresh } from './api.js'
+import { useLiveEvents, pushToast, LiveDot, LiveToasts } from './live.jsx'
 // backend timestamps are UTC without a tz suffix — parse as UTC and render in IST
 const fmtDT = (ts) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(String(ts)) ? ts : `${ts}Z`)
   .toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -22,18 +23,23 @@ const BackCrumb = ({ fallback = '#/', label = '← Back' }) => (
      onClick={(e) => { if (window.history.length > 1) { e.preventDefault(); window.history.back() } }}>{label}</a>
 )
 import QR, { assetUrl } from './qr.jsx'
-import DutyRoster from './roster.jsx'
 import LogBook, { AttachmentUpload, JobCardEntry } from './logbook.jsx'
 import { CHECKSHEET_FORMATS } from './checksheets.js'
 import { TendersView, ReaderView } from './tenders.jsx'
 import { DrawingsView, DrawingViewer, AssetDrawings } from './drawings.jsx'
-import { GuideView } from './guide.jsx'
 import SnapReport, { SnapPrint, rememberNext } from './snap.jsx'
-import { LettersView, LetterViewer } from './letters.jsx'
-import { PlannedView } from './planned.jsx'
-import AiHub from './aihub.jsx'
 import { JobCardApproval } from './approval.jsx'
 import SeenBefore from './similar.jsx'
+// Lazy-split: only reachable behind their own routes, nothing else in this
+// file imports a named export from these modules eagerly — so splitting them
+// out actually shrinks the main chunk instead of just adding a Suspense
+// boundary around code that ships anyway.
+const DutyRoster = lazy(() => import('./roster.jsx'))
+const GuideView = lazy(() => import('./guide.jsx').then((m) => ({ default: m.GuideView })))
+const LettersView = lazy(() => import('./letters.jsx').then((m) => ({ default: m.LettersView })))
+const LetterViewer = lazy(() => import('./letters.jsx').then((m) => ({ default: m.LetterViewer })))
+const PlannedView = lazy(() => import('./planned.jsx').then((m) => ({ default: m.PlannedView })))
+const AiHub = lazy(() => import('./aihub.jsx'))
 
 const STATUS_LABEL = {
   in_service: 'In service',
@@ -5392,6 +5398,19 @@ export default function App() {
     fit()
     return () => { removeEventListener('scroll', on); removeEventListener('resize', on); mo.disconnect(); if (raf) cancelAnimationFrame(raf) }
   }, [])
+  // Live wiring: a backend write/failure/talk event means whatever the user is
+  // looking at may be stale. Debounce 1s (bursts of writes collapse to one
+  // refresh) and nudge the shared refresh signal — useLiveAssets/useLiveAsset
+  // in api.js pick it up and re-fetch themselves; nothing here knows which
+  // view is open. A no-op (never fires) outside live mode.
+  const refreshTimer = useRef(null)
+  useLiveEvents(['write', 'failure.raised', 'talk.reading'], () => {
+    clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(triggerRefresh, 1000)
+  })
+  useLiveEvents('failure.raised', (msg) => {
+    pushToast(`⚡ New failure on ${msg?.data?.asset_code || 'asset'}`)
+  })
   const go = (r) => { location.hash = r }
   const authOn = LIVE && me?.auth_enabled
   const signedIn = authOn && me.username !== 'viewer'
@@ -5441,7 +5460,7 @@ export default function App() {
       <>{siteArt}
       <div className="shell" style={navLine ? { '--nav-c': lineColor(navLine) } : undefined}>
         <header className="topbar">
-  <Brand />
+  <Brand /><LiveDot />
           <nav className="nav">
             {!assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites' || onLanding} />}
             <AnonLineNav line={assetMatch ? null : navLine} active={lineAssetsMatch ? 'assets' : failLine ? 'failures' : (routePath === '/sites' || routePath === '/dash' || onLanding || lineMatch) ? 'dash' : ''} />
@@ -5452,6 +5471,7 @@ export default function App() {
               <span className="li-txt">Sign in</span></a>
           </nav>
         </header>
+        <Suspense fallback={null}>
         {routePath === '/guide' ? <GuideView section={routeQuery.get('s')} />
           : routePath === '/ai' ? <AiHub />
           : routePath === '/sites' || onLanding ? <EstateView />
@@ -5461,9 +5481,11 @@ export default function App() {
           : snapMatch ? <SnapReport code={safeDecode(snapMatch[1])} />
           : lineAssetsMatch ? <LineAssets name={safeDecode(lineAssetsMatch[1])} />
           : <LineView name={decodeURIComponent(lineMatch[1])} />}
+        </Suspense>
         <footer className="foot">{ORG} · maintenance records · <AmpsLink />, MIT © 2026 <FootSig /></footer>
       </div>
       <AskAmps />
+      <LiveToasts />
       </>
     )
   }
@@ -5473,7 +5495,7 @@ export default function App() {
     <>{siteArt}
     <div className="shell" style={navLine ? { '--nav-c': lineColor(navLine) } : undefined}>
       <header className="topbar">
-<Brand />
+<Brand /><LiveDot />
         <nav className="nav">
           {!me?.line && !assetMatch && <SitePicker current={navLine || ''} estate={routePath === '/sites'} />}
           {NAV.map(([path, label]) => {
@@ -5498,6 +5520,7 @@ export default function App() {
         </nav>
       </header>
 
+      <Suspense fallback={null}>
       {assetMatch ? (LIVE ? <LiveAssetDetail code={assetCode} /> : <AssetDetail code={assetCode} />)
         : snapMatch ? (LIVE ? <SnapReport code={safeDecode(snapMatch[1])} /> : <NotYet />)
         : printMatch ? (LIVE ? <SnapPrint kind={printMatch[1]} id={printMatch[2]} code={routeQuery.get('asset')} /> : <NotYet />)
@@ -5530,10 +5553,12 @@ export default function App() {
         : routePath === '/sites' && LIVE ? <EstateView />
         : routePath === '/dash' && LIVE ? <LineDashboard go={go} />
         : (LIVE ? (lastSite() && !me?.line ? <Redirect to={dashHref()} /> : <LineDashboard go={go} />) : <Dashboard go={go} />)}
+      </Suspense>
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
       {LIVE && !OPERATOR && <AskAmps />}
       <ShellFoot />
+      <LiveToasts />
     </div>
     </>
   )

@@ -43,6 +43,21 @@ export async function getJSON(path) {
   return r.json()
 }
 
+/* Live refresh bus: live.jsx's websocket wiring calls triggerRefresh() (debounced
+   1s) when the backend reports a write / failure / talk event. Data hooks below
+   listen and re-run their own fetch — no polling, no page reload. */
+const refreshBus = new EventTarget()
+export function triggerRefresh() { refreshBus.dispatchEvent(new Event('refresh')) }
+function useRefreshSignal() {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    const h = () => setN((x) => x + 1)
+    refreshBus.addEventListener('refresh', h)
+    return () => refreshBus.removeEventListener('refresh', h)
+  }, [])
+  return n
+}
+
 /* API asset → the shape the screens already use for demo data. */
 const toView = (a) => ({
   code: a.code,
@@ -111,6 +126,8 @@ export async function apiChangePassword(current_password, new_password) {
   return r.json()
 }
 
+let assetsCache = null // module-level: { assets, sched, openFail, risk } — see useLiveAssets below
+
 /** Register + dashboard source: every asset, plus PM items due within 60 days. */
 export function useLiveAssets() {
   // Progressive (lazy) load: the asset list is the register's first paint, so it
@@ -119,13 +136,30 @@ export function useLiveAssets() {
   // gate `schedLoading` — the list is browsable/searchable/sortable at once,
   // and PM-state columns + counts fill in a moment later. Aggregate views
   // (dashboards) wait on `schedLoading` since their numbers need the schedule.
-  const [state, set] = useState({ assets: [], sched: {}, openFail: {}, risk: {}, loading: LIVE, schedLoading: LIVE, error: null })
+  // Four separate views (LiveDashboard, LineDashboard, TagSheet, the network
+  // glance) each call this hook on their own mount. Without a shared cache,
+  // clicking Dashboard → Assets → Dashboard re-fetches the full ~2.7MB assets
+  // + ~1.5MB schedule payload every time. Seed instantly from the last
+  // hydrated result (stale-while-revalidate) so only the FIRST mount in a
+  // session pays the full cold-load cost; a background fetch still runs so
+  // the cache catches up, and the live refresh signal invalidates it on a
+  // backend write/failure event.
+  const refreshSignal = useRefreshSignal()
+  const [state, set] = useState(() => (assetsCache
+    ? { ...assetsCache, loading: false, schedLoading: false, error: null }
+    : { assets: [], sched: {}, openFail: {}, risk: {}, loading: LIVE, schedLoading: LIVE, error: null }))
   useEffect(() => {
     if (!LIVE) return undefined
     let alive = true
+    const cold = !assetsCache
+    if (!cold) set((s) => ({ ...s, ...assetsCache }))
     // 1) assets first — the register renders the instant these land
     getJSON('/api/assets')
-      .then((assets) => alive && set((s) => ({ ...s, assets: assets.map(toView), loading: false, error: null })))
+      .then((assets) => {
+        const mapped = assets.map(toView)
+        assetsCache = { ...(assetsCache || {}), assets: mapped }
+        if (alive) set((s) => ({ ...s, assets: mapped, loading: false, error: null }))
+      })
       .catch((e) => alive && set((s) => ({ ...s, loading: false, schedLoading: false, error: String(e) })))
     // 2) schedule + open failures hydrate after, without blocking the list.
     // codes repeat across lines, so both are keyed by `line|code` (the backend
@@ -135,15 +169,17 @@ export function useLiveAssets() {
       getJSON('/api/maintenance/schedule').catch(() => []),
       getJSON('/api/logbook/open-failures-by-asset').catch(() => ({})),
       getJSON('/api/risk').catch(() => []),   // F6 badge — only scored assets come back; no row = green
-    ]).then(([sched, openFail, risk]) => alive && set((s) => ({
-      ...s,
-      sched: Object.fromEntries(sched.map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
-      openFail: openFail || {},
-      risk: Object.fromEntries((risk || []).map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
-      schedLoading: false,
-    })))
+    ]).then(([sched, openFail, risk]) => {
+      const mapped = {
+        sched: Object.fromEntries(sched.map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
+        openFail: openFail || {},
+        risk: Object.fromEntries((risk || []).map((x) => [`${x.line || ''}|${x.asset_code}`, x])),
+      }
+      assetsCache = { ...(assetsCache || {}), ...mapped }
+      if (alive) set((s) => ({ ...s, ...mapped, schedLoading: false }))
+    })
     return () => { alive = false }
-  }, [])
+  }, [refreshSignal])
   return state
 }
 
@@ -155,6 +191,9 @@ export function useLiveAsset(code) {
   const [state, set] = useState({ asset: null, history: [], log: [], loading: true, error: null })
   const [nonce, setNonce] = useState(0)
   const reload = () => setNonce((n) => n + 1)
+  // the shared live refresh signal (a backend write/failure, debounced 1s in
+  // live.jsx) reruns this exactly like a manual reload() — same fetch, same effect
+  const refreshSignal = useRefreshSignal()
   useEffect(() => {
     let alive = true
     set({ asset: null, history: [], log: [], loading: true, error: null })
@@ -166,6 +205,6 @@ export function useLiveAsset(code) {
       .then(([a, history, log]) => alive && set({ asset: toView(a), history, log, loading: false, error: null }))
       .catch((e) => alive && set({ asset: null, history: [], log: [], loading: false, error: String(e) }))
     return () => { alive = false }
-  }, [code, nonce])
+  }, [code, nonce, refreshSignal])
   return { ...state, reload }
 }
