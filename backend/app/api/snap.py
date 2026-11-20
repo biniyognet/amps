@@ -159,13 +159,12 @@ def _gemini_draft(prompt: str, photo: tuple[bytes, str] | None) -> dict:
     if photo:
         parts.insert(0, {"inline_data": {"mime_type": photo[1],
                                          "data": base64.b64encode(photo[0]).decode()}})
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{ai.GEMINI_MODEL}:generateContent"
-    resp = ai._post(url, {
+    resp = ai.gemini_generate({
         "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024,
                              "responseMimeType": "application/json", "responseSchema": SCHEMA,
                              "thinkingConfig": {"thinkingBudget": 0}},
-    }, {"x-goog-api-key": ai.GEMINI_KEY})
+    })
     out = (resp.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
     return json.loads("".join(p.get("text", "") for p in out))
 
@@ -225,9 +224,9 @@ async def analyze(request: Request, asset_code: str = Form(...), remarks: str = 
     history = ai.t_asset_history(db, user, asset.code)
     prompt = PROMPT.format(remarks=remarks or "(none — see photo)",
                            history=json.dumps(history, default=str)[:6000])
-    vision, model = bool(held), ai.GEMINI_MODEL if ai.PROVIDER == "gemini" else ai.MODEL
+    vision, model = bool(held), ai._model()
     try:
-        if ai.PROVIDER == "gemini":
+        if ai.gemini_on():
             raw = _gemini_draft(prompt, held[:2] if held else None)
         else:
             raw, vision = _openai_draft(ai.BASE_URL, ai.MODEL, prompt), False

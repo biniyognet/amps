@@ -11,6 +11,9 @@ the caller's line exactly like the rest of the read API.
 
 Providers (AMPS_AI_PROVIDER):
   gemini  — Google Gemini API, key in AMPS_GEMINI_API_KEY (AI Studio key).
+  vertex  — the same Gemini models on Vertex AI, billed to a GCP project:
+            AMPS_VERTEX_PROJECT (+ AMPS_VERTEX_LOCATION, default global),
+            Google credentials instead of a key (see app.api.vertex).
   openai  — any OpenAI-compatible endpoint (Ollama, llama.cpp, vLLM): set
             AMPS_AI_BASE_URL (e.g. http://localhost:11434/v1) and AMPS_AI_MODEL.
             This is how Gemma runs on-premise, with no data leaving the site.
@@ -34,6 +37,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.api import vertex
 from app.api.auth import current_writer, optional_user, scope_location_ids
 from app.api.maintenance import schedule_all
 from app.db import audit, get_db
@@ -57,9 +61,17 @@ MAX_STEPS = 5   # tool-call rounds before we stop and answer with what we have
 ROW_CAP = 25    # rows any one tool returns — keeps prompts small and cheap
 
 
+def gemini_on() -> bool:
+    """A Gemini model answers: through an AI Studio key (gemini) or Vertex AI (vertex)."""
+    return (PROVIDER == "gemini" and bool(GEMINI_KEY)) or (PROVIDER == "vertex" and vertex.configured())
+
+
 def _enabled() -> bool:
-    return (PROVIDER == "gemini" and bool(GEMINI_KEY)) or \
-           (PROVIDER == "openai" and bool(BASE_URL and MODEL))
+    return gemini_on() or (PROVIDER == "openai" and bool(BASE_URL and MODEL))
+
+
+def _model() -> str:
+    return GEMINI_MODEL if PROVIDER in ("gemini", "vertex") else MODEL
 
 
 # ---- rate limit (in-process; one replica is plenty for this) ----------------
@@ -459,6 +471,20 @@ def _post(url, body, headers):
         return json.loads(r.read())
 
 
+def gemini_target(model: str, method: str = "generateContent") -> tuple[str, dict]:
+    """(url, auth headers) for one Gemini call on the configured transport. The
+    request body is the same on both: Vertex AI takes the Gemini API's JSON."""
+    if PROVIDER == "vertex":
+        return vertex.model_url(model, method), vertex.headers()
+    return (f"https://generativelanguage.googleapis.com/v1beta/models/{model}:{method}",
+            {"x-goog-api-key": GEMINI_KEY})
+
+
+def gemini_generate(body: dict, model: str | None = None) -> dict:
+    url, headers = gemini_target(model or GEMINI_MODEL)
+    return _post(url, body, headers)
+
+
 # ---- provider loops ---------------------------------------------------------
 
 def _gemini(question, history, db, user, trace):
@@ -468,14 +494,13 @@ def _gemini(question, history, db, user, trace):
     contents = [{"role": "model" if h.role == "assistant" else "user", "parts": [{"text": h.text}]}
                 for h in history[-6:]]
     contents.append({"role": "user", "parts": [{"text": question}]})
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     for _ in range(MAX_STEPS):
-        resp = _post(url, {
+        resp = gemini_generate({
             "systemInstruction": {"parts": [{"text": SYSTEM.format(today=date.today())}]},
             "contents": contents,
             "tools": [{"functionDeclarations": decls}],
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
-        }, {"x-goog-api-key": GEMINI_KEY})
+        })
         parts = (resp.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
         calls = [p["functionCall"] for p in parts if "functionCall" in p]
         if not calls:
@@ -545,7 +570,7 @@ class AskOut(BaseModel):
 
 @router.get("/status")
 def status():
-    model = GEMINI_MODEL if PROVIDER == "gemini" else MODEL
+    model = _model()
     return {"enabled": _enabled(), "provider": PROVIDER or None, "model": model if _enabled() else None}
 
 
@@ -557,9 +582,9 @@ def ask(body: AskIn, request: Request, db: Session = Depends(get_db), user=Depen
           .split(",")[0].strip() or (request.client.host if request.client else "?"))
     _throttle(ip)
     trace: list[dict] = []
-    model = GEMINI_MODEL if PROVIDER == "gemini" else MODEL
+    model = _model()
     try:
-        if PROVIDER == "gemini":
+        if gemini_on():
             answer = _gemini(body.question, body.history, db, user, trace)
         else:
             answer = _openai(BASE_URL, MODEL, body.question, body.history, db, user, trace)

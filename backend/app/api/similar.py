@@ -18,6 +18,8 @@ pgvector is the scale-up path, not a demo dependency.
 Without a Gemini key (or when the embedding call fails) the panel still answers,
 from word overlap, and says so (`mode: "keyword"`). The key is read from
 AMPS_GEMINI_API_KEY through app.api.ai and is never logged or returned.
+With AMPS_AI_PROVIDER=vertex the same model runs on Vertex AI (`:predict`, one
+text per call there) under the project's Google credentials.
 """
 import hashlib
 import json
@@ -32,7 +34,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import ai
+from app.api import ai, vertex
 from app.api.assets import visible_asset
 from app.api.auth import optional_user, scope_location_ids
 from app.api.logbook import _down_hours, _drop_superseded, _recovery_map
@@ -46,6 +48,8 @@ EMBED_DIM = int(os.environ.get("AMPS_GEMINI_EMBED_DIM", "768"))   # MRL: 768 of 
 BATCH = 100        # batchEmbedContents takes up to 100 texts per call
 LAZY_CAP = 300     # texts a single page view may embed; the backfill script does the rest
 MIN_SCORE = 0.35   # below this a "match" is noise — show fewer rather than wrong
+# Vertex serves gemini-embedding-001 regionally; us-central1 sits next to the BigQuery dataset
+VERTEX_EMBED_LOCATION = os.environ.get("AMPS_VERTEX_EMBED_LOCATION", "us-central1")
 
 
 def failure_text(e: LogEntry) -> str:
@@ -64,11 +68,24 @@ def _unit(v):
 
 
 def embed_enabled() -> bool:
-    return ai.PROVIDER == "gemini" and bool(ai.GEMINI_KEY)
+    return ai.gemini_on()
+
+
+def _embed_vertex(texts: list[str]) -> list[list[float]]:
+    """Vertex AI :predict — gemini-embedding-001 takes one instance per request."""
+    url = vertex.model_url(EMBED_MODEL, "predict", VERTEX_EMBED_LOCATION)
+    out = []
+    for t in texts:
+        r = ai._post(url, {"instances": [{"content": t, "task_type": "SEMANTIC_SIMILARITY"}],
+                           "parameters": {"outputDimensionality": EMBED_DIM}}, vertex.headers())
+        out.append(r["predictions"][0]["embeddings"]["values"])
+    return out
 
 
 def _embed(texts: list[str]) -> list[list[float]]:
     """Gemini batchEmbedContents → one vector per text, same order."""
+    if ai.PROVIDER == "vertex":
+        return _embed_vertex(texts)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{EMBED_MODEL}:batchEmbedContents"
     out = []
     for i in range(0, len(texts), BATCH):
