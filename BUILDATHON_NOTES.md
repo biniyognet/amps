@@ -52,6 +52,9 @@
 The slide also asks for a **problem statement** (the challenge we solve) and **rubric criteria** (what earns a high or low score).
 Priority for the build: working product first (30%), then Google AI depth and architecture (20% each).
 
+## 1c. Mentor input (20 Nov, Google mentor)
+Full notes + audit → `mentors-advise.md`. Take-aways: Layer 1 (RAG + deterministic + small model + voice + OCR) is mostly live; Layer 2 = **BigQuery ML** predictive model inside BigQuery (next); architecture slide shows app server + worker + queue path (Postgres → Redis → Kafka); voice = Google Speech-to-Text (Chirp) first; acceptance = "pilot operator acceptance", never named.
+
 ## 2. Session notes — Abirami Sukumaran (Cloud Databases & AI, Google)
 Deck: https://goo.gle/data-ai-biz · "Data & AI for Businesses"
 
