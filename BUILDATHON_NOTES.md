@@ -2,7 +2,7 @@
 
 > Kolkata · 20–21 Nov 2026 · submission closes **21 Nov, 09:00** · branch `buildathon`
 > Goal: integrate Google AI + data features into AMPS and make it as powerful as we can.
-> Audited 20 Nov (freya) against `buildathon` 5b40544 and every pushed lane branch. Laptop facts are as JARVIS last reported them.
+> Audited 20 Nov (freya) against `buildathon` 5b40544 and every pushed lane branch. Laptop: JARVIS rebuilt :8081 at 512e0b1, 20 Nov 12:00 (data kept, no `down -v`): app 200, `/api/risk` 200.
 
 ## 1. Checklist
 
