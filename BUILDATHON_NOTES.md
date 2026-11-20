@@ -17,7 +17,7 @@
 - [x] Start Docker Desktop (needed to run AMPS locally)
 - [x] Run the demo-look stack (same build + data as amps.binihost.com): `docker compose -f deploy/compose.yaml -f deploy/compose.demo.yaml up -d --build` → http://localhost:8081 (admin / admin). One stack only, project `amps-buildathon` (set in compose.demo.yaml), checked on the laptop 20 Nov 09:35: `docker compose ls` shows only `amps-buildathon` (3 containers, volumes `amps-buildathon_pgdata`/`_media`); no `amps-demo` containers or volumes left. Re-run the same command after a pull; never `down -v` (it wipes the demo data BigQuery needs).
 - [x] Laptop DB: **keep and grow it, never wipe** (BigQuery wants volume). Add the 85fd3d5 AI demo stories on top: `docker exec amps-buildathon-backend-1 python seed_network.py --stories` (additive, re-run safe). JARVIS runs laptop steps itself over Tailscale ssh (`arupb@100.77.190.74`, PowerShell by full path); seats ask JARVIS, not Arup. `down -v` is never on the path. Done 20 Nov (e658bd6): 10 stories added, data kept
-- [ ] Turn AI on for the laptop stack: put `AMPS_GEMINI_API_KEY=…` in `deploy/.env` (git-ignored), re-run the command. Until then `/api/ai/status` = off and Snap / Ask / auto-plan do not draw (compose.demo now passes provider `gemini` + model `gemini-3.5-flash-lite`)
+- [x] Turn AI on for the laptop stack: `AMPS_GEMINI_API_KEY=…` in `deploy/.env` (git-ignored), backend recreated — done 20 Nov 14:06 (Arup put the key, JARVIS recreated the backend). Key tested from inside the backend: AI Studio endpoint 200, model `gemini-3.5-flash-lite` (compose.demo passes provider `gemini`)
 - [x] Nilanjan synced — 20 Nov 09:15 email: `git clone -b buildathon https://github.com/biniyognet/amps.git amps-buildathon`, pull loop every 2 min, same compose command, push to his own branch `nilanjan` (never `buildathon`)
 - [x] Laptop pulls `buildathon` every 2 min (scheduled task `amps-sync`)
 - [ ] Codelab 2 (**do this one**, ~30 min = F4): https://codelabs.developers.google.com/data-agents-in-agy-and-bq
@@ -33,10 +33,15 @@
 - [ ] F2 Structured fault fields — AI.EXTRACT on free-text remarks · UI: component / symptom / cause / action chips
 - [x] F6 Failure-risk score per asset · UI: red/amber/green badge on the asset list (merged; live after the laptop rebuild)
 
-### Submit
+### Submit (Hack2skill guide email, 20 Nov)
+> Window: opens **20 Nov 23:00**, closes **21 Nov 09:00**, no extension. One submission per team, on the participant dashboard.
+> 21 Nov agenda: mentor evaluation 10:00–13:00 · showcase 14:00–17:30 · results 18:00.
+- [ ] Working prototype link — must stay **live until evaluation ends** (pick: public host vs laptop; see §6)
+- [ ] Pitch deck as **PDF < 10 MB on the dashboard template** (re-flow our 11 slides into it; lead with the two AI layers)
+- [ ] Demo video (optional) ≤ 3 min, public Google Drive or YouTube link
 - [ ] Demo runs end to end (with a pre-loaded backup table, in case the venue Wi-Fi is slow)
 - [~] Pitch deck ✅ drafted 20 Nov, 11 slides in rubric order (private claude.ai Slides link, Arup shares it; fill [team members] · [demo URL] · [contact]) · demo video/link still open
-- [ ] Submit on Hack2skill before 21 Nov 09:00
+- [ ] Submit on Hack2skill between 20 Nov 23:00 and 21 Nov 09:00
 
 ## 1b. Evaluation parameters & weightage (Hack2skill AI Evaluation slide, 20 Nov 11:06)
 | Parameter | Weight | What AMPS shows for it |
@@ -53,7 +58,7 @@ The slide also asks for a **problem statement** (the challenge we solve) and **r
 Priority for the build: working product first (30%), then Google AI depth and architecture (20% each).
 
 ## 1c. Mentor input (20 Nov, Google mentor)
-Full notes → `mentor-input.md` (renamed from mentors-advise.md, simplified to one picture). Mental model: **AI layer 1 = every click** (RAG + deterministic + small model + voice + OCR: Snap, Ask AMPS, Similar failures, PM plan = deterministic scheduler with Gemini explaining, Risk badge) · **AI layer 2 = learns over time** (data cleansing, boosted trees / random forest, neural nets, ML pipelines in BigQuery ML). The AI page (`#/ai`, `aihub.jsx`) now opens with the two layers, each with its techniques, feature → technique rows and an economy line; every card carries an L1 / L2 tag. Gemini key on the laptop verified 20 Nov (AI Studio endpoint, 200). BigQuery ML `failure_risk_model` trained 20 Nov 14:01; first evaluation is degenerate (no positives in the eval split), so the labels and window are next.
+Full notes → `mentor_inputs.md` (the old mentors-advise file is deleted; one picture, two layers). Mental model: **AI layer 1 = every click** (RAG + deterministic + small model + voice + OCR: Snap, Ask AMPS, Similar failures, PM plan = deterministic scheduler with Gemini explaining, Risk badge) · **AI layer 2 = learns over time** (data cleansing, boosted trees / random forest, neural nets, ML pipelines in BigQuery ML). The AI page (`#/ai`, `aihub.jsx`) now opens with the two layers, each with its techniques, feature → technique rows and an economy line; every card carries an L1 / L2 tag. Gemini key on the laptop verified 20 Nov (AI Studio endpoint, 200). BigQuery ML `failure_risk_model` trained 20 Nov 14:01; first evaluation is degenerate (no positives in the eval split), so the labels and window are next.
 
 ## 2. Session notes — Abirami Sukumaran (Cloud Databases & AI, Google)
 Deck: https://goo.gle/data-ai-biz · "Data & AI for Businesses"
@@ -157,12 +162,18 @@ Her codelab flow: **Provision** (AlloyDB Express) → **Enrich in SQL** (embeddi
 | 20 Nov (Arup) | Keep **three hosting paths ready** as alternate economic production hosting: local Postgres, Google (AlloyDB / BigQuery / Cloud SQL), binihost. See §8 | No lock-in; pick the cheapest host that works per client |
 | 20 Nov (Arup) | Operator details live outside git: `AMPS_ORG`, `AMPS_ORDER_REF`, `AMPS_ORDER_EXTRACT`, `AMPS_ORG_ALIASES` build args, set only in the office's untracked `deploy/compose.local.yaml`. Unset = the neutral "In production" block and the org from `AMPS_ORG` (default Demo Industries) on checksheet titles | The pilot is never named in the repo |
 | 20 Nov (Arup) | This file is **the tracker**: every buildathon change updates it in the same branch | One place to see the state |
+| 20 Nov (mentor → Arup) | **Refocus on two AI layers.** Layer 1 = every click: RAG + deterministic rules + small Gemini (Flash-Lite) + voice + OCR. Layer 2 = learns over time: data cleansing + boosted trees / random forest / neural nets in BigQuery ML pipelines. PM plan stays a deterministic scheduler; Gemini only explains it | Jury sees efficiency and economy per layer; cheap and explainable now, predictive as data grows |
+| 20 Nov | AI page `#/ai` opens with the two layers (techniques, feature → technique, economy line), L1 / L2 tag on every card (0d57849) | The jury reads the mental model in one screen |
+| 20 Nov | Deck and pitch use the same two-layer picture; the data is called the "Demo Industries demo dataset" | One story across app, deck and video |
 
 ## 6. Open items (20 Nov evening)
 | Item | Owner | Next |
 |---|---|---|
 | Laptop AI stories | JARVIS | ✅ done e658bd6: `seed_network.py --stories` added 10 stories, data kept (no `down -v`, ever) |
-| Gemini key in laptop `deploy/.env` | Arup (the key) · JARVIS (re-run compose) | not there yet; then `/api/ai/status` = enabled |
+| Gemini key in laptop `deploy/.env` | Arup (the key) · JARVIS (re-run compose) | ✅ done 20 Nov 14:06, key tested (AI Studio 200) |
+| Prototype link for the submission | Arup | pick the public link that stays live until evaluation ends (laptop :8081 is not public; amps.binihost.com gets no roll today) |
+| BigQuery ML `failure_risk_model` (layer 2) | JARVIS | trained 14:01; eval degenerate (no positives in the eval split) → fix the label window, retrain, record metrics here |
+| Deck PDF on the Hack2skill template | Arup + freya | re-flow the 11 slides into the dashboard template, < 10 MB, two-layer slide up front |
 | BigQuery `amps_demo` reload | JARVIS | ✅ reloaded from the laptop DB: assets 1,874 · log_entries 14,416 · asset_risk view 1,874. Project is a BigQuery **sandbox**, so tables expire after 59 days |
 | BigQuery F2 `failure_fields` (AI.GENERATE) + data agent (Codelab 2 steps 6–11) | Arup | needs billing on the project · the event billing account auto-closed (credit expired), Arup is sorting it with the mentors · meanwhile the pitch uses `bigquery/agent/pitch.sh` (JARVIS runs it on the laptop) |
 | Hosting paths ready (§8) | crew | local PG ✅ · binihost ✅ · BigQuery ✅ data (sandbox) · AlloyDB = step 9 (merged fa1a6f6, not run on GCP) · Cloud SQL = not started · Cloud Run = step 10 |
