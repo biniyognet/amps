@@ -101,6 +101,28 @@ function PlanCard({ plan, canWrite }) {
   )
 }
 
+// "gemini-3.5-flash-lite" → "Gemini 3.5 Flash-Lite" · "gemma3:4b" → "Gemma 3 4B"
+function modelName(id = '') {
+  const m = id.split('/').pop()
+  const g = m.match(/^gemma-?(\d+(?:\.\d+)?)[:-]?(\d+)b/i)
+  if (g) return `Gemma ${g[1]} ${g[2]}B`
+  return m.split('-').map((w, i, a) => w === 'lite' && i > 0 ? null
+    : w === 'flash' && a[i + 1] === 'lite' ? 'Flash-Lite'
+    : /^\d/.test(w) ? w : w[0].toUpperCase() + w.slice(1)).filter(Boolean).join(' ')
+}
+
+// which model answered — cloud Gemini, or the on-prem Gemma that stepped in when it failed
+function ModelChip({ model, provider, fallback }) {
+  const where = provider === 'gemma-onprem' ? `on-prem${fallback ? ' (fallback)' : ''}` : 'cloud'
+  return (
+    <small className="ask-src" title={model}
+      style={{ display: 'inline-block', alignSelf: 'flex-start', marginTop: 4, padding: '1px 8px',
+        borderRadius: 999, border: '1px solid currentColor', opacity: .75 }}>
+      {modelName(model)} · {where}
+    </small>
+  )
+}
+
 export default function AskAmps() {
   const [status, setStatus] = useState(null)
   const [open, setOpen] = useState(false)
@@ -140,7 +162,7 @@ export default function AskAmps() {
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.detail || 'The assistant could not answer just now.')
-      setMsgs(m => [...m, { role: 'assistant', text: j.answer, tools: j.tools, model: j.model, plan: j.plan }])
+      setMsgs(m => [...m, { role: 'assistant', text: j.answer, tools: j.tools, model: j.model, provider: j.provider, fallback: j.fallback, plan: j.plan }])
     } catch (e) {
       setMsgs(m => [...m, { role: 'assistant', text: e.message, error: true }])
     } finally {
@@ -183,6 +205,7 @@ export default function AskAmps() {
                     Looked up: {[...new Set(m.tools.map(t => TOOL_LABEL[t.tool] || t.tool))].join(' · ')}
                   </small>
                 )}
+                {m.model && <ModelChip model={m.model} provider={m.provider} fallback={m.fallback} />}
               </div>
             ))}
             {busy && <div className="ask-msg assistant busy"><span /><span /><span /></div>}
