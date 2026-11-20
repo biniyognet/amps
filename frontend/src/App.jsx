@@ -33,6 +33,7 @@ import { LettersView, LetterViewer } from './letters.jsx'
 import { PlannedView } from './planned.jsx'
 import AiHub from './aihub.jsx'
 import { JobCardApproval } from './approval.jsx'
+import SeenBefore from './similar.jsx'
 
 const STATUS_LABEL = {
   in_service: 'In service',
@@ -1663,6 +1664,8 @@ function LiveAssetDetail({ code }) {
             </div>
           )}
         </div>
+
+        <SeenBefore code={a.code} />
 
         <div className="card"><MaintenanceSchedule schedule={schedule} /></div>
 

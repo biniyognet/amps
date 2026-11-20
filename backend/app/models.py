@@ -10,7 +10,7 @@ every deployment configures its own location tree and asset classes.
 from datetime import date, datetime
 from enum import Enum
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -354,6 +354,23 @@ class Failure(Base):
     work_order_id: Mapped[int | None] = mapped_column(ForeignKey("work_orders.id"))
 
     asset: Mapped[Asset] = relationship()
+
+
+class FailureEmbedding(Base):
+    """A failure's text as a vector, for "seen before" (buildathon F1).
+
+    One row per failure logbook entry. The vector is float32 bytes, unit length,
+    so cosine similarity is a dot product in Python — no pgvector needed for an
+    estate of a few thousand failures. text_sha is the hash of the exact text that
+    was embedded: an edited remark, or a different model, re-embeds that row."""
+    __tablename__ = "failure_embeddings"
+
+    entry_id: Mapped[int] = mapped_column(ForeignKey("log_entries.id"), primary_key=True)
+    model: Mapped[str] = mapped_column(String(80))
+    text_sha: Mapped[str] = mapped_column(String(64))
+    dim: Mapped[int]
+    vector: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
 
 class Attachment(Base):
