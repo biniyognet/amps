@@ -1,0 +1,209 @@
+# amps-demo.binihost.com — the Buildathon judges' link (20 Nov 2026).
+# "Our Kubernetes runs the plant, Google is the brain": frontend + api + worker +
+# Redis + Postgres/pgvector on binihost k3s; Gemini + BigQuery are the Google side.
+# Own namespace, so amps.binihost.com (namespace amps-demo) is never touched.
+# Secrets are created out of band (never in git):
+#   amps-judges-db      POSTGRES_PASSWORD, DATABASE_URL
+#   amps-judges-app     AMPS_SECRET, AMPS_ADMIN_PASSWORD (also in bvault amps-judges/)
+#   amps-judges-ai      AMPS_GEMINI_API_KEY
+#   binihost-registry-secret (copied from amps-demo)
+# Data = the Demo Industries demo dataset (AMPS_SEED=network on an empty DB).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: amps-judges
+---
+apiVersion: v1
+kind: Service
+metadata: {name: db, namespace: amps-judges}
+spec:
+  selector: {app: amps-db}
+  ports: [{port: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: amps-db, namespace: amps-judges}
+spec:
+  serviceName: db
+  replicas: 1
+  selector: {matchLabels: {app: amps-db}}
+  template:
+    metadata: {labels: {app: amps-db}}
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          env:
+            - {name: POSTGRES_DB, value: amps}
+            - {name: POSTGRES_USER, value: amps}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: amps-judges-db, key: POSTGRES_PASSWORD}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports: [{containerPort: 5432}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "amps", "-d", "amps"]}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {memory: 768Mi}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: longhorn
+        resources: {requests: {storage: 5Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis, namespace: amps-judges}
+spec:
+  selector: {app: amps-redis}
+  ports: [{port: 6379}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: amps-redis, namespace: amps-judges}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: amps-redis}}
+  template:
+    metadata: {labels: {app: amps-redis}}
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          # job queue + event pub/sub only — nothing here needs to survive a restart
+          args: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+          ports: [{containerPort: 6379}]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: backend, namespace: amps-judges}   # name matches nginx.compose.conf
+spec:
+  selector: {app: amps-api}
+  ports: [{port: 8000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: amps-api, namespace: amps-judges}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: amps-api}}
+  template:
+    metadata: {labels: {app: amps-api}}
+    spec:
+      imagePullSecrets: [{name: binihost-registry-secret}]
+      containers:
+        - name: api
+          image: ghcr.io/biniyognet/amps-backend:oc11202158-e2e
+          envFrom:
+            - secretRef: {name: amps-judges-db}
+            - secretRef: {name: amps-judges-app}
+            - secretRef: {name: amps-judges-ai}
+            - configMapRef: {name: amps-judges-env}
+          ports: [{containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /api/ai/status, port: 8000}
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          volumeMounts: [{name: media, mountPath: /app/media}]
+      volumes: [{name: media, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: amps-worker, namespace: amps-judges}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: amps-worker}}
+  template:
+    metadata: {labels: {app: amps-worker}}
+    spec:
+      imagePullSecrets: [{name: binihost-registry-secret}]
+      containers:
+        - name: worker
+          image: ghcr.io/biniyognet/amps-backend:oc11202158-e2e
+          command: ["python", "-m", "app.worker"]
+          envFrom:
+            - secretRef: {name: amps-judges-db}
+            - secretRef: {name: amps-judges-app}
+            - secretRef: {name: amps-judges-ai}
+            - configMapRef: {name: amps-judges-env}
+          env:
+            - {name: AMPS_SEED_ON_START, value: "0"}   # the api seeds; never both
+          resources:
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          volumeMounts: [{name: media, mountPath: /app/media}]
+      volumes: [{name: media, emptyDir: {}}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: amps-judges-env, namespace: amps-judges}
+data:
+  AMPS_SEED_ON_START: "1"
+  AMPS_SEED: network
+  AMPS_ORG: Demo Industries Group
+  AMPS_STANDARD_LINE: City Traction & Depot
+  AMPS_AUTH: "1"
+  AMPS_MEDIA_DIR: /app/media
+  AMPS_REDIS_URL: redis://redis:6379/0
+  AMPS_AI_PROVIDER: gemini
+  AMPS_GEMINI_MODEL: gemini-3.5-flash-lite
+  AMPS_AI_PER_MINUTE: "12"
+  AMPS_AI_PER_DAY: "1500"
+---
+apiVersion: v1
+kind: Service
+metadata: {name: frontend, namespace: amps-judges}
+spec:
+  selector: {app: amps-frontend}
+  ports: [{port: 80}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: amps-frontend, namespace: amps-judges}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: amps-frontend}}
+  template:
+    metadata: {labels: {app: amps-frontend}}
+    spec:
+      imagePullSecrets: [{name: binihost-registry-secret}]
+      containers:
+        - name: nginx
+          image: ghcr.io/biniyognet/amps-frontend:oc11202158-e2e
+          ports: [{containerPort: 80}]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          volumeMounts:
+            - {name: conf, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf}
+      volumes:
+        - name: conf
+          configMap: {name: amps-judges-nginx}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: amps-demo-tls, namespace: amps-judges}
+spec:
+  secretName: amps-demo-tls
+  dnsNames: [amps-demo.binihost.com]
+  issuerRef: {name: letsencrypt-prod, kind: ClusterIssuer}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: {name: amps-demo, namespace: amps-judges}
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`amps-demo.binihost.com`)
+      kind: Rule
+      services: [{name: frontend, port: 80}]
+  tls: {secretName: amps-demo-tls}
