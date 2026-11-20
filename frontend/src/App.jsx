@@ -92,7 +92,7 @@ const ShellFoot = ({ className = '' }) => (
 
 /* Showcase dropdown — demo-only (amps.binihost.com). Points to the real
    deployments of AMPS so a demo visitor can see it running in the field.
-   Metro AMPS is served from the office server over a Cloudflare Tunnel. */
+   The pilot AMPS is served from the office server over a Cloudflare Tunnel. */
 const SHOWCASE = [
   { name: 'This demo', sub: 'Synthetic data — you are here', href: '#/', here: true },
   { divider: true },
@@ -145,7 +145,7 @@ const Brand = () => (
     {/* the real Indian Railways emblem is for the live office deployment only —
        a public synthetic demo must not carry a national/government emblem */}
     {OPERATOR ? <img className="brand-emblem" src={`${import.meta.env.BASE_URL}ir-railways.png`} alt="" />
-              : <img className="brand-emblem brand-fav" src={`${import.meta.env.BASE_URL}${!LIVE || import.meta.env.VITE_AMPS_BRAND === 'neutral' ? 'amps-bolt.svg' : 'metro-logo.svg'}`} alt="" />}
+              : <img className="brand-emblem brand-fav" src={`${import.meta.env.BASE_URL}${!LIVE || import.meta.env.VITE_AMPS_BRAND === 'neutral' ? 'amps-bolt.svg' : 'operator-logo.svg'}`} alt="" />}
     <span className="brand-lines">
       <span className="brand-l1">
         <span className="brand-name">AMPS</span>
@@ -2773,7 +2773,7 @@ function AboutPage() {
       </div>
 
       {/* the department's standing — its infrastructure, its data. On the live
-          deployment this states Metro Railway's ownership (per the departmental
+          deployment this states the operator's ownership (per the departmental
           order); on the public demo the operator stays unnamed (no consent to name it). */}
       <div className="card about-dept">
         {OPERATOR ? (
@@ -2796,7 +2796,7 @@ function AboutPage() {
           <>
             <h3>In production</h3>
             <p>
-              AMPS runs in production at <b>a metro railway in India</b>, monitoring
+              AMPS runs in production at <b>a pilot site in India</b>, monitoring
               power-supply asset maintenance across its network — the open-source
               framework, adopted as a departmental system.
             </p>
@@ -2880,7 +2880,7 @@ function PrintablesNav({ active }) {
           {!OPERATOR && <>
             <div className="sc-divider" />
             <a className="sc-item" role="menuitem" href="https://metro.binihost.com" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
-              <span className="sc-name">Metro AMPS<span className="sc-live">● LIVE</span></span><span className="sc-sub">in service · Kolkata Metro power-supply ↗</span>
+              <span className="sc-name">Pilot AMPS<span className="sc-live">● LIVE</span></span><span className="sc-sub">in service · pilot power-supply ↗</span>
             </a>
           </>}
         </div>
@@ -4732,7 +4732,7 @@ function useLines() {
   return lines
 }
 
-/* the metro-map ribbon: every line's colour in running order, blended
+/* the transit-map ribbon: every line's colour in running order, blended
    into one continuous band — no joints, colours flow into each other */
 const Ribbon = ({ lines }) => {
   if (!lines?.length) return null

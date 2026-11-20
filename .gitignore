@@ -8,7 +8,7 @@ dist/
 *.local
 .DS_Store
 
-# Metro register data (real asset ids / Drive ids) lives only on the office server, never in the public repo
+# Pilot register data (real asset ids / Drive ids) lives only on the office server, never in the public repo
 backend/app/data/
 
 # BigQuery export dumps (scripts/bq_export.py output), loaded by bigquery/load.sh, never committed
