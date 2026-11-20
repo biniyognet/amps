@@ -162,7 +162,7 @@ Each seat pushes `<seat>/<topic>` to biniyognet/amps; freya reviews, merges, wir
 | 5 F1 similar failures | master-builder | `master-builder/f1-similar` | Similar past failures | ✅ merged 3e61abc · on :8081 · card **live** (opens Pump Motor 1); keyword match until the Gemini key is set |
 | 6 F4 data agent | builder-1 | `builder-1/<topic>` | Estate agent | ⏳ |
 | 7 Metro data import script (prep only, no run) | builder-2 | `b2/<topic>` | — | ⏳ |
-| 8 Gemini in BigQuery + Vertex, ready for billing | master-builder | `master-builder/<topic>` | Fault fields | ⏳ |
+| 8 Gemini in BigQuery + Vertex, ready for billing | master-builder | `master-builder/vertex-bq` | Fault fields | ✅ merged 0551552 · billing day = `bigquery/gemini_go.sh --dry`, then `bigquery/gemini_go.sh` (refuses while billing is off); app: `AMPS_AI_PROVIDER=vertex` + `AMPS_VERTEX_PROJECT` in `deploy/.env`, add `-f deploy/compose.vertex.yaml` · not yet run against GCP · Fault fields flips after `failure_fields` runs |
 | 9 AlloyDB | minion | `minion/<topic>` | Similar (scale-up path) | ⏳ |
 | 10 Cloud Run (billing-gated) | ragnar | `ragnar/<topic>` | MCP (URL) | ⏳ |
 
