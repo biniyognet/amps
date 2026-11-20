@@ -1,6 +1,7 @@
 # AMPS × Startup Buildathon India 2026 — Notes & Checklist
 
-> Kolkata · 20–21 Nov 2026 · submission closes **21 Nov, 09:00** · branch `buildathon`
+> Kolkata · 20–21 Nov 2026 · submission closes **21 Nov, 08:00 IST sharp** (final criteria, Arup 02:55) · branch `buildathon`
+> Final criteria: (1) prototype link **deployed on Google Cloud / Cloud Run / Firebase**, (2) deck in the shared template, (3) demo video as backup.
 > Goal: integrate Google AI + data features into AMPS and make it as powerful as we can.
 > Audited 20 Nov (freya) against `buildathon` 5b40544 and every pushed lane branch. Laptop: JARVIS rebuilt :8081 at 512e0b1, 20 Nov 12:00 (data kept, no `down -v`): app 200, `/api/risk` 200.
 > Refreshed 21 Nov 00:45 (JARVIS): Cloud Run dropped everywhere, F1 = EmbeddingGemma on-prem, deck v12 + PDF re-export, submit checklist.
@@ -15,8 +16,10 @@
 | BigQuery | ✅ data loaded (sandbox) · ⚠️ BQML model eval degenerate · F2 + data agent wait on billing | after submit, only if billing comes back |
 | Demo video (optional) | ⬜ not made | **NEXT after the PPT is final** (Arup 02:30): ≤3 min, public Drive/YouTube link, then fill the deck's video line |
 | Google AI end-to-end (02:40, as Judge on amps-demo) | ✅ Ask AMPS EN 3.3 s + Bengali 2.0 s (Gemini 3.5 Flash-Lite function calling, no fallback) · Snap with photo 2.4 s (vision true: read the panel in the photo) · AI PM plan via Ask 3.1 s (draft, nothing saved) · Similar failures 0.4 s (EmbeddingGemma, top hit 0.78 same seal leak) · Risk 985 assets · MCP tools/list OK | ✅ 02:55 added to the Google deck as slide 7 "AI Test Report" (9/9 pass), on top of Nilanjan's 02:43 slide-1 note; companion PDF refreshed (9 pages). Re-run at 08:00 before close. Deck rule: one slide per upload (co-edited). 03:05 slide 1 team line: "2 co-founders — Arup Biswas (The Builder) & Nilanjan Chakraborty (The Creative)", replacing Nilanjan's tag note |
+| **Prototype on Google (Day 2, 03:40)** | ✅ https://amps-web-1078527281407.asia-south1.run.app · Cloud Run amps-web (nginx) → amps-api (FastAPI, min=max=1, 1Gi) · Cloud SQL `amps-pg` PG16 db-g1-small · Secret Manager (db url, secret, admin pass, Gemini key) · Cloud Build → Artifact Registry `amps/*:d2-7f042f2` · project gen-lang-client-0782327927, asia-south1, billing = Buildathon day 2 credit ($5 cap) · seeded 4 sites / ~1874 assets · verified: /, demo login, Ask, Similar (gemini-embedding-001, embedding mode), MCP tools/list | this link goes on the submission · amps-demo.binihost.com stays the fallback · ⬜ $5 budget alert needs Arup's go · delete Cloud Run job `amps-probe` after judging |
+| Self-hosted vs Google comparison (03:40) | ✅ one-page PDF sent to Arup: same answers on both, same #1 similar match; Google +100–400 ms from Kolkata; shared Gemini key hit its per-minute limit (429) under load tests | Arup decides whether it becomes a deck slide |
 | Demo backup for venue Wi-Fi | ⬜ | laptop :8081 stack is the offline fallback |
-| **Hack2skill submit** | ⬜ | **Arup on the dashboard before 09:00**: prototype link + deck/PDF (+ video if any) |
+| **Hack2skill submit** | ⬜ | **Arup on the dashboard before 08:00**: Google prototype link + deck/PDF (+ video if any) |
 | After judging | GPU free → ragnar resumes user_docs embed · nomic delete last | — |
 
 
@@ -254,7 +257,7 @@ Admin login (Arup, 20 Nov): a simple admin key is fine for the prototype on **lo
 | Local Postgres | `deploy/compose.yaml` (Postgres 16 + API + frontend) on the client's own box or the laptop | ✅ the laptop stack :8081 | — |
 | binihost | k3s + Ensign (`deploy/k8s/`), amps.binihost.com · amps-api · amps-mcp | ✅ live (production) | no buildathon roll |
 | binihost (judges) | ns `amps-judges`: amps-demo.binihost.com, frontend + api + worker + Redis + Postgres/pgvector + Gemma via Ollama (`deploy/k8s/judges/stack.yaml`) | ✅ live | prototype link for the evaluation |
-| Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Gemini / Vertex** for AI, **GKE Autopilot** when an estate outgrows k3s | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 (`deploy/gcp/`, merged fa1a6f6, not run on GCP) · Cloud Run dropped · Cloud SQL not started | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same images on GKE |
+| Google | **Cloud SQL** (Postgres) or **AlloyDB** for the app DB, **BigQuery** for analytics, **Gemini / Vertex** for AI, **GKE Autopilot** when an estate outgrows k3s | BigQuery ✅ `amps_demo` (sandbox, 59-day expiry) · AlloyDB = step 9 (`deploy/gcp/`, merged fa1a6f6, not run on GCP) · **Cloud Run + Cloud SQL ✅ live 21 Nov 03:40** (Day-2 credit; §0) | all billing-gated: a `DATABASE_URL` to Cloud SQL/AlloyDB + Alembic, the same images on GKE |
 
 Rule: nothing is tied to one host. A feature that only works on one of them says so here.
 
@@ -268,6 +271,15 @@ Rule: nothing is tied to one host. A feature that only works on one of them says
 | AI | Gemini (AI Studio now, Vertex on billing) | per call, Flash-Lite | Vertex quotas, same code (`AMPS_AI_PROVIDER`) |
 | Analytics + ML | BigQuery + BQML (sandbox now) | per scan, MB-sized | partitioned tables, scheduled export |
 | IoT (ampsTalk) | HTTP direct, or Pub/Sub push to `/api/talk/telemetry` | per message | Pub/Sub fan-in, no app change |
-| Burst / DR | ~~Cloud Run mirror~~ dropped (§5, 20 Nov final) | — | GKE Autopilot, same images |
+| Burst / DR | Cloud Run + Cloud SQL mirror (revived 21 Nov for the final "deployed on Google" rule) | per request + small SQL | GKE Autopilot, same images |
 
 Pitch line: *runs on a client's own Kubernetes for a fixed cost, uses Google only where Google is best, and moves to fully managed Google with no code change.*
+
+### 8c. Cloud Run deploy log (21 Nov, Day-2 credit)
+
+- Deploy ran from the laptop (gcloud) with `gcp-day2/deploy-api.ps1` + `deploy-web.ps1 -Backend <api url>`; secrets went into Secret Manager via a one-shot script, never into env files or git.
+- `gcloud run deploy --quiet` aborted ("Aborted by user") because it prompted to enable `sql-component.googleapis.com`; enable it first.
+- Similar failures fell back to keyword mode: the first lazy embed sent 178 texts in one Gemini batch → 429. Warmed the vectors in chunks of 10 from a one-off Cloud Run job (178/178), now embedding mode.
+- The pgvector mirror is empty on Cloud SQL, so ranking runs in Python; fine at demo size.
+- Cloud Run uses the Day-2 Gemini key from Secret Manager; the value is in bvault only.
+- Risk: one Gemini key serves both stacks, and the judges' Gemma fallback is weak on tool calls. Keep test load low; re-run E2E gently around 07:00.
