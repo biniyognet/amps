@@ -5127,8 +5127,10 @@ function LoginPage() {
 /* Site switcher for viewers who see every site (no own line): a back chevron to
    the whole estate plus a dropdown of the sites — lives in the totals row. */
 const SITE_KEY = 'amps.site'
-const lastSite = () => { try { return localStorage.getItem(SITE_KEY) || '' } catch { return '' } }
-const keepSite = (v) => { try { localStorage.setItem(SITE_KEY, v || '') } catch { /* private mode */ } }
+// remembered for this tab only: a fresh visit (a judge's first load) always opens
+// on the all-sites dashboard, not whichever site the last visitor picked
+const lastSite = () => { try { return sessionStorage.getItem(SITE_KEY) || '' } catch { return '' } }
+const keepSite = (v) => { try { sessionStorage.setItem(SITE_KEY, v || '') } catch { /* private mode */ } }
 /* where "the dashboard" opens: the last site picked, else every site */
 const dashHref = () => (lastSite() ? `#/line/${encodeURIComponent(lastSite())}` : '#/dash')
 

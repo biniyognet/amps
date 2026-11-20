@@ -180,7 +180,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: nginx
-          image: ghcr.io/biniyognet/amps-frontend:oc11202245-failtab
+          image: ghcr.io/biniyognet/amps-frontend:oc11202256-allsites
           ports: [{containerPort: 80}]
           resources:
             requests: {cpu: 10m, memory: 16Mi}
