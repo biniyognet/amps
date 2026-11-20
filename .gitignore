@@ -14,3 +14,8 @@ backend/app/data/
 # BigQuery export dumps (scripts/bq_export.py output), loaded by bigquery/load.sh, never committed
 bq_out/
 bq_out*.tgz
+
+# Metro export copies for scripts/metro_import.py, never committed
+metro_export*/
+metro_export*.db
+*.dump
