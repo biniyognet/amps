@@ -5232,15 +5232,15 @@ function LineFailures({ name }) {
   return <LiveFailures line={name} />
 }
 
-/* legacy /failures — send the coordinator to their line's board, and anyone
-   line-less (admin) to the first line's board */
+/* /failures — a coordinator goes to their line's board; anyone line-less
+   (admin, the all-sites demo login) sees every line's failures here. Sending
+   them to the first line's board showed an empty "No open failures" page. */
 function FailuresRedirect({ me }) {
-  const lines = useLines()
+  const to = me?.line
   useEffect(() => {
-    const to = me?.line || (lines && lines[0] && lines[0].name)
     if (to) location.replace(`#/line/${encodeURIComponent(to)}/failures`)
-  }, [me, lines])
-  return <p className="dim">Opening the failures board…</p>
+  }, [to])
+  return to ? <p className="dim">Opening the failures board…</p> : <LiveFailures line="" />
 }
 
 /* signed-in home with a remembered site: reopen it */
