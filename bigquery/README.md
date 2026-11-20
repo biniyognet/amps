@@ -12,6 +12,7 @@ Dataset `amps_demo` (project `gen-lang-client-0618042629`), fictional Demo Indus
 ```bash
 DATABASE_URL=... python scripts/bq_export.py --out bq_out   # from a freshly seeded stack (178 failures)
 bigquery/load.sh bq_out
+bigquery/load.sh --check   # read-back only (counts, bands, samples): paste this output
 ```
 
 Expected on the 20 Nov seed: failures 178 · failure_fields 178 · asset_risk 1,874 (red 3, amber 41, green 1,830).
