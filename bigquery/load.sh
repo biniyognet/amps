@@ -11,12 +11,18 @@
 set -euo pipefail
 P=${BQ_PROJECT:-gen-lang-client-0618042629}
 DS=${BQ_DATASET:-amps_demo}
+# BigQuery sandbox (no billing) refuses tables without an expiry under 60 days:
+# default 59 days on the dataset. BQ_EXPIRY_S=0 keeps tables forever (billed project).
+EXP=${BQ_EXPIRY_S:-5097600}
 OUT=${1:-bq_out}
 HERE=$(cd "$(dirname "$0")" && pwd)
 bq="bq --project_id=$P"
 
 if [ "$OUT" != "--check" ]; then
 $bq show "$DS" >/dev/null 2>&1 || $bq mk --location us-central1 --dataset "$DS"
+if [ "$EXP" != 0 ]; then
+  $bq update --default_table_expiration "$EXP" --default_partition_expiration "$EXP" "$DS"
+fi
 for f in "$OUT"/*.json; do
   $bq load --replace --autodetect --source_format=NEWLINE_DELIMITED_JSON "$DS.$(basename "$f" .json)" "$f"
 done

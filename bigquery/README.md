@@ -15,6 +15,8 @@ bigquery/load.sh bq_out
 bigquery/load.sh --check   # read-back only (counts, bands, samples): paste this output
 ```
 
+Sandbox (no billing): `load.sh` sets a 59-day default table + partition expiry on the dataset (the sandbox needs one under 60 days); `BQ_EXPIRY_S=0` skips it on a billed project. The Gemini call in `failure_fields.sql` goes to Vertex AI, which may still need billing on the project.
+
 Expected on the 20 Nov seed: failures 178 · failure_fields 178 · asset_risk 1,874 (red 3, amber 41, green 1,830).
 Pump Motor 1 (CWT-AM-MTR-01) is the top red: past codal life, 4 failures in 12 months, the same seal fault 3 times, open now.
 Power Transformer 1 (EGS-CG-PTR-01) is amber: 2 failures in 12 months (oil temperature, then Buchholz).
