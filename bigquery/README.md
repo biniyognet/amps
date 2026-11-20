@@ -7,6 +7,7 @@ Dataset `amps_demo` (project `gen-lang-client-0618042629`), fictional Demo Indus
 | `failure_fields.sql` | table `failure_fields`: each failure remark (English, हिन्दी, বাংলা, shorthand) → component · symptom · reading · cause · action · language | Gemini in SQL: `AI.GENERATE(…, output_schema => …)`, `gemini-3.5-flash-lite` |
 | `asset_risk.sql` | view `asset_risk`: red / amber / green per asset + up to 3 reasons (`why`) | BigQuery SQL view |
 | `check.sql` | row counts, bands, sample rows | — |
+| `agent/` | F4 estate agent: config to paste + 6 verified questions (`load.sh --agent` reads them back) | BigQuery data agent (Conversational Analytics) |
 | `load.sh` | reloads the 6 tables from `scripts/bq_export.py` output, then runs the three files above | `bq` CLI |
 
 ```bash
