@@ -6,7 +6,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "33KV VCB",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — 33 KV SWITCHGEAR PANEL/VCB MAINTENANCE",
+  "title": "33 KV SWITCHGEAR PANEL/VCB MAINTENANCE",
   "items": [
    {
     "activity": "General visual check",
@@ -93,7 +93,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "750VDC(HSCB)",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — 750VDC SWITCHGEAR (HSCB)  MAINTENANCE",
+  "title": "750VDC SWITCHGEAR (HSCB)  MAINTENANCE",
   "items": [
    {
     "activity": "Visual Check for any loose components",
@@ -136,7 +136,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "SCD",
   "grp": "HT",
-  "title": "METRO RAILWAY, KOLKATA — SCD  MAINTENANCE",
+  "title": "SCD  MAINTENANCE",
   "items": [
    {
     "activity": "Panel inspection Schedule",
@@ -179,7 +179,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "TRANSFORMER",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — AUXILIARY/TRACTION TRANSFORMER  MAINTENANCE",
+  "title": "AUXILIARY/TRACTION TRANSFORMER  MAINTENANCE",
   "items": [
    {
     "activity": "TRACTION/AUXILIARY TRANSFORMER",
@@ -230,7 +230,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "RECTIFIER",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — RECTIFIER MAINTENANCE",
+  "title": "RECTIFIER MAINTENANCE",
   "items": [
    {
     "activity": "Rectifier",
@@ -253,7 +253,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "(IBL&IL) STRINGER SYSTEM",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — CHECKLIST OF STRINGER SYSTEM(IBL) MAINTENANCE & LOAD BREAK SWITCH (IL)",
+  "title": "CHECKLIST OF STRINGER SYSTEM(IBL) MAINTENANCE & LOAD BREAK SWITCH (IL)",
   "items": [
    {
     "activity": "STRINGER SYSTEM(IBL)",
@@ -316,7 +316,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "DISCONNECTOR(IM/IH/ND)",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — DISCONNECTOR MAINTENANCE",
+  "title": "DISCONNECTOR MAINTENANCE",
   "items": [
    {
     "activity": "Visually check the condition of the operated mechanism, the operating linkage and the DISCONNECTOR.",
@@ -355,7 +355,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "DCDB",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — DCDB MAINTENANCE",
+  "title": "DCDB MAINTENANCE",
   "items": [
    {
     "activity": "Make a general visual inspection Check",
@@ -378,7 +378,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "RTU",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — RTU MAINTENANCE",
+  "title": "RTU MAINTENANCE",
   "items": [
    {
     "activity": "Visually check panel for any heat traces or any other abnormality.",
@@ -405,7 +405,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "ETS & BLS",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — ETS & BLS MAINTENANCE",
+  "title": "ETS & BLS MAINTENANCE",
   "items": [
    {
     "activity": "Visually check box for any heat traces or any other abnormality.",
@@ -428,7 +428,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "THIRD RAILSYSTEM",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — THIRD RAIL MAINTENANCE",
+  "title": "THIRD RAIL MAINTENANCE",
   "items": [
    {
     "activity": "Third Rail",
@@ -567,7 +567,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "BUSDUCT",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — BUSDUCT MAINTENANCE",
+  "title": "BUSDUCT MAINTENANCE",
   "items": [
    {
     "activity": "BUSDUCT",
@@ -598,7 +598,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "CABLE-No more as per OEM",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — 33KV & 750VDC CABLE MAINTENANCE",
+  "title": "33KV & 750VDC CABLE MAINTENANCE",
   "items": [
    {
     "activity": "Visual Inspection for any abnormalities/ damages of 33kV cable along the route in TSS/ASS and on viaduct.",
@@ -637,7 +637,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "FOOT PATROLLING",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — FOOT PATROLLING",
+  "title": "FOOT PATROLLING",
   "items": [
    {
     "activity": "Visual inspection for any damage and abnomality",
@@ -712,7 +712,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "BUS RAISER/HBPT",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — BUS RAISER/HBPT PANEL MAINTENANCE",
+  "title": "BUS RAISER/HBPT PANEL MAINTENANCE",
   "items": [
    {
     "activity": "General visual check",
@@ -759,7 +759,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "BET",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — BET MAINTENANCE",
+  "title": "BET MAINTENANCE",
   "items": [
    {
     "activity": "General visual check",
@@ -794,7 +794,7 @@ HT_CHECKSHEET_SEED = [
  {
   "label": "DG 250KVA",
   "grp": "HT",
-  "title": "METRO RAILWAY,KOLKATA — DG 250KVA MAINTENANCE",
+  "title": "DG 250KVA MAINTENANCE",
   "items": [
    {
     "activity": "LUBRICATION SYSTEM",

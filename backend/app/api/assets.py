@@ -45,7 +45,7 @@ class LineOut(BaseModel):
 
 @lines_router.get("", response_model=list[LineOut])
 def list_lines(db: Session = Depends(get_db)):
-    """Every SITE in the location tree (e.g. each metro line), with counts.
+    """Every SITE in the location tree (e.g. each line or plant), with counts.
     Creation order — the first site is the deployment's initiator and leads
     the landing page. Public: this is the walk-up surface."""
     out = []
@@ -254,7 +254,7 @@ def _create_one(db: Session, asset: AssetIn, user) -> Asset:
     site = _line_site(db, asset.line)
     loc = _get_or_create_location(db, asset.location, asset.line)
     # codes are unique PER LOCATION — a depot spans several substations and the
-    # metro reuses generic codes (BAT CH-1, ACDB-1 …) at EACH one, so the same
+    # pilot reuses generic codes (BAT CH-1, ACDB-1 …) at EACH one, so the same
     # code legitimately repeats across stations; only a true same-location
     # duplicate is a conflict.
     if db.scalar(select(Asset).where(Asset.code == asset.code,

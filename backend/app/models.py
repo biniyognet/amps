@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
 
 
 class LocationKind(str, Enum):
-    SITE = "site"          # e.g. a plant, a metro line
+    SITE = "site"          # e.g. a plant, a transit line
     SECTION = "section"    # e.g. a depot, a zone
     STATION = "station"    # e.g. a substation, a bay group
     BAY = "bay"            # smallest addressable slot
@@ -236,7 +236,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(120))
     role: Mapped[UserRole] = mapped_column(default=UserRole.VIEWER)
     password_hash: Mapped[str | None] = mapped_column(String(200))
-    # Access scope: a SITE location (e.g. a metro line). NULL = all sites (HQ/admin).
+    # Access scope: a SITE location (e.g. a transit line). NULL = all sites (HQ/admin).
     line_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"))
     # optional narrower scope WITHIN the line: a depot code (e.g. SHY, KHG). When
     # set, the user only sees that depot's assets/logs; NULL = the whole line.
