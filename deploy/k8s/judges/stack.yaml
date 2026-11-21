@@ -187,7 +187,7 @@ spec:
       imagePullSecrets: [{name: binihost-registry-secret}]
       containers:
         - name: nginx
-          image: ghcr.io/biniyognet/amps-frontend:oc11210522-thanks
+          image: ghcr.io/biniyognet/amps-frontend:oc11210858-herovid3
           ports: [{containerPort: 80}]
           resources:
             requests: {cpu: 10m, memory: 16Mi}

@@ -4884,14 +4884,43 @@ const GEM_CAPS = [
   ['Multilingual', 'Notes and questions in English, हिन्दी or বাংলা; answers in the same language.'],
 ]
 
+/* v89 — landing redesign: full-bleed muted film hero, the film with sound in a
+   modal, live numbers on glass, then steps, a Gemini bento and the modules. */
+function FilmModal({ src, onClose }) {
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', k)
+    const o = document.body.style.overflow; document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', k); document.body.style.overflow = o }
+  }, [onClose])
+  return (
+    <div className="lv-modal" role="dialog" aria-modal="true" aria-label="AMPS film" onClick={onClose}>
+      <div className="lv-modal-box" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="lv-modal-x" onClick={onClose} aria-label="Close">✕</button>
+        <video src={src} controls autoPlay playsInline preload="auto" />
+      </div>
+    </div>
+  )
+}
+
 function Landing() {
   if (OPERATOR) return <OperatorLanding />
   const lines = useLines()
-  const pitch = `${import.meta.env.BASE_URL}pitch/`
+  const base = import.meta.env.BASE_URL
   const ask = (q) => window.dispatchEvent(new CustomEvent('amps:ask', { detail: { q } }))
   const { me } = useMe()
   const signedIn = LIVE && me?.auth_enabled && me.username !== 'viewer'
   const { net, loading } = useNetworkGlance()
+  const [film, setFilm] = useState(false)
+  const [solid, setSolid] = useState(false)
+  const vid = useRef(null)
+  useEffect(() => {
+    const s = () => setSolid(window.scrollY > 40)
+    window.addEventListener('scroll', s, { passive: true }); s()
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) vid.current?.pause()
+    return () => window.removeEventListener('scroll', s)
+  }, [])
+  useEffect(() => { if (!vid.current) return; film ? vid.current.pause() : vid.current.play?.().catch(() => {}) }, [film])
   const nf = (v) => (v == null || loading ? '—' : v.toLocaleString())
   const stats = [
     [lines ? lines.length : '—', W.lines, ''],
@@ -4901,127 +4930,129 @@ function Landing() {
     [nf(net.dueSoon), 'due in 7 days', net.dueSoon ? 'warn' : ''],
   ]
   return (
-    <div className="lx">
-      <header className="lx-bar">
-        <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
-        <nav className="lx-nav">
+    <div className="lv">
+      <header className={solid ? 'lv-bar solid' : 'lv-bar'}>
+        <a className="lv-brand" href="#/"><img src={`${base}amps-bolt.svg`} alt="" />AMPS<span>{ORG}</span></a>
+        <nav className="lv-nav">
           <a href="#/ai">✦ AI</a>
           <a href="#/guide">Pitch</a>
           <a href={dashHref()}>Dashboard</a>
-          {signedIn ? <a className="lx-signin" href="#/">Open app →</a> : <a className="lx-signin" href="#/login">Sign in</a>}
+          {signedIn ? <a className="lv-signin" href="#/">Open app →</a> : <a className="lv-signin" href="#/login">Sign in</a>}
         </nav>
       </header>
-      <section className="lx-hero" aria-label="AMPS">
-        <div className={SNAP_CLIP ? 'lx-main' : 'lx-main no-clip'}>
-        <div className="lx-copy">
-          <div className="lx-tags">
-            <span className="lx-live"><i />Live demo · synthetic data</span>
-            <span className="lx-gem"><GemStar size={14} />Built on Google Gemini</span>
+
+      <section className="lv-hero" aria-label="AMPS">
+        <video ref={vid} className="lv-hero-vid" src={`${base}hero/amps-film-muted.mp4`} poster={`${base}hero/amps-film-poster.jpg`}
+               autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
+        <div className="lv-hero-shade" />
+        <div className="lv-hero-in">
+          <div className="lv-tags">
+            <span className="lv-live"><i />Live demo · synthetic data</span>
+            <span className="lv-gem"><GemStar size={14} />Built on Google Gemini</span>
           </div>
-          <h1>A failure nobody logs comes back as downtime.</h1>
-          <p>Scan the tag, snap the fault, and Google Gemini drafts the report and job card. A person checks and submits.
-            Every {W.line}'s maintenance on one record.</p>
-          <div className="lx-cta">
-            <a className="lx-btn pri" href={dashHref()}>Open the dashboard →</a>
-            <a className="lx-btn" href={`#/snap/${SNAP_DEMO}`}>Try Snap &amp; Report</a>
+          <h1>A failure nobody logs{' '}<br />comes back as <em>downtime.</em></h1>
+          <p>Scan the tag, snap the fault, and Google Gemini drafts the failure report and job card.
+            A person checks and submits. Every {W.line}'s maintenance on one record.</p>
+          <div className="lv-cta">
+            <a className="lv-btn pri" href={dashHref()}>Open the dashboard →</a>
+            <a className="lv-btn glass" href={`#/snap/${SNAP_DEMO}`}>Try Snap &amp; Report</a>
+            <button type="button" className="lv-play" onClick={() => setFilm(true)}>
+              <span aria-hidden="true">▶</span>Watch the film <small>3 min · sound on</small></button>
           </div>
         </div>
-        {SNAP_CLIP && <figure className="lx-stage">
-          <div className="lx-win">
-            <video className="lx-vid" src={`${pitch}snap-clip.mp4?v=1119`} poster={`${pitch}snap-poster.jpg?v=1119`}
-                   autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
-          </div>
-          <figcaption className="lx-cap">A real run on this demo · Gemini Flash · 30 s</figcaption>
-        </figure>}
-        </div>
-        <div className="lx-rib"><Ribbon lines={lines} /></div>
+        <dl className="lv-stats" aria-label="Live from this demo">
+          {stats.map(([v, l, c]) => <div key={l} className={c}><dd>{v}</dd><dt>{l}</dt></div>)}
+        </dl>
       </section>
-      <section className="lx-stats" aria-label="Live numbers">
-        <div className="lx-wrap">
-          <span className="lx-kick">Live from this demo</span>
-          <dl>
-            {stats.map(([v, l, c]) => <div key={l} className={c}><dt>{l}</dt><dd>{v}</dd></div>)}
-          </dl>
-        </div>
-      </section>
-      <section className="lx-sec lx-light" aria-labelledby="lx-how">
-        <div className="lx-wrap">
-          <header className="lx-head">
-            <span className="lx-kick">How it works</span>
-            <h2 id="lx-how">From the fault on the floor to a job card, in under a minute</h2>
+
+      <section className="lv-sec" aria-labelledby="lv-how">
+        <div className="lv-wrap">
+          <header className="lv-head">
+            <span className="lv-kick">How it works</span>
+            <h2 id="lv-how">From the fault on the floor to a job card, in under a minute</h2>
             <p>No app to install. The fitter's phone camera is the whole kit.</p>
           </header>
-          <ol className="lx-steps">
-            <li><LxIcon d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2M18 14v2M14 18h2v2M20 18v2" />
+          <ol className="lv-steps">
+            <li><span className="lv-n">1</span><LxIcon d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2M18 14v2M14 18h2v2M20 18v2" />
               <b>Scan</b><span>The QR tag on the asset opens its full record: plan, history, open failures. No sign-in.</span></li>
-            <li><LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+            <li><span className="lv-n">2</span><LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
               <b>Snap</b><span>A photo and a rough note, typed or spoken, in English, हिन्दी or বাংলা.</span></li>
-            <li><LxIcon d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
+            <li><span className="lv-n">3</span><LxIcon d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
               <b>Gemini drafts</b><span>The failure report and job card come back filled in. A person checks and submits.</span></li>
           </ol>
-          <a className="lx-link" href={`#/snap/${SNAP_DEMO}`}>Try it on HSCB Panel 1 →</a>
+          <a className="lv-link" href={`#/snap/${SNAP_DEMO}`}>Try it on HSCB Panel 1 →</a>
         </div>
       </section>
-      <section className="lx-sec lx-dark" aria-labelledby="lx-ai">
-        <div className="lx-wrap">
-          <header className="lx-head">
-            <span className="lx-kick lx-kick-gem"><GemStar size={14} />Built on Google AI</span>
-            <h2 id="lx-ai">Google Gemini does the paperwork. People make the calls.</h2>
+
+      <section className="lv-sec lv-ai" aria-labelledby="lv-ai">
+        <div className="lv-wrap">
+          <header className="lv-head">
+            <span className="lv-kick"><GemStar size={14} />Built on Google AI</span>
+            <h2 id="lv-ai">Google Gemini does the paperwork. People make the calls.</h2>
             <p>Every answer is looked up in the register, PM schedule and failure log. Nothing is saved until someone approves it.</p>
           </header>
-          <div className="lx-cards">
-            <a className="lx-card" href={`#/snap/${SNAP_DEMO}`}>
-              <LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
-              <b>Snap &amp; Report</b><span>Photo plus note in, a drafted failure report and job card out, marked AI-drafted.</span><em>Open Snap →</em></a>
-            <button type="button" className="lx-card" onClick={() => ask('Which assets are overdue for maintenance?')}>
+          <div className="lv-bento">
+            <a className="lv-tile big" href={`#/snap/${SNAP_DEMO}`}>
+              <img src={`${base}hero/amps-film-poster.jpg`} alt="" loading="lazy" />
+              <div><LxIcon d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+                <b>Snap &amp; Report</b><span>Photo plus note in, a drafted failure report and job card out, marked AI-drafted.</span><em>Open Snap →</em></div>
+            </a>
+            <div className="lv-tile ask">
               <LxIcon d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5" />
-              <b>Ask AMPS</b><span>Plain-language questions over the live records, with the sources it looked up shown.</span><em>Ask a question →</em></button>
-            <a className="lx-card" href="#/guide">
+              <b>Ask AMPS</b><span>Plain-language questions over the live records, with the sources shown.</span>
+              <div className="lv-chips">
+                {['Which assets are overdue for maintenance?', 'Show open failures by site', 'What failed most this month?'].map((q) =>
+                  <button type="button" key={q} onClick={() => ask(q)}>{q}</button>)}
+              </div>
+            </div>
+            <a className="lv-tile plan" href="#/guide">
               <LxIcon d="M5 3h10l4 4v14H5zM9 11h6M9 15h6M9 7h3" />
               <b>AI maintenance plans</b><span>Gemini drafts the PM plan for a {W.line}; a supervisor approves each change.</span><em>See how →</em></a>
+            <ol className="lv-tile lv-flow" aria-label="How a Snap travels">
+              <li><small>Phone</small><b>Photo + note</b></li>
+              <li className="gem"><small><GemStar size={12} /> Google AI</small><b>gemini-3.5-flash-lite</b></li>
+              <li><small>Schema JSON</small><b>Report + job card</b></li>
+              <li><small>Person</small><b>Checks, submits</b></li>
+            </ol>
+            {GEM_CAPS.map(([t, d]) => <div key={t} className="lv-tile cap"><b>{t}</b><span>{d}</span></div>)}
           </div>
-          <ol className="lx-flow" aria-label="How a Snap travels">
-            <li><small>Phone</small><b>Photo + rough note</b></li>
-            <li className="gem"><small><GemStar size={12} /> Google AI</small><b>gemini-3.5-flash-lite</b></li>
-            <li><small>Schema JSON</small><b>Report + job card</b></li>
-            <li><small>Person</small><b>Checks and submits</b></li>
-          </ol>
-          <dl className="lx-gcaps">
-            {GEM_CAPS.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}
-          </dl>
         </div>
       </section>
-      <section className="lx-sec lx-light" aria-labelledby="lx-cap">
-        <div className="lx-wrap">
-          <header className="lx-head">
-            <span className="lx-kick">One record per asset</span>
-            <h2 id="lx-cap">Everything maintenance needs, in one place</h2>
+
+      <section className="lv-sec" aria-labelledby="lv-cap">
+        <div className="lv-wrap">
+          <header className="lv-head">
+            <span className="lv-kick">One record per asset</span>
+            <h2 id="lv-cap">Everything maintenance needs, in one place</h2>
           </header>
-          <div className="lx-grid">
+          <div className="lv-grid">
             {CAPS.map(([href, t, d, ic]) => (
-              <a key={href} href={href}><LxIcon d={ic} /><b>{t}</b><span>{d}</span></a>
+              <a key={href} href={href}><LxIcon d={ic} /><b>{t}</b><span>{d}</span><em aria-hidden="true">→</em></a>
             ))}
           </div>
         </div>
       </section>
-      <section className="lx-band" aria-label="Get started">
-        <div className="lx-wrap">
+
+      <section className="lv-band" aria-label="Get started">
+        <div className="lv-wrap">
           <div><h2>See every {W.line} at a glance</h2><p>Open the live demo. Synthetic data, nothing to set up.</p></div>
-          <div className="lx-cta">
-            <a className="lx-btn pri" href={dashHref()}>Open the dashboard →</a>
-            <a className="lx-btn" href="#/guide">Read the pitch</a>
+          <div className="lv-cta">
+            <a className="lv-btn pri" href={dashHref()}>Open the dashboard →</a>
+            <button type="button" className="lv-btn ghost" onClick={() => setFilm(true)}>▶ Watch the film</button>
           </div>
         </div>
       </section>
-      <footer className="lx-foot">
-        <div className="lx-wrap">
-          <a className="lx-brand" href="#/"><img src={`${import.meta.env.BASE_URL}amps-bolt.svg`} alt="" />AMPS</a>
+
+      <footer className="lv-foot">
+        <div className="lv-wrap">
+          <a className="lv-brand" href="#/"><img src={`${base}amps-bolt.svg`} alt="" />AMPS</a>
           <nav aria-label="Footer">
             <a href={dashHref()}>Dashboard</a><a href="#/sites">{W.Network}</a><a href="#/guide">Pitch</a><a href="#/about">About</a>{signedIn ? <a href="#/">Open app</a> : <a href="#/login">Sign in</a>}
           </nav>
           <small><AmpsLink /> · MIT © 2026 <SignatureMark /></small>
         </div>
       </footer>
+      {film && <FilmModal src={`${base}hero/amps-film.mp4`} onClose={() => setFilm(false)} />}
     </div>
   )
 }
